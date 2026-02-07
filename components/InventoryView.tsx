@@ -60,8 +60,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({ inventory, locations, sub
   }, [newItem.itemName, products]);
 
   const availableSubLocations = useMemo(() => {
-    return subLocations.filter(s => s.locationId === newItem.locationId);
-  }, [subLocations, newItem.locationId]);
+    return subLocations.filter(s => s.locationId === (newItem.locationId || activeLocationId));
+  }, [subLocations, newItem.locationId, activeLocationId]);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,7 +205,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({ inventory, locations, sub
                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
                       {locations.find(l => l.id === item.locationId)?.name || 'Unknown'} 
                       {item.subLocation && <span className="text-indigo-400"> • {item.subLocation}</span>}
-                      <span className="text-slate-200 font-bold ml-1 text-[8px]">[{new Date(item.updatedAt).toLocaleDateString()}]</span>
                    </p>
                 </div>
               </div>
@@ -230,72 +229,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({ inventory, locations, sub
           </div>
         )}
       </div>
-
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-             <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-                <h3 className="text-xl font-black text-slate-900">Bulk Stock Import</h3>
-                <button onClick={() => setIsImportModalOpen(false)} className="text-slate-300 p-2"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
-             </div>
-             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {importStep === 'upload' && (
-                  <div onClick={() => fileInputRef.current?.click()} className="h-64 border-4 border-dashed border-slate-100 bg-slate-50 rounded-[40px] flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors">
-                     <div className="bg-white p-5 rounded-3xl shadow-sm mb-4 text-indigo-500"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg></div>
-                     <p className="text-slate-900 font-black uppercase tracking-widest text-xs">Drop CSV here or Tap to Upload</p>
-                     <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileChange} />
-                  </div>
-                )}
-                {importStep === 'map' && (
-                  <div className="space-y-6">
-                    <div className="bg-indigo-50 p-4 rounded-3xl border border-indigo-100"><p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest leading-relaxed">Step 2: Map your CSV columns to app fields.</p></div>
-                    <div className="overflow-x-auto border border-slate-100 rounded-3xl">
-                      <table className="w-full text-left">
-                        <thead className="bg-slate-50">
-                          <tr>
-                            {csvHeaders.map((header, idx) => (
-                              <th key={idx} className="p-4">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 truncate max-w-[120px]">{header}</p>
-                                <select className="w-full bg-white border border-slate-200 rounded-lg p-2 text-[10px] font-bold text-indigo-600 appearance-none" value={mappings[idx]} onChange={(e) => setMappings({...mappings, [idx]: e.target.value as MappingField})}>
-                                  <option value="ignore">Skip Column</option>
-                                  <option value="itemName">Item Name</option>
-                                  <option value="category">Category</option>
-                                  <option value="variety">Variety</option>
-                                  <option value="subLocation">Shelf/Shelf Loc</option>
-                                  <option value="quantity">Quantity</option>
-                                  <option value="unit">Unit</option>
-                                  <option value="locationId">Storage Location</option>
-                                </select>
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>{csvRows.slice(0, 3).map((row, ridx) => (<tr key={ridx} className="border-t border-slate-50">{row.map((cell, cidx) => (<td key={cidx} className="p-4 text-[10px] text-slate-400 truncate max-w-[120px]">{cell}</td>))}</tr>))}</tbody>
-                      </table>
-                    </div>
-                    <button onClick={() => setImportStep('review')} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase tracking-widest">Review Data</button>
-                  </div>
-                )}
-                {importStep === 'review' && (
-                   <div className="space-y-6">
-                      <div className="flex items-center justify-between"><h4 className="text-sm font-black text-slate-800 uppercase">Confirm {finalItemsToImport.length} Items</h4><button onClick={() => setImportStep('map')} className="text-[10px] font-black text-indigo-600 uppercase">Back</button></div>
-                      <div className="space-y-2">
-                        {finalItemsToImport.slice(0, 10).map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                             <div><p className="text-[11px] font-black text-slate-800 uppercase leading-none">{item.itemName}</p>
-                                <div className="flex space-x-2 mt-1"><span className="text-[8px] font-black text-indigo-500 uppercase">{item.category}</span><span className="text-[8px] font-bold text-slate-400 uppercase">{locations.find(l => l.id === item.locationId)?.name}</span>{item.subLocation && <span className="text-[8px] font-bold text-indigo-300 uppercase italic">@ {item.subLocation}</span>}</div>
-                             </div>
-                             <p className="text-xs font-black text-slate-900">{item.quantity} <span className="text-[9px] uppercase">{item.unit}</span></p>
-                          </div>
-                        ))}
-                      </div>
-                      <button onClick={executeImport} className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl uppercase tracking-widest shadow-lg shadow-emerald-100">Finish & Sync Stock</button>
-                   </div>
-                )}
-             </div>
-          </div>
-        </div>
-      )}
 
       {isAdding && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4">

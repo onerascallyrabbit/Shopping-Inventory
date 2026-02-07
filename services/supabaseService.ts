@@ -1,9 +1,9 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
+import { InventoryItem, SubLocation } from '../types';
 
-import { createClient } from '@supabase/supabase-js';
-import { InventoryItem, StorageLocation, SubLocation } from '../types';
-
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+// Safely access environment variables
+const supabaseUrl = (typeof process !== 'undefined' && process.env.SUPABASE_URL) || '';
+const supabaseAnonKey = (typeof process !== 'undefined' && process.env.SUPABASE_ANON_KEY) || '';
 
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 

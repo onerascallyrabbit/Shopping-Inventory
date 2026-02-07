@@ -1,0 +1,9 @@
+
+{
+  "name": "Aisle Be Back: Smart Shopping Tracker",
+  "description": "A mobile-first shopping companion to track price history, compare values across stores, and analyze price tags using AI.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

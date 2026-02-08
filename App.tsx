@@ -34,7 +34,7 @@ const DEFAULT_STORAGE: StorageLocation[] = [
   { id: '3', name: 'Freezer #1' }
 ];
 
-const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
+const DiagnosticBanner: React.FC<{ user?: any, onShowAuth: () => void }> = ({ user, onShowAuth }) => {
   const hasEnv = typeof process !== 'undefined' && process.env;
   const hasApiKey = !!(hasEnv && process.env.API_KEY);
   const hasSupabase = !!supabase;
@@ -53,7 +53,6 @@ const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
     }
   };
 
-  // If everything is fine, only show if specifically toggled or error occurs
   const isHealthy = hasApiKey && hasSupabase && user && dbStatus === 'success';
   if (isHealthy && !show) return null;
 
@@ -66,8 +65,16 @@ const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
       
       <div className="flex flex-wrap justify-center gap-1.5">
         {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase tracking-wider">AI Service Offline</span>}
-        {!hasSupabase && <span className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase tracking-wider">Cloud Unlinked</span>}
-        {hasSupabase && !user && <span className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-indigo-400 uppercase tracking-wider">Sign-in Required</span>}
+        {!hasSupabase && (
+          <button onClick={onShowAuth} className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase tracking-wider hover:bg-amber-500/20 transition-colors">
+            Cloud Unlinked (Click to Fix)
+          </button>
+        )}
+        {hasSupabase && !user && (
+          <button onClick={onShowAuth} className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-indigo-400 uppercase tracking-wider">
+            Sign-in Required
+          </button>
+        )}
         {hasSupabase && user && (
           <button 
             onClick={checkConnection}
@@ -85,7 +92,6 @@ const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
       {dbStatus === 'error' && (
         <div className="max-w-xs bg-red-500/5 border border-red-500/10 rounded-lg p-2 mt-1">
           <p className="text-[9px] font-medium text-red-400/80 leading-relaxed italic">DB Error: {dbError}</p>
-          <p className="text-[8px] font-black text-red-300/40 uppercase mt-1 tracking-widest">Ensure you ran the SQL script in Supabase Editor</p>
         </div>
       )}
 
@@ -96,6 +102,7 @@ const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
 
 const App: React.FC = () => {
   const [user, setUser] = useState<any>(null);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
@@ -137,21 +144,12 @@ const App: React.FC = () => {
           setInventory(mapped);
         }
         
-        // Map Storage Locations (Ensure structure matches)
         if (data.storageLocations.length) {
-          setStorageLocations(data.storageLocations.map(s => ({
-            id: s.id,
-            name: s.name
-          })));
+          setStorageLocations(data.storageLocations.map(s => ({ id: s.id, name: s.name })));
         }
 
-        // Map Sub Locations (DB columns are snake_case)
         if (data.subLocations.length) {
-          setSubLocations(data.subLocations.map(s => ({
-            id: s.id,
-            locationId: s.location_id,
-            name: s.name
-          })));
+          setSubLocations(data.subLocations.map(s => ({ id: s.id, locationId: s.location_id, name: s.name })));
         }
       }
     };
@@ -303,10 +301,7 @@ const App: React.FC = () => {
   const handleUpdateStorageLocations = (newLocs: StorageLocation[]) => {
     const currentIds = storageLocations.map(s => s.id);
     const newIds = newLocs.map(s => s.id);
-    
     setStorageLocations(newLocs);
-    
-    // Sync to cloud
     newLocs.forEach(loc => syncStorageLocation(loc));
     currentIds.forEach(id => {
       if (!newIds.includes(id)) deleteStorageLocation(id);
@@ -316,9 +311,7 @@ const App: React.FC = () => {
   const handleUpdateSubLocations = (newSubs: SubLocation[]) => {
     const currentIds = subLocations.map(s => s.id);
     const newIds = newSubs.map(s => s.id);
-
     setSubLocations(newSubs);
-    
     newSubs.forEach(s => syncSubLocation(s));
     currentIds.forEach(id => {
       if (!newIds.includes(id)) deleteSubLocation(id);
@@ -340,9 +333,7 @@ const App: React.FC = () => {
   };
 
   const handleToggleListItem = (id: string) => {
-    setShoppingList(prev => prev.map(item => 
-      item.id === id ? { ...item, isCompleted: !item.isCompleted } : item
-    ));
+    setShoppingList(prev => prev.map(item => item.id === id ? { ...item, isCompleted: !item.isCompleted } : item));
   };
 
   const handleRemoveListItem = (id: string) => {
@@ -350,75 +341,73 @@ const App: React.FC = () => {
   };
 
   const handleUpdateListItem = (id: string, updates: Partial<ShoppingItem>) => {
-    setShoppingList(prev => prev.map(item => 
-      item.id === id ? { ...item, ...updates } : item
-    ));
+    setShoppingList(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
   };
 
   const handleAddPriceRecord = (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string) => {
-    const newRecord: PriceRecord = {
-      ...record,
-      id: crypto.randomUUID(),
-      date: new Date().toISOString()
-    };
+    const newRecord: PriceRecord = { ...record, id: crypto.randomUUID(), date: new Date().toISOString() };
     setProducts(prev => {
-      const existingIdx = prev.findIndex(p => 
-        (barcode && p.barcode === barcode) || 
-        (p.itemName.toLowerCase() === itemName.toLowerCase() && p.variety?.toLowerCase() === (variety || '').toLowerCase())
-      );
+      const existingIdx = prev.findIndex(p => (barcode && p.barcode === barcode) || (p.itemName.toLowerCase() === itemName.toLowerCase() && p.variety?.toLowerCase() === (variety || '').toLowerCase()));
       if (existingIdx > -1) {
         const updated = [...prev];
-        updated[existingIdx] = {
-          ...updated[existingIdx],
-          history: [newRecord, ...updated[existingIdx].history],
-          brand: brand || updated[existingIdx].brand,
-          barcode: barcode || updated[existingIdx].barcode,
-          category: category
-        };
+        updated[existingIdx] = { ...updated[existingIdx], history: [newRecord, ...updated[existingIdx].history], brand: brand || updated[existingIdx].brand, barcode: barcode || updated[existingIdx].barcode, category: category };
         return updated;
       }
-      const newProduct: Product = {
-        id: crypto.randomUUID(),
-        category,
-        itemName,
-        variety,
-        brand,
-        barcode,
-        history: [newRecord]
-      };
+      const newProduct: Product = { id: crypto.randomUUID(), category, itemName, variety, brand, barcode, history: [newRecord] };
       return [...prev, newProduct];
     });
     setLastUsedStore(record.store);
     setIsAddModalOpen(false);
   };
 
-  if (supabase && !user) {
+  // AUTH GATE: Show if no user and not explicitly in offline mode
+  if (!user && !isOfflineMode) {
     return (
-      <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center">
-        <div className="bg-indigo-600 p-6 rounded-[40px] shadow-2xl shadow-indigo-200 mb-8">
+      <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center animate-in fade-in duration-500">
+        <div className="bg-indigo-600 p-6 rounded-[40px] shadow-2xl shadow-indigo-200 mb-8 transform hover:scale-105 transition-transform cursor-pointer">
           <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
         <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Aisle Be Back</h1>
-        <p className="text-slate-400 font-medium mb-12 max-w-[280px] leading-relaxed">Securely track and compare prices. Sign in to sync your inventory across all your devices.</p>
-        <button 
-          onClick={signInWithGoogle}
-          className="w-full max-w-xs flex items-center justify-center space-x-3 bg-slate-900 text-white font-black py-5 rounded-[24px] shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs"
-        >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.908 3.152-1.928 4.176-1.248 1.248-3.216 2.592-6.528 2.592-5.32 0-9.28-4.32-9.28-9.64s3.96-9.64 9.28-9.64c2.88 0 5.112 1.136 6.64 2.56l2.312-2.312C18.84 1.288 15.864 0 12 0 5.48 0 0 5.48 0 12s5.48 12 12 12c3.544 0 6.232-1.176 8.336-3.32 2.16-2.16 2.848-5.216 2.848-7.68 0-.744-.064-1.44-.192-2.08h-10.512z"/>
-          </svg>
-          <span>Sign In with Google</span>
-        </button>
-        <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-widest">Environment: {supabase ? 'Linked' : 'Standalone'}</p>
+        <p className="text-slate-400 font-medium mb-12 max-w-[280px] leading-relaxed">Securely track and compare prices. Sign in to sync your data across all your devices.</p>
+        
+        <div className="w-full max-w-xs space-y-4">
+          <button 
+            disabled={!supabase}
+            onClick={signInWithGoogle}
+            className={`w-full flex items-center justify-center space-x-3 text-white font-black py-5 rounded-[24px] shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs ${supabase ? 'bg-slate-900 hover:bg-black' : 'bg-slate-300 cursor-not-allowed'}`}
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.908 3.152-1.928 4.176-1.248 1.248-3.216 2.592-6.528 2.592-5.32 0-9.28-4.32-9.28-9.64s3.96-9.64 9.28-9.64c2.88 0 5.112 1.136 6.64 2.56l2.312-2.312C18.84 1.288 15.864 0 12 0 5.48 0 0 5.48 0 12s5.48 12 12 12c3.544 0 6.232-1.176 8.336-3.32 2.16-2.16 2.848-5.216 2.848-7.68 0-.744-.064-1.44-.192-2.08h-10.512z"/>
+            </svg>
+            <span>{supabase ? 'Sign In with Google' : 'Cloud Setup Required'}</span>
+          </button>
+
+          {!supabase && (
+             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 animate-in slide-in-from-top-2">
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest leading-relaxed">
+                   Link not found: Add SUPABASE_URL and SUPABASE_ANON_KEY to Vercel environment variables and redeploy.
+                </p>
+             </div>
+          )}
+
+          <button 
+            onClick={() => setIsOfflineMode(true)}
+            className="w-full text-slate-400 font-black py-4 uppercase tracking-[0.2em] text-[10px] hover:text-indigo-600 transition-colors"
+          >
+            Continue Locally
+          </button>
+        </div>
+        
+        <p className="mt-12 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Build 2.0.4 • {supabase ? 'Sync Enabled' : 'Standalone Mode'}</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
-      <DiagnosticBanner user={user} />
+      <DiagnosticBanner user={user} onShowAuth={() => setIsOfflineMode(false)} />
       <Header user={user} onSettingsClick={() => setActiveTab('settings')} />
       <main className="flex-1 overflow-y-auto pb-32 px-4 pt-6">
         {activeTab === 'dashboard' && <Dashboard products={products} onAddToList={handleAddToList} />}

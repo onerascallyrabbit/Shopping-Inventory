@@ -1,13 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation } from '../types';
 
-// Utility for safe environment variable access
+// Robust environment variable access including standard and Next.js prefixes
 const getEnv = (key: string): string => {
   try {
-    return (typeof process !== 'undefined' && process.env && process.env[key]) || '';
-  } catch {
-    return '';
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env[key] || process.env[`NEXT_PUBLIC_${key}`] || '';
+    }
+  } catch (e) {
+    console.warn(`Environment access error for ${key}:`, e);
   }
+  return '';
 };
 
 const supabaseUrl = getEnv('SUPABASE_URL');
@@ -18,9 +21,9 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   : null;
 
 if (!supabase) {
-  console.warn("Supabase Sync: Disabled (Missing configuration). Application will function in offline mode.");
+  console.warn("Supabase Sync: Disabled. Check SUPABASE_URL and SUPABASE_ANON_KEY.");
 } else {
-  console.log("Supabase Sync: Initialized.");
+  console.log("Supabase Sync: Online.");
 }
 
 export const syncInventoryItem = async (item: InventoryItem) => {

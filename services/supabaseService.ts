@@ -29,6 +29,29 @@ if (!supabase) {
 }
 
 /**
+ * HEALTH CHECK
+ * Explicitly tests if we can read from the tables.
+ */
+export const testDatabaseConnection = async () => {
+  if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No user session' };
+
+    // Try to read a single row from storage_locations
+    const { error } = await supabase.from('storage_locations').select('id').limit(1);
+    
+    if (error) {
+      return { success: false, error: `${error.code}: ${error.message}` };
+    }
+    
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * AUTH FUNCTIONS
  */
 export const signInWithGoogle = async () => {

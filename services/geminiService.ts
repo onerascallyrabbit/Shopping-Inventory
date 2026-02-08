@@ -1,21 +1,21 @@
 import { GoogleGenAI, Type } from "https://esm.sh/@google/genai@1.39.0";
 
-// Utility for safe environment variable access
+// Robust environment variable access
 const getEnv = (key: string): string => {
   try {
-    return (typeof process !== 'undefined' && process.env && process.env[key]) || '';
-  } catch {
-    return '';
-  }
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env[key] || '';
+    }
+  } catch (e) {}
+  return '';
 };
 
 const apiKey = getEnv('API_KEY');
 
-// Initialize AI lazily to avoid immediate failure if API key is temporarily missing
 let aiInstance: GoogleGenAI | null = null;
 const getAI = () => {
   if (!apiKey) {
-    console.warn("Gemini Service: API_KEY missing. AI features will be disabled.");
+    console.warn("Gemini Service: API_KEY missing.");
     return null;
   }
   if (!aiInstance) aiInstance = new GoogleGenAI({ apiKey });
@@ -34,9 +34,6 @@ export interface AnalyzedPrice {
   unit: string;
 }
 
-/**
- * Uses Google Maps tool to search for store details.
- */
 export const searchStoreDetails = async (storeQuery: string, locationContext: string) => {
   const ai = getAI();
   if (!ai) return null;
@@ -67,9 +64,6 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
   }
 };
 
-/**
- * Uses Gemini with Google Search to find current market prices or details for a specific item.
- */
 export const lookupMarketDetails = async (itemName: string, variety?: string) => {
   const ai = getAI();
   if (!ai) return null;
@@ -93,16 +87,13 @@ export const lookupMarketDetails = async (itemName: string, variety?: string) =>
   }
 };
 
-/**
- * Analyzes an image to extract product details in a hierarchy: Category | Item | Variety.
- */
 export const identifyProductFromImage = async (base64Image: string, mode: 'barcode' | 'product' | 'tag' = 'tag'): Promise<AnalyzedPrice | null> => {
   const ai = getAI();
   if (!ai) return null;
   const prompts = {
-    barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category (e.g., Produce), Item Name (e.g., Onion), and Variety/Sub-item (e.g., Yellow).",
-    product: "This is a photo of a product. Identify the hierarchy: Category (e.g., Dairy), Item Name (e.g., Milk), and Variety/Sub-item (e.g., 2% Reduced Fat). Also find the brand.",
-    tag: "This is a photo of a price tag or shelf label. Extract the hierarchy: Category (e.g., Produce), Item Name (e.g., Onion), and Variety/Sub-item (e.g., Yellow). Also extract total price, quantity, unit, and store name."
+    barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category, Item Name, and Variety.",
+    product: "This is a photo of a product. Identify the hierarchy: Category, Item Name, and Variety. Also find the brand.",
+    tag: "This is a photo of a price tag. Extract hierarchy: Category, Item Name, and Variety. Also extract total price, quantity, unit, and store name."
   };
 
   try {
@@ -126,11 +117,11 @@ export const identifyProductFromImage = async (base64Image: string, mode: 'barco
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            category: { type: Type.STRING, description: "Broad group like Produce, Dairy, Meat, Pantry" },
-            itemName: { type: Type.STRING, description: "The specific product, e.g., Onion, Milk, Bread" },
-            variety: { type: Type.STRING, description: "Specific type/sub-item, e.g., Yellow, 2%, Sourdough" },
+            category: { type: Type.STRING },
+            itemName: { type: Type.STRING },
+            variety: { type: Type.STRING },
             brand: { type: Type.STRING },
-            barcode: { type: Type.STRING, description: "The numeric barcode string" },
+            barcode: { type: Type.STRING },
             price: { type: Type.NUMBER },
             store: { type: Type.STRING },
             quantity: { type: Type.NUMBER },
@@ -141,10 +132,9 @@ export const identifyProductFromImage = async (base64Image: string, mode: 'barco
       }
     });
 
-    const result = JSON.parse(response.text || '{}');
-    return result as AnalyzedPrice;
+    return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Gemini Error identifying product hierarchy:", error);
+    console.error("Gemini Analysis Error:", error);
     return null;
   }
 };

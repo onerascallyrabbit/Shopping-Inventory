@@ -36,8 +36,7 @@ const DEFAULT_STORAGE: StorageLocation[] = [
 ];
 
 const DiagnosticBanner: React.FC<{ user?: any, onShowAuth: () => void }> = ({ user, onShowAuth }) => {
-  const hasEnv = typeof process !== 'undefined' && process.env;
-  const hasApiKey = !!(hasEnv && process.env.API_KEY);
+  const hasApiKey = !!getEnv('API_KEY');
   const hasSupabase = !!supabase;
   const [show, setShow] = useState(true);
   const [dbStatus, setDbStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
@@ -364,8 +363,8 @@ const App: React.FC = () => {
 
   // AUTH GATE: Show if no user and not explicitly in offline mode
   if (!user && !isOfflineMode) {
-    const sUrl = getEnv('SUPABASE_URL') || getEnv('URL');
-    const sKey = getEnv('SUPABASE_ANON_KEY') || getEnv('ANON_KEY');
+    const sUrl = getEnv('SUPABASE_URL');
+    const sKey = getEnv('SUPABASE_ANON_KEY');
 
     return (
       <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center animate-in fade-in duration-500 overflow-y-auto">
@@ -402,16 +401,23 @@ const App: React.FC = () => {
                       <span className={`text-[10px] font-black ${sKey ? 'text-emerald-500' : 'text-red-500'}`}>{sKey ? 'DETECTED' : 'MISSING'}</span>
                    </div>
                 </div>
-                <button 
-                  onClick={() => setShowTechDetails(!showTechDetails)}
-                  className="text-[9px] font-black text-amber-600 underline uppercase tracking-tighter"
-                >
-                  {showTechDetails ? 'Hide' : 'Show'} help for Vercel
-                </button>
+                <div className="flex flex-col space-y-2 pt-2">
+                  <button 
+                    onClick={() => setShowTechDetails(!showTechDetails)}
+                    className="text-[9px] font-black text-amber-600 underline uppercase tracking-tighter text-left"
+                  >
+                    {showTechDetails ? 'Hide' : 'Show'} help for Vercel
+                  </button>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 py-2 rounded-lg"
+                  >
+                    RELOAD PAGE (After Redeploy)
+                  </button>
+                </div>
                 {showTechDetails && (
                   <p className="text-[9px] font-medium text-amber-800 italic leading-relaxed pt-1 border-t border-amber-100 mt-2">
-                    In Vercel, ensure variables are named exactly <b>NEXT_PUBLIC_SUPABASE_URL</b> and <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b>. 
-                    Redeploy the project after adding them.
+                    Vercel variables must be in your <b>Production</b> environment. Ensure you have triggered a <b>new deployment</b> in Vercel after connecting the Supabase integration.
                   </p>
                 )}
              </div>
@@ -425,7 +431,7 @@ const App: React.FC = () => {
           </button>
         </div>
         
-        <p className="mt-12 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Build 2.1.0 • {supabase ? 'Sync Active' : 'Offline Mode'}</p>
+        <p className="mt-12 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Build 2.1.2 • {supabase ? 'Sync Active' : 'Offline Mode'}</p>
       </div>
     );
   }

@@ -19,7 +19,8 @@ import {
   fetchUserData,
   testDatabaseConnection,
   supabase, 
-  signInWithGoogle 
+  signInWithGoogle,
+  getEnv
 } from './services/supabaseService';
 
 const DEFAULT_CATEGORIES = [
@@ -67,7 +68,7 @@ const DiagnosticBanner: React.FC<{ user?: any, onShowAuth: () => void }> = ({ us
         {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase tracking-wider">AI Service Offline</span>}
         {!hasSupabase && (
           <button onClick={onShowAuth} className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase tracking-wider hover:bg-amber-500/20 transition-colors">
-            Cloud Unlinked (Click to Fix)
+            Cloud Unlinked (Tap for info)
           </button>
         )}
         {hasSupabase && !user && (
@@ -103,6 +104,7 @@ const DiagnosticBanner: React.FC<{ user?: any, onShowAuth: () => void }> = ({ us
 const App: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [showTechDetails, setShowTechDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
@@ -362,8 +364,11 @@ const App: React.FC = () => {
 
   // AUTH GATE: Show if no user and not explicitly in offline mode
   if (!user && !isOfflineMode) {
+    const sUrl = getEnv('SUPABASE_URL') || getEnv('URL');
+    const sKey = getEnv('SUPABASE_ANON_KEY') || getEnv('ANON_KEY');
+
     return (
-      <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center animate-in fade-in duration-500">
+      <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center animate-in fade-in duration-500 overflow-y-auto">
         <div className="bg-indigo-600 p-6 rounded-[40px] shadow-2xl shadow-indigo-200 mb-8 transform hover:scale-105 transition-transform cursor-pointer">
           <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -385,10 +390,30 @@ const App: React.FC = () => {
           </button>
 
           {!supabase && (
-             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 animate-in slide-in-from-top-2">
-                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest leading-relaxed">
-                   Link not found: Add SUPABASE_URL and SUPABASE_ANON_KEY to Vercel environment variables and redeploy.
-                </p>
+             <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 text-left space-y-3">
+                <p className="text-[11px] font-black text-amber-700 uppercase tracking-widest">Connection Diagnostics:</p>
+                <div className="space-y-1.5">
+                   <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-slate-500">SUPABASE_URL:</span>
+                      <span className={`text-[10px] font-black ${sUrl ? 'text-emerald-500' : 'text-red-500'}`}>{sUrl ? 'DETECTED' : 'MISSING'}</span>
+                   </div>
+                   <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-slate-500">SUPABASE_ANON_KEY:</span>
+                      <span className={`text-[10px] font-black ${sKey ? 'text-emerald-500' : 'text-red-500'}`}>{sKey ? 'DETECTED' : 'MISSING'}</span>
+                   </div>
+                </div>
+                <button 
+                  onClick={() => setShowTechDetails(!showTechDetails)}
+                  className="text-[9px] font-black text-amber-600 underline uppercase tracking-tighter"
+                >
+                  {showTechDetails ? 'Hide' : 'Show'} help for Vercel
+                </button>
+                {showTechDetails && (
+                  <p className="text-[9px] font-medium text-amber-800 italic leading-relaxed pt-1 border-t border-amber-100 mt-2">
+                    In Vercel, ensure variables are named exactly <b>NEXT_PUBLIC_SUPABASE_URL</b> and <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b>. 
+                    Redeploy the project after adding them.
+                  </p>
+                )}
              </div>
           )}
 
@@ -396,11 +421,11 @@ const App: React.FC = () => {
             onClick={() => setIsOfflineMode(true)}
             className="w-full text-slate-400 font-black py-4 uppercase tracking-[0.2em] text-[10px] hover:text-indigo-600 transition-colors"
           >
-            Continue Locally
+            Continue Offline
           </button>
         </div>
         
-        <p className="mt-12 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Build 2.0.4 • {supabase ? 'Sync Enabled' : 'Standalone Mode'}</p>
+        <p className="mt-12 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Build 2.1.0 • {supabase ? 'Sync Active' : 'Offline Mode'}</p>
       </div>
     );
   }

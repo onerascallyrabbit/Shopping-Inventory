@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "https://esm.sh/@google/genai@1.39.0";
 
-// Safely access environment variables
+// Utility for safe environment variable access
 const getEnv = (key: string): string => {
   try {
     return (typeof process !== 'undefined' && process.env && process.env[key]) || '';
@@ -11,10 +11,13 @@ const getEnv = (key: string): string => {
 
 const apiKey = getEnv('API_KEY');
 
-// Initialize AI lazily or check for key before use
+// Initialize AI lazily to avoid immediate failure if API key is temporarily missing
 let aiInstance: GoogleGenAI | null = null;
 const getAI = () => {
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.warn("Gemini Service: API_KEY missing. AI features will be disabled.");
+    return null;
+  }
   if (!aiInstance) aiInstance = new GoogleGenAI({ apiKey });
   return aiInstance;
 };

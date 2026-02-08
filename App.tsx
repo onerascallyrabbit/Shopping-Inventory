@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AppTab, Product, PriceRecord, ShoppingItem, StoreLocation, Vehicle, StorageLocation, InventoryItem, SubLocation } from './types';
 import Dashboard from './components/Dashboard';
@@ -10,7 +9,7 @@ import Header from './components/Header';
 import AddItemModal from './components/AddItemModal';
 import SettingsView from './components/SettingsView';
 import InventoryView from './components/InventoryView';
-import { syncInventoryItem, bulkSyncInventory, syncSubLocation, deleteSubLocation } from './services/supabaseService';
+import { syncInventoryItem, bulkSyncInventory, syncSubLocation, deleteSubLocation, supabase } from './services/supabaseService';
 
 const DEFAULT_CATEGORIES = [
   "Produce", "Dairy", "Meat", "Seafood", "Deli", "Bakery", 
@@ -23,6 +22,28 @@ const DEFAULT_STORAGE: StorageLocation[] = [
   { id: '2', name: 'Refrigerator #1' },
   { id: '3', name: 'Freezer #1' }
 ];
+
+const DiagnosticBanner: React.FC = () => {
+  const hasApiKey = !!(typeof process !== 'undefined' && process.env.API_KEY);
+  const hasSupabase = !!supabase;
+  const [show, setShow] = useState(!hasApiKey || !hasSupabase);
+
+  if (!show) return null;
+
+  return (
+    <div className="bg-amber-50 border-b border-amber-100 p-3 flex flex-col items-center space-y-2 text-center animate-in slide-in-from-top duration-300">
+      <div className="flex items-center space-x-2">
+        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Environment Setup Incomplete</span>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        {!hasApiKey && <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-[8px] font-bold text-amber-600">Missing API_KEY</span>}
+        {!hasSupabase && <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-[8px] font-bold text-amber-600">Sync Disabled (Supabase Config Missing)</span>}
+      </div>
+      <button onClick={() => setShow(false)} className="text-[9px] font-black text-amber-400 uppercase">Dismiss</button>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
@@ -52,36 +73,40 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const savedProducts = localStorage.getItem('pricewise_products');
-    const savedList = localStorage.getItem('pricewise_list');
-    const savedInventory = localStorage.getItem('pricewise_inventory');
-    const savedStorage = localStorage.getItem('pricewise_storage');
-    const savedSubLocations = localStorage.getItem('pricewise_sub_locations');
-    const savedCategories = localStorage.getItem('pricewise_categories');
-    const savedLocation = localStorage.getItem('pricewise_location');
-    const savedZip = localStorage.getItem('pricewise_zip');
-    const savedStores = localStorage.getItem('pricewise_stores');
-    const savedVehicles = localStorage.getItem('pricewise_vehicles');
-    const savedActiveVehicle = localStorage.getItem('pricewise_active_vehicle');
-    const savedLastStore = localStorage.getItem('pricewise_last_store');
-    const savedGas = localStorage.getItem('pricewise_gas_price');
-    
-    if (savedProducts) setProducts(JSON.parse(savedProducts));
-    if (savedList) setShoppingList(JSON.parse(savedList));
-    if (savedInventory) setInventory(JSON.parse(savedInventory));
-    if (savedStorage) setStorageLocations(JSON.parse(savedStorage));
-    if (savedSubLocations) setSubLocations(JSON.parse(savedSubLocations));
-    if (savedLocation) setUserLocation(savedLocation);
-    if (savedZip) setUserZip(savedZip);
-    if (savedStores) setStores(JSON.parse(savedStores));
-    if (savedVehicles) setVehicles(JSON.parse(savedVehicles));
-    if (savedActiveVehicle) setActiveVehicleId(savedActiveVehicle);
-    if (savedLastStore) setLastUsedStore(savedLastStore);
-    if (savedGas) setGasPrice(parseFloat(savedGas));
-    if (savedCategories) {
-      const parsed = JSON.parse(savedCategories);
-      const merged = Array.from(new Set([...parsed, ...DEFAULT_CATEGORIES]));
-      setCategoryOrder(merged);
+    try {
+      const savedProducts = localStorage.getItem('pricewise_products');
+      const savedList = localStorage.getItem('pricewise_list');
+      const savedInventory = localStorage.getItem('pricewise_inventory');
+      const savedStorage = localStorage.getItem('pricewise_storage');
+      const savedSubLocations = localStorage.getItem('pricewise_sub_locations');
+      const savedCategories = localStorage.getItem('pricewise_categories');
+      const savedLocation = localStorage.getItem('pricewise_location');
+      const savedZip = localStorage.getItem('pricewise_zip');
+      const savedStores = localStorage.getItem('pricewise_stores');
+      const savedVehicles = localStorage.getItem('pricewise_vehicles');
+      const savedActiveVehicle = localStorage.getItem('pricewise_active_vehicle');
+      const savedLastStore = localStorage.getItem('pricewise_last_store');
+      const savedGas = localStorage.getItem('pricewise_gas_price');
+      
+      if (savedProducts) setProducts(JSON.parse(savedProducts));
+      if (savedList) setShoppingList(JSON.parse(savedList));
+      if (savedInventory) setInventory(JSON.parse(savedInventory));
+      if (savedStorage) setStorageLocations(JSON.parse(savedStorage));
+      if (savedSubLocations) setSubLocations(JSON.parse(savedSubLocations));
+      if (savedLocation) setUserLocation(savedLocation);
+      if (savedZip) setUserZip(savedZip);
+      if (savedStores) setStores(JSON.parse(savedStores));
+      if (savedVehicles) setVehicles(JSON.parse(savedVehicles));
+      if (savedActiveVehicle) setActiveVehicleId(savedActiveVehicle);
+      if (savedLastStore) setLastUsedStore(savedLastStore);
+      if (savedGas) setGasPrice(parseFloat(savedGas));
+      if (savedCategories) {
+        const parsed = JSON.parse(savedCategories);
+        const merged = Array.from(new Set([...parsed, ...DEFAULT_CATEGORIES]));
+        setCategoryOrder(merged);
+      }
+    } catch (e) {
+      console.error("LocalStorage corruption detected:", e);
     }
   }, []);
 
@@ -166,13 +191,11 @@ const App: React.FC = () => {
 
   const handleUpdateSubLocations = (newSubs: SubLocation[]) => {
     setSubLocations(newSubs);
-    // Find missing items to delete from DB
     const currentIds = subLocations.map(s => s.id);
     const newIds = newSubs.map(s => s.id);
     currentIds.forEach(id => {
       if (!newIds.includes(id)) deleteSubLocation(id);
     });
-    // Upsert all others
     newSubs.forEach(s => syncSubLocation(s));
   };
 
@@ -245,6 +268,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
+      <DiagnosticBanner />
       <Header onSettingsClick={() => setActiveTab('settings')} />
       <main className="flex-1 overflow-y-auto pb-32 px-4 pt-6">
         {activeTab === 'dashboard' && <Dashboard products={products} onAddToList={handleAddToList} />}

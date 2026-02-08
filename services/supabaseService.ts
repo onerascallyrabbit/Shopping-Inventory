@@ -2,8 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation } from '../types';
 
 /**
- * Robust environment variable access. 
- * Checks for standard, Next.js, and Vercel-specific prefixes.
+ * Robust environment variable access for Vercel/Supabase integrations.
  */
 const getEnv = (key: string): string => {
   const prefixes = ['', 'NEXT_PUBLIC_', 'SUPABASE_PUBLISHABLE_', 'REACT_APP_'];
@@ -18,15 +17,15 @@ const getEnv = (key: string): string => {
   return '';
 };
 
-const supabaseUrl = getEnv('SUPABASE_URL');
-const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') || getEnv('SUPABASE_ANON_KEY');
+const supabaseUrl = getEnv('SUPABASE_URL') || getEnv('URL');
+const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') || getEnv('ANON_KEY');
 
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
 if (!supabase) {
-  console.warn("Supabase Service: Initialisation failed. Keys not found in process.env.");
+  console.warn("Supabase Service: Initialisation failed. Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.");
 }
 
 /**
@@ -78,13 +77,16 @@ export const syncInventoryItem = async (item: InventoryItem) => {
 export const syncSubLocation = async (sub: SubLocation) => {
   if (!supabase) return;
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const { error } = await supabase
       .from('sub_locations')
       .upsert({
         id: sub.id,
         location_id: sub.locationId,
         name: sub.name,
-        user_id: (await supabase.auth.getUser()).data.user?.id
+        user_id: user.id
       });
     if (error) throw error;
   } catch (err) {
@@ -105,8 +107,8 @@ export const deleteSubLocation = async (id: string) => {
 export const bulkSyncInventory = async (items: InventoryItem[]) => {
   if (!supabase) return;
   try {
-    const userId = (await supabase.auth.getUser()).data.user?.id;
-    if (!userId) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
     const payload = items.map(item => ({
       id: item.id,
@@ -119,7 +121,7 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
       unit: item.unit,
       location_id: item.locationId,
       updated_at: item.updatedAt,
-      user_id: userId
+      user_id: user.id
     }));
     const { error } = await supabase.from('inventory').upsert(payload);
     if (error) throw error;

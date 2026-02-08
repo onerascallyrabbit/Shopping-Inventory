@@ -14,6 +14,9 @@ import {
   bulkSyncInventory, 
   syncSubLocation, 
   deleteSubLocation, 
+  syncStorageLocation,
+  deleteStorageLocation,
+  fetchUserData,
   supabase, 
   signInWithGoogle 
 } from './services/supabaseService';
@@ -75,15 +78,44 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [initialMode, setInitialMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('tag');
 
+  // Auth & Cloud Load
   useEffect(() => {
     if (!supabase) return;
     
+    const loadCloudData = async () => {
+      const data = await fetchUserData();
+      if (data) {
+        if (data.inventory.length) {
+          const mapped = data.inventory.map(i => ({
+            id: i.id,
+            productId: i.product_id,
+            itemName: i.item_name,
+            category: i.category,
+            variety: i.variety,
+            subLocation: i.sub_location,
+            quantity: Number(i.quantity),
+            unit: i.unit,
+            locationId: i.location_id,
+            updatedAt: i.updated_at,
+            userId: i.user_id
+          }));
+          setInventory(mapped);
+        }
+        if (data.storageLocations.length) setStorageLocations(data.storageLocations);
+        if (data.subLocations.length) setSubLocations(data.subLocations);
+      }
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) loadCloudData();
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) loadCloudData();
     });
 
     return () => subscription.unsubscribe();
@@ -116,9 +148,9 @@ const App: React.FC = () => {
       
       if (savedProducts) setProducts(JSON.parse(savedProducts));
       if (savedList) setShoppingList(JSON.parse(savedList));
-      if (savedInventory) setInventory(JSON.parse(savedInventory));
-      if (savedStorage) setStorageLocations(JSON.parse(savedStorage));
-      if (savedSubLocations) setSubLocations(JSON.parse(savedSubLocations));
+      if (!user && savedInventory) setInventory(JSON.parse(savedInventory));
+      if (!user && savedStorage) setStorageLocations(JSON.parse(savedStorage));
+      if (!user && savedSubLocations) setSubLocations(JSON.parse(savedSubLocations));
       if (savedLocation) setUserLocation(savedLocation);
       if (savedZip) setUserZip(savedZip);
       if (savedStores) setStores(JSON.parse(savedStores));
@@ -134,7 +166,7 @@ const App: React.FC = () => {
     } catch (e) {
       console.error("LocalStorage load error:", e);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => { localStorage.setItem('pricewise_products', JSON.stringify(products)); }, [products]);
   useEffect(() => { localStorage.setItem('pricewise_list', JSON.stringify(shoppingList)); }, [shoppingList]);
@@ -218,14 +250,29 @@ const App: React.FC = () => {
     bulkSyncInventory(itemsWithMeta);
   };
 
+  const handleUpdateStorageLocations = (newLocs: StorageLocation[]) => {
+    const currentIds = storageLocations.map(s => s.id);
+    const newIds = newLocs.map(s => s.id);
+    
+    setStorageLocations(newLocs);
+    
+    // Sync to cloud
+    newLocs.forEach(loc => syncStorageLocation(loc));
+    currentIds.forEach(id => {
+      if (!newIds.includes(id)) deleteStorageLocation(id);
+    });
+  };
+
   const handleUpdateSubLocations = (newSubs: SubLocation[]) => {
-    setSubLocations(newSubs);
     const currentIds = subLocations.map(s => s.id);
     const newIds = newSubs.map(s => s.id);
+
+    setSubLocations(newSubs);
+    
+    newSubs.forEach(s => syncSubLocation(s));
     currentIds.forEach(id => {
       if (!newIds.includes(id)) deleteSubLocation(id);
     });
-    newSubs.forEach(s => syncSubLocation(s));
   };
 
   const handleAddToList = (name: string, qty: number, unit: string, productId?: string) => {
@@ -357,7 +404,7 @@ const App: React.FC = () => {
             gasPrice={gasPrice}
             onGasPriceChange={setGasPrice}
             storageLocations={storageLocations}
-            onStorageLocationsChange={setStorageLocations}
+            onStorageLocationsChange={handleUpdateStorageLocations}
             subLocations={subLocations}
             onSubLocationsChange={handleUpdateSubLocations}
           />

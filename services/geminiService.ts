@@ -1,5 +1,5 @@
-// Updated to use standard import and direct process.env.API_KEY access
 import { GoogleGenAI, Type } from "@google/genai";
+import { getEnv } from "./supabaseService";
 
 export interface AnalyzedPrice {
   category: string;
@@ -13,9 +13,13 @@ export interface AnalyzedPrice {
   unit: string;
 }
 
-// Fixed searchStoreDetails to use recommended model and direct API key access
+// Helper to get the API Key safely
+const getApiKey = () => getEnv('API_KEY');
+
 export const searchStoreDetails = async (storeQuery: string, locationContext: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+  const ai = new GoogleGenAI({ apiKey });
   try {
     const prompt = `Find the most relevant store matching "${storeQuery}" near "${locationContext}". 
     Extract and return the following as a structured list: 
@@ -43,9 +47,10 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
   }
 };
 
-// Updated to use gemini-3-pro-preview and direct API key access
 export const lookupMarketDetails = async (itemName: string, variety?: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+  const ai = new GoogleGenAI({ apiKey });
   try {
     const query = `Current average grocery price and standard units for ${itemName} ${variety || ''} in the US.`;
     const response = await ai.models.generateContent({
@@ -66,9 +71,10 @@ export const lookupMarketDetails = async (itemName: string, variety?: string) =>
   }
 };
 
-// Updated to use gemini-3-flash-preview and direct API key access
 export const identifyProductFromImage = async (base64Image: string, mode: 'barcode' | 'product' | 'tag' = 'tag'): Promise<AnalyzedPrice | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+  const ai = new GoogleGenAI({ apiKey });
   const prompts = {
     barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category, Item Name, and Variety.",
     product: "This is a photo of a product. Identify the hierarchy: Category, Item Name, and Variety. Also find the brand.",

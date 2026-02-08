@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation } from '../types';
 
-// Safely access environment variables with fallbacks
+// Utility for safe environment variable access
 const getEnv = (key: string): string => {
   try {
     return (typeof process !== 'undefined' && process.env && process.env[key]) || '';
@@ -18,7 +18,9 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   : null;
 
 if (!supabase) {
-  console.warn("Supabase client not initialized: Missing environment variables.");
+  console.warn("Supabase Sync: Disabled (Missing configuration). Application will function in offline mode.");
+} else {
+  console.log("Supabase Sync: Initialized.");
 }
 
 export const syncInventoryItem = async (item: InventoryItem) => {

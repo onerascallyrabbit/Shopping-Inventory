@@ -1,2 +1,2 @@
 added Google User login and user tracking
-a
+added supabase auth and gemini key

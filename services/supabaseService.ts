@@ -8,71 +8,68 @@ import { InventoryItem, SubLocation, StorageLocation } from '../types';
 export const getEnv = (key: string): string => {
   const k = key.toUpperCase();
   
-  // 1. Literal access for common bundler patterns (allows static replacement)
-  // We use literal checks because bundlers (Vite/Webpack) often can't handle dynamic indexing of process.env
+  // 1. Check for literal matches first. 
+  // We explicitly list these because some bundlers (like Vite) only replace literal strings.
   if (k === 'SUPABASE_URL') {
     try {
-      const val = (typeof process !== 'undefined' ? (process.env?.NEXT_PUBLIC_SUPABASE_URL || process.env?.SUPABASE_URL || process.env?.VITE_SUPABASE_URL) : undefined) ||
-                  (import.meta as any).env?.NEXT_PUBLIC_SUPABASE_URL ||
-                  (import.meta as any).env?.VITE_SUPABASE_URL ||
-                  (import.meta as any).env?.SUPABASE_URL;
-      if (val) return val;
-    } catch {}
+      // Check process.env (Node/Next.js/Vercel)
+      if (typeof process !== 'undefined' && process.env) {
+        const val = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        if (val) return val;
+      }
+      // Check import.meta.env (Vite/ESM)
+      const meta = (import.meta as any).env;
+      if (meta) {
+        const val = meta.NEXT_PUBLIC_SUPABASE_URL || meta.VITE_SUPABASE_URL || meta.SUPABASE_URL;
+        if (val) return val;
+      }
+    } catch (e) {}
   }
   
   if (k === 'SUPABASE_ANON_KEY') {
     try {
-      const val = (typeof process !== 'undefined' ? (process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env?.SUPABASE_ANON_KEY || process.env?.VITE_SUPABASE_ANON_KEY) : undefined) ||
-                  (import.meta as any).env?.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-                  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
-                  (import.meta as any).env?.SUPABASE_ANON_KEY;
-      if (val) return val;
-    } catch {}
+      if (typeof process !== 'undefined' && process.env) {
+        const val = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+        if (val) return val;
+      }
+      const meta = (import.meta as any).env;
+      if (meta) {
+        const val = meta.NEXT_PUBLIC_SUPABASE_ANON_KEY || meta.VITE_SUPABASE_ANON_KEY || meta.SUPABASE_ANON_KEY;
+        if (val) return val;
+      }
+    } catch (e) {}
   }
 
   if (k === 'API_KEY') {
     try {
-      const val = (typeof process !== 'undefined' ? (process.env?.API_KEY || process.env?.NEXT_PUBLIC_API_KEY || process.env?.VITE_API_KEY) : undefined) ||
-                  (import.meta as any).env?.API_KEY ||
-                  (import.meta as any).env?.NEXT_PUBLIC_API_KEY ||
-                  (import.meta as any).env?.VITE_API_KEY;
-      if (val) return val;
-    } catch {}
-  }
-
-  // 2. Generic fallback loop for other environments/keys
-  const prefixes = ['', 'NEXT_PUBLIC_', 'VITE_', 'REACT_APP_'];
-  
-  // Try process.env
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      for (const p of prefixes) {
-        const val = (process.env as any)[p + k];
+      if (typeof process !== 'undefined' && process.env) {
+        const val = process.env.API_KEY || process.env.NEXT_PUBLIC_API_KEY || process.env.VITE_API_KEY;
         if (val) return val;
       }
-    }
-  } catch {}
-
-  // Try import.meta.env
-  try {
-    const env = (import.meta as any)?.env;
-    if (env) {
-      for (const p of prefixes) {
-        if (env[p + k]) return env[p + k];
+      const meta = (import.meta as any).env;
+      if (meta) {
+        const val = meta.API_KEY || meta.NEXT_PUBLIC_API_KEY || meta.VITE_API_KEY;
+        if (val) return val;
       }
-    }
-  } catch {}
+    } catch (e) {}
+  }
 
-  // Try window/global
-  try {
-    const win = (globalThis as any);
-    const env = win.process?.env || win.ENV || win.__ENV__;
-    if (env) {
-      for (const p of prefixes) {
-        if (env[p + k]) return env[p + k];
-      }
+  // 2. Fallback: Dynamic lookup in common objects
+  const prefixes = ['', 'NEXT_PUBLIC_', 'VITE_', 'REACT_APP_'];
+  const sources = [];
+  
+  try { if (typeof process !== 'undefined' && process.env) sources.push(process.env); } catch {}
+  try { if ((import.meta as any).env) sources.push((import.meta as any).env); } catch {}
+  try { sources.push(window); } catch {}
+  try { sources.push(globalThis); } catch {}
+
+  for (const source of sources) {
+    if (!source) continue;
+    for (const p of prefixes) {
+      const val = (source as any)[p + k];
+      if (typeof val === 'string' && val.length > 0) return val;
     }
-  } catch {}
+  }
   
   return '';
 };
@@ -86,10 +83,7 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   : null;
 
 if (!supabase) {
-  console.warn("Supabase Config: Missing URL or Key. Detected:", { 
-    url: !!supabaseUrl, 
-    key: !!supabaseAnonKey 
-  });
+  console.warn("Supabase Config: Missing URL or Key. App will operate in Local-Only mode.");
 }
 
 /**

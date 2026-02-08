@@ -1,7 +1,23 @@
 import { GoogleGenAI, Type } from "https://esm.sh/@google/genai@1.39.0";
 
-const apiKey = (typeof process !== 'undefined' && process.env.API_KEY) || '';
-const ai = new GoogleGenAI({ apiKey });
+// Safely access environment variables
+const getEnv = (key: string): string => {
+  try {
+    return (typeof process !== 'undefined' && process.env && process.env[key]) || '';
+  } catch {
+    return '';
+  }
+};
+
+const apiKey = getEnv('API_KEY');
+
+// Initialize AI lazily or check for key before use
+let aiInstance: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!apiKey) return null;
+  if (!aiInstance) aiInstance = new GoogleGenAI({ apiKey });
+  return aiInstance;
+};
 
 export interface AnalyzedPrice {
   category: string;
@@ -19,7 +35,8 @@ export interface AnalyzedPrice {
  * Uses Google Maps tool to search for store details.
  */
 export const searchStoreDetails = async (storeQuery: string, locationContext: string) => {
-  if (!apiKey) return null;
+  const ai = getAI();
+  if (!ai) return null;
   try {
     const prompt = `Find the most relevant store matching "${storeQuery}" near "${locationContext}". 
     Extract and return the following as a structured list: 
@@ -30,7 +47,7 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
     - Hours of Operation`;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', // Maps grounding requires 2.5 series
+      model: 'gemini-2.5-flash', 
       contents: prompt,
       config: {
         tools: [{ googleMaps: {} }],
@@ -51,7 +68,8 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
  * Uses Gemini with Google Search to find current market prices or details for a specific item.
  */
 export const lookupMarketDetails = async (itemName: string, variety?: string) => {
-  if (!apiKey) return null;
+  const ai = getAI();
+  if (!ai) return null;
   try {
     const query = `Current average grocery price and standard units for ${itemName} ${variety || ''} in the US.`;
     const response = await ai.models.generateContent({
@@ -76,7 +94,8 @@ export const lookupMarketDetails = async (itemName: string, variety?: string) =>
  * Analyzes an image to extract product details in a hierarchy: Category | Item | Variety.
  */
 export const identifyProductFromImage = async (base64Image: string, mode: 'barcode' | 'product' | 'tag' = 'tag'): Promise<AnalyzedPrice | null> => {
-  if (!apiKey) return null;
+  const ai = getAI();
+  if (!ai) return null;
   const prompts = {
     barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category (e.g., Produce), Item Name (e.g., Onion), and Variety/Sub-item (e.g., Yellow).",
     product: "This is a photo of a product. Identify the hierarchy: Category (e.g., Dairy), Item Name (e.g., Milk), and Variety/Sub-item (e.g., 2% Reduced Fat). Also find the brand.",

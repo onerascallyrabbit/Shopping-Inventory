@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
-import { InventoryItem, SubLocation } from '../types';
+import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
  * Robust environment variable access for Vercel/Supabase integrations.
@@ -48,7 +48,28 @@ export const signOut = async () => {
 };
 
 /**
- * DATA FUNCTIONS
+ * FETCH FUNCTIONS
+ */
+export const fetchUserData = async () => {
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const [inventory, storage, subs] = await Promise.all([
+    supabase.from('inventory').select('*').eq('user_id', user.id),
+    supabase.from('storage_locations').select('*').eq('user_id', user.id),
+    supabase.from('sub_locations').select('*').eq('user_id', user.id)
+  ]);
+
+  return {
+    inventory: inventory.data || [],
+    storageLocations: storage.data || [],
+    subLocations: subs.data || []
+  };
+};
+
+/**
+ * DATA FUNCTIONS - INVENTORY
  */
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase || !item.userId) return;
@@ -70,10 +91,71 @@ export const syncInventoryItem = async (item: InventoryItem) => {
       });
     if (error) throw error;
   } catch (err) {
-    console.error('Supabase Sync Error:', err);
+    console.error('Supabase Inventory Sync Error:', err);
   }
 };
 
+export const bulkSyncInventory = async (items: InventoryItem[]) => {
+  if (!supabase) return;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const payload = items.map(item => ({
+      id: item.id,
+      product_id: item.productId,
+      item_name: item.itemName,
+      category: item.category,
+      variety: item.variety,
+      sub_location: item.subLocation,
+      quantity: item.quantity,
+      unit: item.unit,
+      location_id: item.locationId,
+      updated_at: item.updatedAt,
+      user_id: user.id
+    }));
+    const { error } = await supabase.from('inventory').upsert(payload);
+    if (error) throw error;
+  } catch (err) {
+    console.error('Supabase Bulk Inventory Sync Error:', err);
+  }
+};
+
+/**
+ * DATA FUNCTIONS - STORAGE LOCATIONS
+ */
+export const syncStorageLocation = async (loc: StorageLocation) => {
+  if (!supabase) return;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('storage_locations')
+      .upsert({
+        id: loc.id,
+        name: loc.name,
+        user_id: user.id
+      });
+    if (error) throw error;
+  } catch (err) {
+    console.error('Supabase Storage Location Sync Error:', err);
+  }
+};
+
+export const deleteStorageLocation = async (id: string) => {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('storage_locations').delete().eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.error('Supabase Storage Location Delete Error:', err);
+  }
+};
+
+/**
+ * DATA FUNCTIONS - SUB LOCATIONS
+ */
 export const syncSubLocation = async (sub: SubLocation) => {
   if (!supabase) return;
   try {
@@ -101,31 +183,5 @@ export const deleteSubLocation = async (id: string) => {
     if (error) throw error;
   } catch (err) {
     console.error('Supabase Sub-location Delete Error:', err);
-  }
-};
-
-export const bulkSyncInventory = async (items: InventoryItem[]) => {
-  if (!supabase) return;
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const payload = items.map(item => ({
-      id: item.id,
-      product_id: item.productId,
-      item_name: item.itemName,
-      category: item.category,
-      variety: item.variety,
-      sub_location: item.subLocation,
-      quantity: item.quantity,
-      unit: item.unit,
-      location_id: item.locationId,
-      updated_at: item.updatedAt,
-      user_id: user.id
-    }));
-    const { error } = await supabase.from('inventory').upsert(payload);
-    if (error) throw error;
-  } catch (err) {
-    console.error('Supabase Bulk Sync Error:', err);
   }
 };

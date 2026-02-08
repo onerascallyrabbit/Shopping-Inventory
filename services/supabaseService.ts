@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
- * Robust environment variable access for Vercel/Supabase integrations.
+ * Enhanced environment variable discovery.
  */
 const getEnv = (key: string): string => {
   const prefixes = ['', 'NEXT_PUBLIC_', 'SUPABASE_PUBLISHABLE_', 'REACT_APP_'];
@@ -14,31 +14,40 @@ const getEnv = (key: string): string => {
       }
     }
   } catch (e) {}
+  
+  // Fallback for some browser environments that inject into window or globalThis
+  const globalObj = (globalThis as any);
+  if (globalObj.process?.env) {
+    for (const prefix of prefixes) {
+       const val = globalObj.process.env[prefix + key];
+       if (val) return val;
+    }
+  }
+  
   return '';
 };
 
 const supabaseUrl = getEnv('SUPABASE_URL') || getEnv('URL');
 const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') || getEnv('ANON_KEY');
 
+// Initialise only if keys exist
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
 if (!supabase) {
-  console.warn("Supabase Service: Initialisation failed. Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.");
+  console.warn("Supabase Config: Missing URL or Key. App will operate in Local-Only mode.");
 }
 
 /**
  * HEALTH CHECK
- * Explicitly tests if we can read from the tables.
  */
 export const testDatabaseConnection = async () => {
-  if (!supabase) return { success: false, error: 'Supabase client not initialized' };
+  if (!supabase) return { success: false, error: 'Supabase keys missing in environment' };
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No user session' };
+    if (!user) return { success: false, error: 'No user session found. Please sign in.' };
 
-    // Try to read a single row from storage_locations
     const { error } = await supabase.from('storage_locations').select('id').limit(1);
     
     if (error) {
@@ -92,7 +101,7 @@ export const fetchUserData = async () => {
 };
 
 /**
- * DATA FUNCTIONS - INVENTORY
+ * DATA FUNCTIONS
  */
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase || !item.userId) return;
@@ -144,9 +153,6 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
   }
 };
 
-/**
- * DATA FUNCTIONS - STORAGE LOCATIONS
- */
 export const syncStorageLocation = async (loc: StorageLocation) => {
   if (!supabase) return;
   try {
@@ -176,9 +182,6 @@ export const deleteStorageLocation = async (id: string) => {
   }
 };
 
-/**
- * DATA FUNCTIONS - SUB LOCATIONS
- */
 export const syncSubLocation = async (sub: SubLocation) => {
   if (!supabase) return;
   try {

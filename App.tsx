@@ -36,7 +36,6 @@ const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
   const hasSupabase = !!supabase;
   const [show, setShow] = useState(!hasApiKey || !hasSupabase || !user);
 
-  // If everything is fine, don't show the banner at all
   if (hasApiKey && hasSupabase && user && !show) return null;
   if (!show) return null;
 
@@ -48,9 +47,9 @@ const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
       </div>
       <div className="flex flex-wrap justify-center gap-1.5">
         {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase">AI Service Offline</span>}
-        {!hasSupabase && <span className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase">Cloud Sync Restricted</span>}
+        {!hasSupabase && <span className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase">Sync Restricted</span>}
         {hasSupabase && !user && <span className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-indigo-400 uppercase">Sign-in Required</span>}
-        {hasApiKey && hasSupabase && user && <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-emerald-400 uppercase">All Systems Ready</span>}
+        {hasApiKey && hasSupabase && user && <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-emerald-400 uppercase">All Systems Nominal</span>}
       </div>
       <button onClick={() => setShow(false)} className="text-[8px] font-black text-slate-500 uppercase hover:text-white transition-colors">Dismiss</button>
     </div>
@@ -155,7 +154,7 @@ const App: React.FC = () => {
     setInventory(prev => prev.map(item => {
       if (item.id === id) {
         const newQty = Math.max(0, item.quantity + delta);
-        const updated = { ...item, quantity: newQty, updatedAt: new Date().toISOString() };
+        const updated = { ...item, quantity: newQty, updatedAt: new Date().toISOString(), userId: user?.id };
         syncInventoryItem(updated);
         return updated;
       }
@@ -305,7 +304,7 @@ const App: React.FC = () => {
           </svg>
         </div>
         <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Aisle Be Back</h1>
-        <p className="text-slate-400 font-medium mb-12 max-w-[280px] leading-relaxed">Smart inventory and price tracking. Securely sync your data across all your devices.</p>
+        <p className="text-slate-400 font-medium mb-12 max-w-[280px] leading-relaxed">Securely track and compare prices. Sign in to sync your inventory across all your devices.</p>
         <button 
           onClick={signInWithGoogle}
           className="w-full max-w-xs flex items-center justify-center space-x-3 bg-slate-900 text-white font-black py-5 rounded-[24px] shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs"

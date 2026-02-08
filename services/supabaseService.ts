@@ -1,13 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation } from '../types';
 
-// Safely access environment variables
-const supabaseUrl = (typeof process !== 'undefined' && process.env.SUPABASE_URL) || '';
-const supabaseAnonKey = (typeof process !== 'undefined' && process.env.SUPABASE_ANON_KEY) || '';
+// Safely access environment variables with fallbacks
+const getEnv = (key: string): string => {
+  try {
+    return (typeof process !== 'undefined' && process.env && process.env[key]) || '';
+  } catch {
+    return '';
+  }
+};
+
+const supabaseUrl = getEnv('SUPABASE_URL');
+const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
 
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
+
+if (!supabase) {
+  console.warn("Supabase client not initialized: Missing environment variables.");
+}
 
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase) return;

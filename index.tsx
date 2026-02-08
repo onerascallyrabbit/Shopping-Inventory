@@ -1,47 +1,49 @@
-import React from 'react';
+import React from 'https://esm.sh/react@19.0.0';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-console.log("Aisle Be Back: Application Bootstrapping...");
+console.log("Aisle Be Back: Initializing entry point...");
 
 const rootElement = document.getElementById('root');
 const fallbackUi = document.getElementById('fallback-ui');
 const errorMessage = document.getElementById('error-message');
+const initialLoader = document.getElementById('initial-loader');
 
 function showFallback(err: unknown) {
-  console.error("Critical Application Error:", err);
+  console.error("Critical Boot Error:", err);
   if (fallbackUi && errorMessage) {
     fallbackUi.style.display = 'block';
-    errorMessage.innerText = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    errorMessage.innerText = err instanceof Error ? `${err.name}: ${err.message}\n${err.stack}` : String(err);
     if (rootElement) rootElement.style.display = 'none';
   } else {
-    // Basic alert if the fallback UI elements aren't found
-    alert("Application failed to load. Check console for details.");
+    alert("Application failed to load completely. Check browser console for stack trace.");
   }
 }
 
 try {
   if (!rootElement) {
-    throw new Error("Target container 'root' not found in document.");
+    throw new Error("Target container #root not found in document.");
   }
 
   const root = ReactDOM.createRoot(rootElement);
+  
+  // Render the App
   root.render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
   );
-  console.log("Aisle Be Back: Render initiated successfully.");
+
+  console.log("Aisle Be Back: Root render call successful.");
 } catch (err) {
   showFallback(err);
 }
 
-// Catch unhandled rejections as well
+// Catch runtime errors that occur during the initial module evaluation
 window.onunhandledrejection = (event) => {
   showFallback(event.reason);
 };
 
-// Catch global errors
 window.onerror = (message, source, lineno, colno, error) => {
   showFallback(error || message);
   return true;

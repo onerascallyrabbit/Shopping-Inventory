@@ -1,31 +1,57 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation } from '../types';
 
-// Robust environment variable access including standard and Next.js prefixes
+// Robust environment variable access for Vercel/Next.js/Standard environments
 const getEnv = (key: string): string => {
   try {
     if (typeof process !== 'undefined' && process.env) {
-      return process.env[key] || process.env[`NEXT_PUBLIC_${key}`] || '';
+      // Check variants provided by user and standard ones
+      return (
+        process.env[key] || 
+        process.env[`NEXT_PUBLIC_${key}`] || 
+        process.env[`SUPABASE_PUBLISHABLE_${key}`] || 
+        ''
+      );
     }
   } catch (e) {
-    console.warn(`Environment access error for ${key}:`, e);
+    console.warn(`Env access error for ${key}:`, e);
   }
   return '';
 };
 
-const supabaseUrl = getEnv('SUPABASE_URL');
-const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
+const supabaseUrl = getEnv('SUPABASE_URL') || getEnv('NEXT_PUBLIC_SUPABASE_URL');
+const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') || getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
 if (!supabase) {
-  console.warn("Supabase Sync: Disabled. Check SUPABASE_URL and SUPABASE_ANON_KEY.");
-} else {
-  console.log("Supabase Sync: Online.");
+  console.warn("Supabase Service: Failed to initialize. Check your URL and Key settings.");
 }
 
+/**
+ * AUTH FUNCTIONS
+ */
+export const signInWithGoogle = async () => {
+  if (!supabase) return;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin
+    }
+  });
+  if (error) throw error;
+};
+
+export const signOut = async () => {
+  if (!supabase) return;
+  await supabase.auth.signOut();
+};
+
+/**
+ * DATA FUNCTIONS
+ */
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase) return;
   try {
@@ -41,7 +67,8 @@ export const syncInventoryItem = async (item: InventoryItem) => {
         quantity: item.quantity,
         unit: item.unit,
         location_id: item.locationId,
-        updated_at: item.updatedAt
+        updated_at: item.updatedAt,
+        user_id: item.userId // Track ownership
       });
     if (error) throw error;
   } catch (err) {
@@ -88,7 +115,8 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
       quantity: item.quantity,
       unit: item.unit,
       location_id: item.locationId,
-      updated_at: item.updatedAt
+      updated_at: item.updatedAt,
+      user_id: item.userId
     }));
     const { error } = await supabase.from('inventory').upsert(payload);
     if (error) throw error;

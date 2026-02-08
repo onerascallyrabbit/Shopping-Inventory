@@ -16,23 +16,70 @@
             padding: 0;
             background-color: #f8fafc;
         }
-        #root:empty {
-            display: none;
+        /* Ensure the root is visible even when empty during load */
+        #root {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
         #fallback-ui {
             display: none;
-            padding: 2rem;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: white;
+            padding: 40px;
             text-align: center;
         }
+        .loading-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #6366f1;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4"
+  }
+}
+</script>
 </head>
 <body class="bg-slate-50 text-slate-900">
-    <div id="root"></div>
-    <div id="fallback-ui" style="display: none; font-family: sans-serif; padding: 40px; color: #334155;">
-        <h1 style="font-weight: 800; font-size: 24px; color: #1e293b;">System Diagnostic</h1>
-        <p id="error-message" style="margin-top: 16px; font-size: 14px; color: #ef4444; background: #fef2f2; padding: 16px; border-radius: 12px; border: 1px solid #fee2e2;"></p>
-        <button onclick="window.location.reload()" style="margin-top: 24px; padding: 12px 24px; background: #4f46e5; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Retry Application</button>
+    <div id="root">
+        <div class="loading-screen" id="initial-loader">
+            <div class="spinner"></div>
+            <p style="font-weight: 700; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase;">Bootstrapping Aisle Be Back...</p>
+        </div>
     </div>
+
+    <div id="fallback-ui">
+        <h1 style="font-weight: 800; font-size: 24px; color: #1e293b;">System Diagnostic</h1>
+        <div style="margin: 24px auto; max-width: 400px; text-align: left;">
+            <p style="font-size: 12px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">Error Details:</p>
+            <p id="error-message" style="font-size: 14px; color: #ef4444; background: #fef2f2; padding: 16px; border-radius: 12px; border: 1px solid #fee2e2; word-break: break-all; font-family: monospace;"></p>
+        </div>
+        <button onclick="window.location.reload()" style="margin-top: 24px; padding: 12px 24px; background: #4f46e5; color: white; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em;">Restart Application</button>
+    </div>
+
     <script type="module" src="./index.tsx"></script>
 </body>
 </html>

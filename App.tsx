@@ -36,21 +36,23 @@ const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
   const hasSupabase = !!supabase;
   const [show, setShow] = useState(!hasApiKey || !hasSupabase || !user);
 
+  // If everything is fine, don't show the banner at all
+  if (hasApiKey && hasSupabase && user && !show) return null;
   if (!show) return null;
 
   return (
     <div className="bg-slate-900 border-b border-slate-800 p-2.5 flex flex-col items-center space-y-2 text-center z-50">
       <div className="flex items-center space-x-2">
-        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasSupabase ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasSupabase && user ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
         <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">System Status</span>
       </div>
       <div className="flex flex-wrap justify-center gap-1.5">
-        {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase">AI Offline</span>}
-        {!hasSupabase && <span className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase">Cloud Sync Failed</span>}
-        {hasSupabase && !user && <span className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-indigo-400 uppercase">Session Required</span>}
-        {hasApiKey && hasSupabase && user && <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-emerald-400 uppercase">Connected</span>}
+        {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase">AI Service Offline</span>}
+        {!hasSupabase && <span className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase">Cloud Sync Restricted</span>}
+        {hasSupabase && !user && <span className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-indigo-400 uppercase">Sign-in Required</span>}
+        {hasApiKey && hasSupabase && user && <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-emerald-400 uppercase">All Systems Ready</span>}
       </div>
-      <button onClick={() => setShow(false)} className="text-[8px] font-black text-slate-500 uppercase hover:text-white transition-colors">Dismiss Warnings</button>
+      <button onClick={() => setShow(false)} className="text-[8px] font-black text-slate-500 uppercase hover:text-white transition-colors">Dismiss</button>
     </div>
   );
 };
@@ -74,16 +76,13 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [initialMode, setInitialMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('tag');
 
-  // Handle Auth Changes
   useEffect(() => {
     if (!supabase) return;
     
-    // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
     });
 
-    // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
@@ -316,7 +315,7 @@ const App: React.FC = () => {
           </svg>
           <span>Sign In with Google</span>
         </button>
-        <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-widest">Database Ready</p>
+        <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-widest">Environment: {supabase ? 'Linked' : 'Standalone'}</p>
       </div>
     );
   }

@@ -1,26 +1,5 @@
-import { GoogleGenAI, Type } from "https://esm.sh/@google/genai@1.39.0";
-
-// Robust environment variable access
-const getEnv = (key: string): string => {
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env[key] || '';
-    }
-  } catch (e) {}
-  return '';
-};
-
-const apiKey = getEnv('API_KEY');
-
-let aiInstance: GoogleGenAI | null = null;
-const getAI = () => {
-  if (!apiKey) {
-    console.warn("Gemini Service: API_KEY missing.");
-    return null;
-  }
-  if (!aiInstance) aiInstance = new GoogleGenAI({ apiKey });
-  return aiInstance;
-};
+// Updated to use standard import and direct process.env.API_KEY access
+import { GoogleGenAI, Type } from "@google/genai";
 
 export interface AnalyzedPrice {
   category: string;
@@ -34,9 +13,9 @@ export interface AnalyzedPrice {
   unit: string;
 }
 
+// Fixed searchStoreDetails to use recommended model and direct API key access
 export const searchStoreDetails = async (storeQuery: string, locationContext: string) => {
-  const ai = getAI();
-  if (!ai) return null;
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const prompt = `Find the most relevant store matching "${storeQuery}" near "${locationContext}". 
     Extract and return the following as a structured list: 
@@ -64,9 +43,9 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
   }
 };
 
+// Updated to use gemini-3-pro-preview and direct API key access
 export const lookupMarketDetails = async (itemName: string, variety?: string) => {
-  const ai = getAI();
-  if (!ai) return null;
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const query = `Current average grocery price and standard units for ${itemName} ${variety || ''} in the US.`;
     const response = await ai.models.generateContent({
@@ -87,9 +66,9 @@ export const lookupMarketDetails = async (itemName: string, variety?: string) =>
   }
 };
 
+// Updated to use gemini-3-flash-preview and direct API key access
 export const identifyProductFromImage = async (base64Image: string, mode: 'barcode' | 'product' | 'tag' = 'tag'): Promise<AnalyzedPrice | null> => {
-  const ai = getAI();
-  if (!ai) return null;
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompts = {
     barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category, Item Name, and Variety.",
     product: "This is a photo of a product. Identify the hierarchy: Category, Item Name, and Variety. Also find the brand.",

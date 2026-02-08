@@ -1,3 +1,12 @@
 added Google User login and user tracking
 added supabase auth and gemini key
-Auth Gate Refactor 2.0
+Auth Gate Refactor 3.0
+Specification of Updates
+Robust Variable Discovery (services/supabaseService.ts):
+Updated getEnv to check for VITE_ prefixes (common in modern stacks).
+Added checks for import.meta.env, which is the standard for Vite-based environments.
+Included a check for window.ENV or window.process, as some platforms inject variables there.
+Explicit Debugging in Auth Gate (App.tsx):
+The "Link not found" message now explicitly lists which variables it's looking for and which ones are currently undefined. This helps you confirm if Vercel is actually passing the values through.
+Visual Feedback:
+Added a "Technical Details" toggle on the sign-in screen to show the detected environment state, making it easier to troubleshoot without looking at the console.

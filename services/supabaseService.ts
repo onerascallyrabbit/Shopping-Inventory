@@ -2,51 +2,83 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
- * Enhanced environment variable discovery.
- * Tries process.env, import.meta.env, and window-level globals.
+ * Robust environment variable discovery.
+ * Prioritizes literal access patterns (NEXT_PUBLIC_) for bundler static replacement.
  */
 export const getEnv = (key: string): string => {
-  const prefixes = ['', 'VITE_', 'NEXT_PUBLIC_', 'SUPABASE_PUBLISHABLE_', 'REACT_APP_'];
+  const k = key.toUpperCase();
   
-  // 1. Try standard process.env (Node/Webpack/CRA)
-  try {
-    const p = (globalThis as any).process;
-    if (p?.env) {
-      for (const prefix of prefixes) {
-        const val = p.env[prefix + key];
-        if (val) return val;
-      }
-    }
-  } catch (e) {}
+  // 1. Literal access for common bundler patterns (allows static replacement)
+  // We use literal checks because bundlers (Vite/Webpack) often can't handle dynamic indexing of process.env
+  if (k === 'SUPABASE_URL') {
+    try {
+      const val = (typeof process !== 'undefined' ? (process.env?.NEXT_PUBLIC_SUPABASE_URL || process.env?.SUPABASE_URL || process.env?.VITE_SUPABASE_URL) : undefined) ||
+                  (import.meta as any).env?.NEXT_PUBLIC_SUPABASE_URL ||
+                  (import.meta as any).env?.VITE_SUPABASE_URL ||
+                  (import.meta as any).env?.SUPABASE_URL;
+      if (val) return val;
+    } catch {}
+  }
   
-  // 2. Try import.meta.env (Vite/ESM)
-  try {
-    const meta = (import.meta as any).env;
-    if (meta) {
-      for (const prefix of prefixes) {
-        const val = meta[prefix + key];
-        if (val) return val;
-      }
-    }
-  } catch (e) {}
+  if (k === 'SUPABASE_ANON_KEY') {
+    try {
+      const val = (typeof process !== 'undefined' ? (process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env?.SUPABASE_ANON_KEY || process.env?.VITE_SUPABASE_ANON_KEY) : undefined) ||
+                  (import.meta as any).env?.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+                  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+                  (import.meta as any).env?.SUPABASE_ANON_KEY;
+      if (val) return val;
+    } catch {}
+  }
 
-  // 3. Try window globals (Some injectors)
+  if (k === 'API_KEY') {
+    try {
+      const val = (typeof process !== 'undefined' ? (process.env?.API_KEY || process.env?.NEXT_PUBLIC_API_KEY || process.env?.VITE_API_KEY) : undefined) ||
+                  (import.meta as any).env?.API_KEY ||
+                  (import.meta as any).env?.NEXT_PUBLIC_API_KEY ||
+                  (import.meta as any).env?.VITE_API_KEY;
+      if (val) return val;
+    } catch {}
+  }
+
+  // 2. Generic fallback loop for other environments/keys
+  const prefixes = ['', 'NEXT_PUBLIC_', 'VITE_', 'REACT_APP_'];
+  
+  // Try process.env
   try {
-    const win = (window as any);
-    const envSource = win.process?.env || win.ENV || win.__ENV__;
-    if (envSource) {
-      for (const prefix of prefixes) {
-        const val = envSource[prefix + key];
+    if (typeof process !== 'undefined' && process.env) {
+      for (const p of prefixes) {
+        const val = (process.env as any)[p + k];
         if (val) return val;
       }
     }
-  } catch (e) {}
+  } catch {}
+
+  // Try import.meta.env
+  try {
+    const env = (import.meta as any)?.env;
+    if (env) {
+      for (const p of prefixes) {
+        if (env[p + k]) return env[p + k];
+      }
+    }
+  } catch {}
+
+  // Try window/global
+  try {
+    const win = (globalThis as any);
+    const env = win.process?.env || win.ENV || win.__ENV__;
+    if (env) {
+      for (const p of prefixes) {
+        if (env[p + k]) return env[p + k];
+      }
+    }
+  } catch {}
   
   return '';
 };
 
-const supabaseUrl = getEnv('SUPABASE_URL') || getEnv('URL');
-const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') || getEnv('ANON_KEY');
+const supabaseUrl = getEnv('SUPABASE_URL');
+const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
 
 // Initialise only if keys exist
 export const supabase = (supabaseUrl && supabaseAnonKey) 

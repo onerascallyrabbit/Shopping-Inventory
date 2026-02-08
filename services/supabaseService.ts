@@ -1,33 +1,32 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation } from '../types';
 
-// Robust environment variable access for Vercel/Next.js/Standard environments
+/**
+ * Robust environment variable access. 
+ * Checks for standard, Next.js, and Vercel-specific prefixes.
+ */
 const getEnv = (key: string): string => {
+  const prefixes = ['', 'NEXT_PUBLIC_', 'SUPABASE_PUBLISHABLE_', 'REACT_APP_'];
   try {
     if (typeof process !== 'undefined' && process.env) {
-      // Check variants provided by user and standard ones
-      return (
-        process.env[key] || 
-        process.env[`NEXT_PUBLIC_${key}`] || 
-        process.env[`SUPABASE_PUBLISHABLE_${key}`] || 
-        ''
-      );
+      for (const prefix of prefixes) {
+        const val = process.env[prefix + key];
+        if (val) return val;
+      }
     }
-  } catch (e) {
-    console.warn(`Env access error for ${key}:`, e);
-  }
+  } catch (e) {}
   return '';
 };
 
-const supabaseUrl = getEnv('SUPABASE_URL') || getEnv('NEXT_PUBLIC_SUPABASE_URL');
-const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') || getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+const supabaseUrl = getEnv('SUPABASE_URL');
+const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY') || getEnv('SUPABASE_ANON_KEY');
 
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
 if (!supabase) {
-  console.warn("Supabase Service: Failed to initialize. Check your URL and Key settings.");
+  console.warn("Supabase Service: Initialisation failed. Keys not found in process.env.");
 }
 
 /**
@@ -53,7 +52,7 @@ export const signOut = async () => {
  * DATA FUNCTIONS
  */
 export const syncInventoryItem = async (item: InventoryItem) => {
-  if (!supabase) return;
+  if (!supabase || !item.userId) return;
   try {
     const { error } = await supabase
       .from('inventory')
@@ -68,7 +67,7 @@ export const syncInventoryItem = async (item: InventoryItem) => {
         unit: item.unit,
         location_id: item.locationId,
         updated_at: item.updatedAt,
-        user_id: item.userId // Track ownership
+        user_id: item.userId 
       });
     if (error) throw error;
   } catch (err) {
@@ -84,7 +83,8 @@ export const syncSubLocation = async (sub: SubLocation) => {
       .upsert({
         id: sub.id,
         location_id: sub.locationId,
-        name: sub.name
+        name: sub.name,
+        user_id: (await supabase.auth.getUser()).data.user?.id
       });
     if (error) throw error;
   } catch (err) {
@@ -105,6 +105,9 @@ export const deleteSubLocation = async (id: string) => {
 export const bulkSyncInventory = async (items: InventoryItem[]) => {
   if (!supabase) return;
   try {
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    if (!userId) return;
+
     const payload = items.map(item => ({
       id: item.id,
       product_id: item.productId,
@@ -116,7 +119,7 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
       unit: item.unit,
       location_id: item.locationId,
       updated_at: item.updatedAt,
-      user_id: item.userId
+      user_id: userId
     }));
     const { error } = await supabase.from('inventory').upsert(payload);
     if (error) throw error;

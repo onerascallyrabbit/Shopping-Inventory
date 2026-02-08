@@ -58,11 +58,12 @@ export interface InventoryItem {
   itemName: string;
   category: string;
   variety?: string;
-  subLocation?: string; // Store name of sub-location for simplicity/flexibility
+  subLocation?: string; 
   quantity: number;
   unit: string;
   locationId: string;
   updatedAt: string;
+  userId?: string; // Track who owns/created this record
 }
 
 export interface Vehicle {

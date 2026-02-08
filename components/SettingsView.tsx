@@ -1,9 +1,11 @@
-
 import React, { useState } from 'react';
 import { StoreLocation, Vehicle, StorageLocation, SubLocation } from '../types';
+// Corrected import: searchStoreDetails is provided by Gemini, not Supabase
+import { supabase } from '../services/supabaseService';
 import { searchStoreDetails } from '../services/geminiService';
 
 interface SettingsViewProps {
+  user?: any;
   location: string;
   onLocationChange: (loc: string) => void;
   zip: string;
@@ -25,7 +27,7 @@ interface SettingsViewProps {
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ 
-  location, onLocationChange, zip, onZipChange, categoryOrder, onCategoryOrderChange,
+  user, location, onLocationChange, zip, onZipChange, categoryOrder, onCategoryOrderChange,
   stores, onStoresChange, vehicles, onVehiclesChange, activeVehicleId, onActiveVehicleChange,
   gasPrice, onGasPriceChange, storageLocations, onStorageLocationsChange,
   subLocations, onSubLocationsChange
@@ -118,7 +120,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <h2 className="text-2xl font-black text-slate-900 px-1">Settings</h2>
 
       <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
-        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Location & Fuel</h3>
+        <div className="flex items-center justify-between mb-4">
+           <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest leading-none">Location & Fuel</h3>
+           <div className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase ${supabase && user ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+              {supabase && user ? 'Cloud Sync' : 'Local Only'}
+           </div>
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">City/Region</label>
@@ -154,7 +161,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </section>
 
       <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
-        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Storage & Sub-locations</h3>
+        <div className="flex items-center justify-between mb-4">
+           <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest leading-none">Storage & Sub-locations</h3>
+           <div className={`flex items-center space-x-1.5 px-2 py-0.5 rounded text-[8px] font-bold uppercase ${supabase && user ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+              <div className={`w-1 h-1 rounded-full ${supabase && user ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+              <span>{supabase && user ? 'Secured' : 'No Sync'}</span>
+           </div>
+        </div>
         <div className="space-y-4 mb-6">
           {storageLocations.map(loc => (
             <div key={loc.id} className="space-y-2">

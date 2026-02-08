@@ -17,6 +17,7 @@ import {
   syncStorageLocation,
   deleteStorageLocation,
   fetchUserData,
+  testDatabaseConnection,
   supabase, 
   signInWithGoogle 
 } from './services/supabaseService';
@@ -37,24 +38,58 @@ const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
   const hasEnv = typeof process !== 'undefined' && process.env;
   const hasApiKey = !!(hasEnv && process.env.API_KEY);
   const hasSupabase = !!supabase;
-  const [show, setShow] = useState(!hasApiKey || !hasSupabase || !user);
+  const [show, setShow] = useState(true);
+  const [dbStatus, setDbStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
+  const [dbError, setDbError] = useState<string>('');
 
-  if (hasApiKey && hasSupabase && user && !show) return null;
-  if (!show) return null;
+  const checkConnection = async () => {
+    setDbStatus('checking');
+    const result = await testDatabaseConnection();
+    if (result.success) {
+      setDbStatus('success');
+    } else {
+      setDbStatus('error');
+      setDbError(result.error || 'Unknown connection error');
+    }
+  };
+
+  // If everything is fine, only show if specifically toggled or error occurs
+  const isHealthy = hasApiKey && hasSupabase && user && dbStatus === 'success';
+  if (isHealthy && !show) return null;
 
   return (
-    <div className="bg-slate-900 border-b border-slate-800 p-2.5 flex flex-col items-center space-y-2 text-center z-50">
+    <div className="bg-slate-900 border-b border-slate-800 p-3 flex flex-col items-center space-y-3 text-center z-50 animate-in slide-in-from-top duration-300">
       <div className="flex items-center space-x-2">
-        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasSupabase && user ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">System Status</span>
+        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${dbStatus === 'success' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Diagnostic Console</span>
       </div>
+      
       <div className="flex flex-wrap justify-center gap-1.5">
-        {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase">AI Service Offline</span>}
-        {!hasSupabase && <span className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase">Sync Restricted</span>}
-        {hasSupabase && !user && <span className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-indigo-400 uppercase">Sign-in Required</span>}
-        {hasApiKey && hasSupabase && user && <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-emerald-400 uppercase">All Systems Nominal</span>}
+        {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase tracking-wider">AI Service Offline</span>}
+        {!hasSupabase && <span className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase tracking-wider">Cloud Unlinked</span>}
+        {hasSupabase && !user && <span className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-indigo-400 uppercase tracking-wider">Sign-in Required</span>}
+        {hasSupabase && user && (
+          <button 
+            onClick={checkConnection}
+            className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider transition-colors border ${
+              dbStatus === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+              dbStatus === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+              'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+            }`}
+          >
+            {dbStatus === 'checking' ? 'Testing Link...' : dbStatus === 'success' ? 'Link Verified' : 'Verify Link'}
+          </button>
+        )}
       </div>
-      <button onClick={() => setShow(false)} className="text-[8px] font-black text-slate-500 uppercase hover:text-white transition-colors">Dismiss</button>
+
+      {dbStatus === 'error' && (
+        <div className="max-w-xs bg-red-500/5 border border-red-500/10 rounded-lg p-2 mt-1">
+          <p className="text-[9px] font-medium text-red-400/80 leading-relaxed italic">DB Error: {dbError}</p>
+          <p className="text-[8px] font-black text-red-300/40 uppercase mt-1 tracking-widest">Ensure you ran the SQL script in Supabase Editor</p>
+        </div>
+      )}
+
+      <button onClick={() => setShow(false)} className="text-[9px] font-black text-slate-600 uppercase hover:text-white transition-colors tracking-widest">Hide Console</button>
     </div>
   );
 };
@@ -101,8 +136,23 @@ const App: React.FC = () => {
           }));
           setInventory(mapped);
         }
-        if (data.storageLocations.length) setStorageLocations(data.storageLocations);
-        if (data.subLocations.length) setSubLocations(data.subLocations);
+        
+        // Map Storage Locations (Ensure structure matches)
+        if (data.storageLocations.length) {
+          setStorageLocations(data.storageLocations.map(s => ({
+            id: s.id,
+            name: s.name
+          })));
+        }
+
+        // Map Sub Locations (DB columns are snake_case)
+        if (data.subLocations.length) {
+          setSubLocations(data.subLocations.map(s => ({
+            id: s.id,
+            locationId: s.location_id,
+            name: s.name
+          })));
+        }
       }
     };
 
@@ -389,6 +439,7 @@ const App: React.FC = () => {
         {activeTab === 'shop' && <ShopPlan items={shoppingList} products={products} stores={stores} vehicles={vehicles} activeVehicleId={activeVehicleId} gasPrice={gasPrice} onToggle={handleToggleListItem} onOverrideStore={(id, store) => handleUpdateListItem(id, { manualStore: store })} />}
         {activeTab === 'settings' && (
           <SettingsView 
+            user={user}
             location={userLocation}
             onLocationChange={setUserLocation}
             zip={userZip}

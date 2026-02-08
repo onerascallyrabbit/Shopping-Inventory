@@ -9,7 +9,14 @@ import Header from './components/Header';
 import AddItemModal from './components/AddItemModal';
 import SettingsView from './components/SettingsView';
 import InventoryView from './components/InventoryView';
-import { syncInventoryItem, bulkSyncInventory, syncSubLocation, deleteSubLocation, supabase } from './services/supabaseService';
+import { 
+  syncInventoryItem, 
+  bulkSyncInventory, 
+  syncSubLocation, 
+  deleteSubLocation, 
+  supabase, 
+  signInWithGoogle 
+} from './services/supabaseService';
 
 const DEFAULT_CATEGORIES = [
   "Produce", "Dairy", "Meat", "Seafood", "Deli", "Bakery", 
@@ -23,24 +30,25 @@ const DEFAULT_STORAGE: StorageLocation[] = [
   { id: '3', name: 'Freezer #1' }
 ];
 
-const DiagnosticBanner: React.FC = () => {
+const DiagnosticBanner: React.FC<{ user?: any }> = ({ user }) => {
   const hasEnv = typeof process !== 'undefined' && process.env;
   const hasApiKey = !!(hasEnv && process.env.API_KEY);
   const hasSupabase = !!supabase;
-  const [show, setShow] = useState(!hasApiKey || !hasSupabase);
+  const [show, setShow] = useState(!hasApiKey || !hasSupabase || !user);
 
   if (!show) return null;
 
   return (
     <div className="bg-slate-900 border-b border-slate-800 p-2.5 flex flex-col items-center space-y-2 text-center z-50">
       <div className="flex items-center space-x-2">
-        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasSupabase ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
         <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">System Status</span>
       </div>
       <div className="flex flex-wrap justify-center gap-1.5">
-        {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase">AI Key Missing</span>}
-        {!hasSupabase && <span className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase">Sync Restricted</span>}
-        {hasApiKey && hasSupabase && <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-emerald-400 uppercase">All Systems Nominal</span>}
+        {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase">AI Offline</span>}
+        {!hasSupabase && <span className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 uppercase">Cloud Sync Failed</span>}
+        {hasSupabase && !user && <span className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-indigo-400 uppercase">Session Required</span>}
+        {hasApiKey && hasSupabase && user && <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-emerald-400 uppercase">Connected</span>}
       </div>
       <button onClick={() => setShow(false)} className="text-[8px] font-black text-slate-500 uppercase hover:text-white transition-colors">Dismiss Warnings</button>
     </div>
@@ -48,6 +56,7 @@ const DiagnosticBanner: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
@@ -64,6 +73,23 @@ const App: React.FC = () => {
   const [lastUsedStore, setLastUsedStore] = useState<string>('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [initialMode, setInitialMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('tag');
+
+  // Handle Auth Changes
+  useEffect(() => {
+    if (!supabase) return;
+    
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const handleOpenModal = (e: any) => {
@@ -147,7 +173,8 @@ const App: React.FC = () => {
         updatedItem = {
           ...updated[existingIndex],
           quantity: updated[existingIndex].quantity + qty,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          userId: user?.id
         };
         updated[existingIndex] = updatedItem;
         syncInventoryItem(updatedItem);
@@ -163,7 +190,8 @@ const App: React.FC = () => {
         quantity: qty,
         unit,
         locationId,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        userId: user?.id
       };
       syncInventoryItem(updatedItem);
       return [...prev, updatedItem];
@@ -174,7 +202,8 @@ const App: React.FC = () => {
     const itemsWithMeta: InventoryItem[] = newItems.map(item => ({
       ...item,
       id: crypto.randomUUID(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      userId: user?.id
     }));
     setInventory(prev => {
       const merged = [...prev];
@@ -268,10 +297,34 @@ const App: React.FC = () => {
     setIsAddModalOpen(false);
   };
 
+  if (supabase && !user) {
+    return (
+      <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center">
+        <div className="bg-indigo-600 p-6 rounded-[40px] shadow-2xl shadow-indigo-200 mb-8">
+          <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Aisle Be Back</h1>
+        <p className="text-slate-400 font-medium mb-12 max-w-[280px] leading-relaxed">Smart inventory and price tracking. Securely sync your data across all your devices.</p>
+        <button 
+          onClick={signInWithGoogle}
+          className="w-full max-w-xs flex items-center justify-center space-x-3 bg-slate-900 text-white font-black py-5 rounded-[24px] shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.908 3.152-1.928 4.176-1.248 1.248-3.216 2.592-6.528 2.592-5.32 0-9.28-4.32-9.28-9.64s3.96-9.64 9.28-9.64c2.88 0 5.112 1.136 6.64 2.56l2.312-2.312C18.84 1.288 15.864 0 12 0 5.48 0 0 5.48 0 12s5.48 12 12 12c3.544 0 6.232-1.176 8.336-3.32 2.16-2.16 2.848-5.216 2.848-7.68 0-.744-.064-1.44-.192-2.08h-10.512z"/>
+          </svg>
+          <span>Sign In with Google</span>
+        </button>
+        <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-widest">Database Ready</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
-      <DiagnosticBanner />
-      <Header onSettingsClick={() => setActiveTab('settings')} />
+      <DiagnosticBanner user={user} />
+      <Header user={user} onSettingsClick={() => setActiveTab('settings')} />
       <main className="flex-1 overflow-y-auto pb-32 px-4 pt-6">
         {activeTab === 'dashboard' && <Dashboard products={products} onAddToList={handleAddToList} />}
         {activeTab === 'items' && <ItemBrowser products={products} categoryOrder={categoryOrder} onAddToList={handleAddToList} />}

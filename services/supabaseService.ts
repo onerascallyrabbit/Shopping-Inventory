@@ -3,26 +3,44 @@ import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
  * Enhanced environment variable discovery.
+ * Tries process.env, import.meta.env, and window-level globals.
  */
-const getEnv = (key: string): string => {
-  const prefixes = ['', 'NEXT_PUBLIC_', 'SUPABASE_PUBLISHABLE_', 'REACT_APP_'];
+export const getEnv = (key: string): string => {
+  const prefixes = ['', 'VITE_', 'NEXT_PUBLIC_', 'SUPABASE_PUBLISHABLE_', 'REACT_APP_'];
+  
+  // 1. Try standard process.env (Node/Webpack/CRA)
   try {
-    if (typeof process !== 'undefined' && process.env) {
+    const p = (globalThis as any).process;
+    if (p?.env) {
       for (const prefix of prefixes) {
-        const val = process.env[prefix + key];
+        const val = p.env[prefix + key];
         if (val) return val;
       }
     }
   } catch (e) {}
   
-  // Fallback for some browser environments that inject into window or globalThis
-  const globalObj = (globalThis as any);
-  if (globalObj.process?.env) {
-    for (const prefix of prefixes) {
-       const val = globalObj.process.env[prefix + key];
-       if (val) return val;
+  // 2. Try import.meta.env (Vite/ESM)
+  try {
+    const meta = (import.meta as any).env;
+    if (meta) {
+      for (const prefix of prefixes) {
+        const val = meta[prefix + key];
+        if (val) return val;
+      }
     }
-  }
+  } catch (e) {}
+
+  // 3. Try window globals (Some injectors)
+  try {
+    const win = (window as any);
+    const envSource = win.process?.env || win.ENV || win.__ENV__;
+    if (envSource) {
+      for (const prefix of prefixes) {
+        const val = envSource[prefix + key];
+        if (val) return val;
+      }
+    }
+  } catch (e) {}
   
   return '';
 };
@@ -36,7 +54,10 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   : null;
 
 if (!supabase) {
-  console.warn("Supabase Config: Missing URL or Key. App will operate in Local-Only mode.");
+  console.warn("Supabase Config: Missing URL or Key. Detected:", { 
+    url: !!supabaseUrl, 
+    key: !!supabaseAnonKey 
+  });
 }
 
 /**

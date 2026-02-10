@@ -150,7 +150,7 @@ const App: React.FC = () => {
         }
 
         if (data.subLocations.length) {
-          setSubLocations(data.subLocations.map(s => ({ id: s.id, locationId: s.location_id, name: s.name })));
+          setSubLocations(data.subLocations.map(s => ({ id: s.id, location_id: s.location_id, name: s.name })));
         }
       }
     };
@@ -361,25 +361,25 @@ const App: React.FC = () => {
     setIsAddModalOpen(false);
   };
 
-  const debugEnvironment = () => {
-    console.group("Aisle Be Back: Environment Debug");
+  const runDeepScan = () => {
+    console.group("Aisle Be Back: Deep Environment Scan");
     try {
       if (typeof process !== 'undefined') {
         console.log("process.env keys:", Object.keys(process.env || {}));
       }
-      // Fix: Line 372/373 TypeScript error by casting import.meta to any
       // @ts-ignore
       if (import.meta && (import.meta as any).env) {
         console.log("import.meta.env keys:", Object.keys((import.meta as any).env));
       }
-      console.log("Diagnostic check for literal keys:");
-      console.log("- NEXT_PUBLIC_SUPABASE_URL found:", !!getEnv('SUPABASE_URL'));
-      console.log("- NEXT_PUBLIC_SUPABASE_ANON_KEY found:", !!getEnv('SUPABASE_ANON_KEY'));
+      console.log("--- Standard Key Detection ---");
+      console.log("NEXT_PUBLIC_SUPABASE_URL:", getEnv('SUPABASE_URL') ? 'FOUND' : 'MISSING');
+      console.log("NEXT_PUBLIC_SUPABASE_ANON_KEY:", getEnv('SUPABASE_ANON_KEY') ? 'FOUND' : 'MISSING');
+      console.log("API_KEY:", getEnv('API_KEY') ? 'FOUND' : 'MISSING');
     } catch (e) {
-      console.error("Debug failed", e);
+      console.error("Scan failed", e);
     }
     console.groupEnd();
-    alert("Environment variables logged to browser console. Right-click -> Inspect -> Console to view.");
+    alert("Deep Scan complete. Check browser console (Right-Click -> Inspect -> Console).");
   };
 
   // AUTH GATE: Show if no user and not explicitly in offline mode
@@ -413,12 +413,12 @@ const App: React.FC = () => {
              <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 text-left space-y-3">
                 <p className="text-[11px] font-black text-amber-700 uppercase tracking-widest">Connection Diagnostics:</p>
                 <div className="space-y-1.5">
-                   <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-bold text-slate-500">NEXT_PUBLIC_SUPABASE_URL:</span>
+                   <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">NEXT_PUBLIC_SUPABASE_URL</span>
                       <span className={`text-[10px] font-black ${sUrl ? 'text-emerald-500' : 'text-red-500'}`}>{sUrl ? 'DETECTED' : 'MISSING'}</span>
                    </div>
-                   <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-bold text-slate-500">NEXT_PUBLIC_SUPABASE_ANON_KEY:</span>
+                   <div className="flex flex-col pt-1">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>
                       <span className={`text-[10px] font-black ${sKey ? 'text-emerald-500' : 'text-red-500'}`}>{sKey ? 'DETECTED' : 'MISSING'}</span>
                    </div>
                 </div>
@@ -427,26 +427,26 @@ const App: React.FC = () => {
                     onClick={() => setShowTechDetails(!showTechDetails)}
                     className="text-[9px] font-black text-amber-600 underline uppercase tracking-tighter text-left"
                   >
-                    {showTechDetails ? 'Hide' : 'Show'} help for Vercel
+                    {showTechDetails ? 'Hide' : 'Show'} Vercel Fix
                   </button>
                   <button 
-                    onClick={debugEnvironment}
+                    onClick={runDeepScan}
                     className="text-[9px] font-black text-slate-500 uppercase tracking-widest bg-slate-200/50 py-2 rounded-lg"
                   >
-                    Debug Environment (Console)
+                    Run Deep Scan (Console)
                   </button>
                   <button 
                     onClick={() => window.location.reload()}
                     className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 py-2 rounded-lg"
                   >
-                    RELOAD PAGE (After Redeploy)
+                    RELOAD & REBUILD
                   </button>
                 </div>
                 {showTechDetails && (
                   <p className="text-[9px] font-medium text-amber-800 italic leading-relaxed pt-1 border-t border-amber-100 mt-2">
-                    Vercel variables must be in your <b>Production</b> environment. Ensure you have triggered a <b>new deployment</b> in Vercel after connecting the Supabase integration. 
+                    Vercel variables must be prefixed with <b>NEXT_PUBLIC_</b> to be visible to the client. If they are named just `SUPABASE_URL`, they are hidden from the browser. 
                     <br/><br/>
-                    If both show MISSING after a redeploy, ensure your project build settings are configured to use the integration's environment variables.
+                    Rename them in Vercel settings and then <b>Redeploy</b> the project.
                   </p>
                 )}
              </div>
@@ -460,7 +460,7 @@ const App: React.FC = () => {
           </button>
         </div>
         
-        <p className="mt-12 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Build 2.1.3 • {supabase ? 'Sync Active' : 'Offline Mode'}</p>
+        <p className="mt-12 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Build 2.1.4 • {supabase ? 'Sync Active' : 'Offline Mode'}</p>
       </div>
     );
   }

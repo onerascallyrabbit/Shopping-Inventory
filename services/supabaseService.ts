@@ -2,51 +2,25 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
- * Robust environment variable discovery using literal access.
- * Vercel and other bundlers replace these strings at build time.
+ * Direct environment variable access matching user's successful project pattern.
  */
-export const getEnv = (key: string): string => {
-  const k = key.toUpperCase();
-  
-  if (k === 'SUPABASE_URL') {
-    return (
-      // @ts-ignore
-      (typeof process !== 'undefined' ? (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL) : '') ||
-      // @ts-ignore
-      (import.meta.env?.SUPABASE_URL || import.meta.env?.NEXT_PUBLIC_SUPABASE_URL || import.meta.env?.VITE_SUPABASE_URL) || 
-      ''
-    );
-  }
-  
-  if (k === 'SUPABASE_ANON_KEY') {
-    return (
-      // @ts-ignore
-      (typeof process !== 'undefined' ? (process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY) : '') ||
-      // @ts-ignore
-      (import.meta.env?.SUPABASE_ANON_KEY || import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY) ||
-      ''
-    );
-  }
+// @ts-ignore
+const SUPABASE_URL = (typeof process !== 'undefined' ? process.env.SUPABASE_URL : undefined) || (import.meta as any).env?.SUPABASE_URL || '';
+// @ts-ignore
+const SUPABASE_ANON_KEY = (typeof process !== 'undefined' ? process.env.SUPABASE_ANON_KEY : undefined) || (import.meta as any).env?.SUPABASE_ANON_KEY || '';
+// @ts-ignore
+const API_KEY = (typeof process !== 'undefined' ? process.env.API_KEY : undefined) || (import.meta as any).env?.API_KEY || '';
 
-  if (k === 'API_KEY') {
-    return (
-      // @ts-ignore
-      (typeof process !== 'undefined' ? (process.env.API_KEY || process.env.NEXT_PUBLIC_API_KEY || process.env.VITE_API_KEY) : '') ||
-      // @ts-ignore
-      (import.meta.env?.API_KEY || import.meta.env?.NEXT_PUBLIC_API_KEY || import.meta.env?.VITE_API_KEY) ||
-      ''
-    );
-  }
-  
+export const getEnv = (key: string): string => {
+  if (key === 'SUPABASE_URL') return SUPABASE_URL;
+  if (key === 'SUPABASE_ANON_KEY') return SUPABASE_ANON_KEY;
+  if (key === 'API_KEY') return API_KEY;
   return '';
 };
 
-const supabaseUrl = getEnv('SUPABASE_URL');
-const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
-
 // Initialize only if keys exist
-export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey) 
+export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
   : null;
 
 /**

@@ -361,6 +361,27 @@ const App: React.FC = () => {
     setIsAddModalOpen(false);
   };
 
+  const debugEnvironment = () => {
+    console.group("Aisle Be Back: Environment Debug");
+    try {
+      if (typeof process !== 'undefined') {
+        console.log("process.env keys:", Object.keys(process.env || {}));
+      }
+      // Fix: Line 372/373 TypeScript error by casting import.meta to any
+      // @ts-ignore
+      if (import.meta && (import.meta as any).env) {
+        console.log("import.meta.env keys:", Object.keys((import.meta as any).env));
+      }
+      console.log("Diagnostic check for literal keys:");
+      console.log("- NEXT_PUBLIC_SUPABASE_URL found:", !!getEnv('SUPABASE_URL'));
+      console.log("- NEXT_PUBLIC_SUPABASE_ANON_KEY found:", !!getEnv('SUPABASE_ANON_KEY'));
+    } catch (e) {
+      console.error("Debug failed", e);
+    }
+    console.groupEnd();
+    alert("Environment variables logged to browser console. Right-click -> Inspect -> Console to view.");
+  };
+
   // AUTH GATE: Show if no user and not explicitly in offline mode
   if (!user && !isOfflineMode) {
     const sUrl = getEnv('SUPABASE_URL');
@@ -393,11 +414,11 @@ const App: React.FC = () => {
                 <p className="text-[11px] font-black text-amber-700 uppercase tracking-widest">Connection Diagnostics:</p>
                 <div className="space-y-1.5">
                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-slate-500">SUPABASE_URL:</span>
+                      <span className="text-[9px] font-bold text-slate-500">NEXT_PUBLIC_SUPABASE_URL:</span>
                       <span className={`text-[10px] font-black ${sUrl ? 'text-emerald-500' : 'text-red-500'}`}>{sUrl ? 'DETECTED' : 'MISSING'}</span>
                    </div>
                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-slate-500">SUPABASE_ANON_KEY:</span>
+                      <span className="text-[9px] font-bold text-slate-500">NEXT_PUBLIC_SUPABASE_ANON_KEY:</span>
                       <span className={`text-[10px] font-black ${sKey ? 'text-emerald-500' : 'text-red-500'}`}>{sKey ? 'DETECTED' : 'MISSING'}</span>
                    </div>
                 </div>
@@ -409,6 +430,12 @@ const App: React.FC = () => {
                     {showTechDetails ? 'Hide' : 'Show'} help for Vercel
                   </button>
                   <button 
+                    onClick={debugEnvironment}
+                    className="text-[9px] font-black text-slate-500 uppercase tracking-widest bg-slate-200/50 py-2 rounded-lg"
+                  >
+                    Debug Environment (Console)
+                  </button>
+                  <button 
                     onClick={() => window.location.reload()}
                     className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 py-2 rounded-lg"
                   >
@@ -417,7 +444,9 @@ const App: React.FC = () => {
                 </div>
                 {showTechDetails && (
                   <p className="text-[9px] font-medium text-amber-800 italic leading-relaxed pt-1 border-t border-amber-100 mt-2">
-                    Vercel variables must be in your <b>Production</b> environment. Ensure you have triggered a <b>new deployment</b> in Vercel after connecting the Supabase integration.
+                    Vercel variables must be in your <b>Production</b> environment. Ensure you have triggered a <b>new deployment</b> in Vercel after connecting the Supabase integration. 
+                    <br/><br/>
+                    If both show MISSING after a redeploy, ensure your project build settings are configured to use the integration's environment variables.
                   </p>
                 )}
              </div>
@@ -431,7 +460,7 @@ const App: React.FC = () => {
           </button>
         </div>
         
-        <p className="mt-12 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Build 2.1.2 • {supabase ? 'Sync Active' : 'Offline Mode'}</p>
+        <p className="mt-12 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Build 2.1.3 • {supabase ? 'Sync Active' : 'Offline Mode'}</p>
       </div>
     );
   }

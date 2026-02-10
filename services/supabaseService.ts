@@ -2,74 +2,66 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
- * Robust environment variable discovery.
- * Prioritizes literal access patterns (NEXT_PUBLIC_) for bundler static replacement.
+ * Robust environment variable discovery using literal access.
+ * Bundlers like Vite/Webpack use static analysis to replace these strings.
+ * Dynamic access like process.env[key] often fails in production builds.
  */
 export const getEnv = (key: string): string => {
   const k = key.toUpperCase();
   
-  // 1. Check for literal matches first. 
-  // We explicitly list these because some bundlers (like Vite) only replace literal strings.
+  // 1. SUPABASE URL - Literal checks for static replacement
   if (k === 'SUPABASE_URL') {
     try {
-      // Check process.env (Node/Next.js/Vercel)
-      if (typeof process !== 'undefined' && process.env) {
-        const val = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-        if (val) return val;
-      }
-      // Check import.meta.env (Vite/ESM)
-      const meta = (import.meta as any).env;
-      if (meta) {
-        const val = meta.NEXT_PUBLIC_SUPABASE_URL || meta.VITE_SUPABASE_URL || meta.SUPABASE_URL;
-        if (val) return val;
-      }
+      const val = 
+        // @ts-ignore
+        (typeof process !== 'undefined' && process.env ? (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) : undefined) ||
+        // @ts-ignore
+        (import.meta.env ? (import.meta.env.NEXT_PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL) : undefined);
+      if (val) return val;
     } catch (e) {}
   }
   
+  // 2. SUPABASE ANON KEY - Literal checks for static replacement
   if (k === 'SUPABASE_ANON_KEY') {
     try {
-      if (typeof process !== 'undefined' && process.env) {
-        const val = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-        if (val) return val;
-      }
-      const meta = (import.meta as any).env;
-      if (meta) {
-        const val = meta.NEXT_PUBLIC_SUPABASE_ANON_KEY || meta.VITE_SUPABASE_ANON_KEY || meta.SUPABASE_ANON_KEY;
-        if (val) return val;
-      }
+      const val = 
+        // @ts-ignore
+        (typeof process !== 'undefined' && process.env ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY) : undefined) ||
+        // @ts-ignore
+        (import.meta.env ? (import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY) : undefined);
+      if (val) return val;
     } catch (e) {}
   }
 
+  // 3. GEMINI API KEY - Literal checks for static replacement
   if (k === 'API_KEY') {
     try {
-      if (typeof process !== 'undefined' && process.env) {
-        const val = process.env.API_KEY || process.env.NEXT_PUBLIC_API_KEY || process.env.VITE_API_KEY;
-        if (val) return val;
-      }
-      const meta = (import.meta as any).env;
-      if (meta) {
-        const val = meta.API_KEY || meta.NEXT_PUBLIC_API_KEY || meta.VITE_API_KEY;
-        if (val) return val;
-      }
+      const val = 
+        // @ts-ignore
+        (typeof process !== 'undefined' && process.env ? (process.env.API_KEY || process.env.NEXT_PUBLIC_API_KEY || process.env.VITE_API_KEY) : undefined) ||
+        // @ts-ignore
+        (import.meta.env ? (import.meta.env.API_KEY || import.meta.env.NEXT_PUBLIC_API_KEY || import.meta.env.VITE_API_KEY) : undefined);
+      if (val) return val;
     } catch (e) {}
   }
 
-  // 2. Fallback: Dynamic lookup in common objects
-  const prefixes = ['', 'NEXT_PUBLIC_', 'VITE_', 'REACT_APP_'];
-  const sources = [];
-  
-  try { if (typeof process !== 'undefined' && process.env) sources.push(process.env); } catch {}
-  try { if ((import.meta as any).env) sources.push((import.meta as any).env); } catch {}
-  try { sources.push(window); } catch {}
-  try { sources.push(globalThis); } catch {}
+  // 4. Fallback: Try dynamic lookup for other keys
+  try {
+    const sources = [
+      typeof process !== 'undefined' ? process.env : null,
+      (import.meta as any).env,
+      (window as any).process?.env,
+      (window as any).ENV
+    ].filter(Boolean);
 
-  for (const source of sources) {
-    if (!source) continue;
-    for (const p of prefixes) {
-      const val = (source as any)[p + k];
-      if (typeof val === 'string' && val.length > 0) return val;
+    const prefixes = ['', 'NEXT_PUBLIC_', 'VITE_', 'REACT_APP_'];
+    for (const source of sources) {
+      for (const p of prefixes) {
+        const val = (source as any)[p + k];
+        if (typeof val === 'string' && val.length > 0) return val;
+      }
     }
-  }
+  } catch (e) {}
   
   return '';
 };
@@ -83,7 +75,7 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   : null;
 
 if (!supabase) {
-  console.warn("Supabase Config: Missing URL or Key. App will operate in Local-Only mode.");
+  console.warn("Supabase Config: Missing URL or Key. Check Vercel Environment Variables.");
 }
 
 /**

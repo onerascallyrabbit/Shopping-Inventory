@@ -2,64 +2,40 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
- * Robust environment variable discovery.
- * Bundlers like Vite, Webpack, and Vercel's internal build engine 
- * use static analysis to replace literal strings like 'process.env.NAME'.
+ * Robust environment variable discovery using literal access.
+ * Vercel and other bundlers replace these strings at build time.
  */
 export const getEnv = (key: string): string => {
   const k = key.toUpperCase();
   
-  // 1. Explicit check for Supabase URL
   if (k === 'SUPABASE_URL') {
-    try {
-      // Literal access for bundler replacement
-      const val = 
-        (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) : undefined) ||
-        (import.meta as any).env?.NEXT_PUBLIC_SUPABASE_URL ||
-        (import.meta as any).env?.VITE_SUPABASE_URL ||
-        (import.meta as any).env?.SUPABASE_URL;
-      if (val) return val;
-    } catch {}
+    return (
+      // @ts-ignore
+      (typeof process !== 'undefined' ? (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL) : '') ||
+      // @ts-ignore
+      (import.meta.env?.SUPABASE_URL || import.meta.env?.NEXT_PUBLIC_SUPABASE_URL || import.meta.env?.VITE_SUPABASE_URL) || 
+      ''
+    );
   }
   
-  // 2. Explicit check for Supabase Anon Key
   if (k === 'SUPABASE_ANON_KEY') {
-    try {
-      const val = 
-        (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY) : undefined) ||
-        (import.meta as any).env?.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-        (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
-        (import.meta as any).env?.SUPABASE_ANON_KEY;
-      if (val) return val;
-    } catch {}
+    return (
+      // @ts-ignore
+      (typeof process !== 'undefined' ? (process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY) : '') ||
+      // @ts-ignore
+      (import.meta.env?.SUPABASE_ANON_KEY || import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY) ||
+      ''
+    );
   }
 
-  // 3. Explicit check for Gemini API Key
   if (k === 'API_KEY') {
-    try {
-      const val = 
-        (typeof process !== 'undefined' ? (process.env.API_KEY || process.env.NEXT_PUBLIC_API_KEY || process.env.VITE_API_KEY) : undefined) ||
-        (import.meta as any).env?.API_KEY ||
-        (import.meta as any).env?.NEXT_PUBLIC_API_KEY ||
-        (import.meta as any).env?.VITE_API_KEY;
-      if (val) return val;
-    } catch {}
-  }
-
-  // 4. Dynamic Fallback
-  const prefixes = ['', 'NEXT_PUBLIC_', 'VITE_', 'REACT_APP_'];
-  const sources = [
-    typeof process !== 'undefined' ? process.env : null,
-    (import.meta as any)?.env,
-    (window as any).process?.env,
-    (window as any).ENV
-  ].filter(Boolean);
-
-  for (const source of sources) {
-    for (const p of prefixes) {
-      const val = (source as any)[p + k];
-      if (typeof val === 'string' && val.length > 0) return val;
-    }
+    return (
+      // @ts-ignore
+      (typeof process !== 'undefined' ? (process.env.API_KEY || process.env.NEXT_PUBLIC_API_KEY || process.env.VITE_API_KEY) : '') ||
+      // @ts-ignore
+      (import.meta.env?.API_KEY || import.meta.env?.NEXT_PUBLIC_API_KEY || import.meta.env?.VITE_API_KEY) ||
+      ''
+    );
   }
   
   return '';
@@ -68,14 +44,10 @@ export const getEnv = (key: string): string => {
 const supabaseUrl = getEnv('SUPABASE_URL');
 const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
 
-// Initialise only if keys exist
+// Initialize only if keys exist
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
-
-if (!supabase) {
-  console.warn("Supabase Config: Connection keys not found in client environment.");
-}
 
 /**
  * HEALTH CHECK

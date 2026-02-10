@@ -1,60 +1,94 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-
-const bootStatus = document.getElementById('boot-status');
-const bootMessage = document.getElementById('boot-message');
-const errorConsole = document.getElementById('error-console');
-const errorText = document.getElementById('error-text');
-
-function reportError(err: unknown) {
-  console.error("BOOTSTRAP ERROR:", err);
-  if (bootMessage) bootMessage.innerText = "Boot Failed";
-  if (errorConsole) errorConsole.style.display = 'block';
-  if (errorText) {
-    errorText.innerText = err instanceof Error 
-      ? `${err.name}: ${err.message}\n\nStack Trace:\n${err.stack}` 
-      : String(err);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aisle Be Back</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+        }
+        #root:empty {
+            display: none;
+        }
+        .system-status {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            z-index: 10000;
+            padding: 2rem;
+            text-align: center;
+        }
+        .system-status.hidden {
+            display: none;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react/": "https://esm.sh/react@19.0.0/",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "@google/genai": "https://esm.sh/@google/genai@^1.39.0"
   }
 }
+</script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="boot-status" class="system-status">
+        <div class="spinner"></div>
+        <h1 style="font-weight: 800; font-size: 1.25rem; color: #1e293b; margin-bottom: 0.5rem;">Aisle Be Back</h1>
+        <p id="boot-message" style="font-size: 0.875rem; color: #64748b;">Initializing application...</p>
+        <div id="error-console" style="margin-top: 2rem; display: none; text-align: left; width: 100%; max-width: 500px;">
+            <p style="font-[10px] font-black uppercase text-red-500 mb-2">Critical Failure Detected:</p>
+            <pre id="error-text" style="background: #fef2f2; border: 1px solid #fee2e2; color: #ef4444; padding: 1rem; border-radius: 12px; font-size: 12px; white-space: pre-wrap; word-break: break-all; font-family: monospace;"></pre>
+            <button onclick="window.location.reload()" style="margin-top: 1rem; width: 100%; padding: 0.75rem; background: #6366f1; color: white; border-radius: 8px; font-weight: 700; border: none; cursor: pointer;">RETRY BOOT</button>
+        </div>
+    </div>
 
-try {
-  console.log("Aisle Be Back: Attempting to mount React root...");
-  const rootElement = document.getElementById('root');
-  
-  if (!rootElement) {
-    throw new Error("Target container #root was not found in the DOM.");
-  }
+    <div id="root"></div>
 
-  const root = ReactDOM.createRoot(rootElement);
-  
-  root.render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  );
-
-  // Mark as bootstrapped for the index.html watchdog
-  (window as any).__APP_BOOTSTRAPPED__ = true;
-
-  // Hide the boot status overlay once React has had a chance to render
-  requestAnimationFrame(() => {
-    if (bootStatus) {
-      bootStatus.classList.add('hidden');
-    }
-    console.log("Aisle Be Back: Application successfully mounted.");
-  });
-
-} catch (err) {
-  reportError(err);
-}
-
-// Catch global errors during execution
-window.onerror = (message, source, lineno, colno, error) => {
-  reportError(error || message);
-  return true;
-};
-
-window.onunhandledrejection = (event) => {
-  reportError(event.reason);
-};
+    <script type="module" src="./index.tsx"></script>
+    
+    <script>
+        setTimeout(() => {
+            const root = document.getElementById('root');
+            if (root && root.innerHTML === '' && !window.__APP_BOOTSTRAPPED__) {
+                const msg = document.getElementById('boot-message');
+                const console = document.getElementById('error-console');
+                const errorText = document.getElementById('error-text');
+                if (msg) msg.innerText = "Application failed to start.";
+                if (console) console.style.display = 'block';
+                if (errorText) errorText.innerText = "Module resolution timeout or version conflict. Ensure only one React version is requested.";
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

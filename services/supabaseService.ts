@@ -1,5 +1,6 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
-import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord } from '../types';
+import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family } from '../types';
 
 // Environment variables
 // @ts-ignore
@@ -43,6 +44,20 @@ export const fetchGlobalStores = async (query: string): Promise<StoreLocation[]>
     hours: s.hours,
     zip: s.zip
   }));
+};
+
+/**
+ * FAMILY MANAGEMENT
+ */
+export const fetchFamily = async (familyId: string): Promise<Family | null> => {
+  if (!supabase || !familyId) return null;
+  const { data, error } = await supabase
+    .from('families')
+    .select('*')
+    .eq('id', familyId)
+    .single();
+  if (error) return null;
+  return data;
 };
 
 /**

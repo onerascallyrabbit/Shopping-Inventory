@@ -1,36 +1,14 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
-import { InventoryItem, SubLocation, StorageLocation } from '../types';
+import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation } from '../types';
 
-/**
- * STATIC ENVIRONMENT CONSTANTS
- * Vite strictly requires the VITE_ prefix to expose variables to the client.
- * If you are using NEXT_PUBLIC_, Vite will strip them during the build.
- */
-
-// 1. Check VITE_ prefix (Highest priority for this build environment)
+// Environment variables handled by Vite/Vercel static replacement
 // @ts-ignore
-const VITE_URL = (import.meta.env?.VITE_SUPABASE_URL) || '';
+export const SUPABASE_URL = (import.meta.env?.VITE_SUPABASE_URL) || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : '') || '';
 // @ts-ignore
-const VITE_KEY = (import.meta.env?.VITE_SUPABASE_ANON_KEY) || '';
-
-// 2. Check NEXT_PUBLIC_ prefix (Requires specific Vite config, often fails in standard builds)
+export const SUPABASE_ANON_KEY = (import.meta.env?.VITE_SUPABASE_ANON_KEY) || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : '') || '';
 // @ts-ignore
-const NEXT_URL = (import.meta.env?.NEXT_PUBLIC_SUPABASE_URL) || (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL : '');
-// @ts-ignore
-const NEXT_KEY = (import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) || (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : '');
-
-// 3. Check Standard Names
-// @ts-ignore
-const STD_URL = (import.meta.env?.SUPABASE_URL) || (typeof process !== 'undefined' ? process.env.SUPABASE_URL : '');
-// @ts-ignore
-const STD_KEY = (import.meta.env?.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' ? process.env.SUPABASE_ANON_KEY : '');
-
-export const SUPABASE_URL = VITE_URL || NEXT_URL || STD_URL || '';
-export const SUPABASE_ANON_KEY = VITE_KEY || NEXT_KEY || STD_KEY || '';
-
-// API Key detection
-// @ts-ignore
-export const API_KEY = (import.meta.env?.VITE_API_KEY) || (import.meta.env?.API_KEY) || (typeof process !== 'undefined' ? (process.env.API_KEY || process.env.VITE_API_KEY) : '') || '';
+export const API_KEY = (import.meta.env?.VITE_API_KEY) || (typeof process !== 'undefined' ? process.env.VITE_API_KEY : '') || '';
 
 export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_URL') return SUPABASE_URL;
@@ -39,180 +17,220 @@ export const getEnv = (key: string): string => {
   return '';
 };
 
-// Initialize Supabase only if keys were successfully injected at build time
 export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
   : null;
 
 /**
- * HEALTH CHECK
+ * PROFILE & SETTINGS SYNC
  */
-export const testDatabaseConnection = async () => {
-  if (!supabase) return { success: false, error: 'Cloud keys missing. Ensure your Vercel/Supabase prefix is set to VITE_' };
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No user session found. Please sign in.' };
+export const fetchProfile = async (): Promise<Profile | null> => {
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
-    const { error } = await supabase.from('storage_locations').select('id').limit(1);
-    
-    if (error) {
-      return { success: false, error: `${error.code}: ${error.message}` };
-    }
-    
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  if (error && error.code !== 'PGRST116') throw error;
+  
+  if (!data) {
+    // Initialize profile if missing
+    const initial = { id: user.id, location_label: '', zip: '', gas_price: 3.50, share_prices: false };
+    await supabase.from('profiles').insert(initial);
+    return { 
+      id: user.id, 
+      locationLabel: '', 
+      zip: '', 
+      gasPrice: 3.50, 
+      sharePrices: false, 
+      categoryOrder: ['Produce', 'Dairy', 'Meat', 'Seafood', 'Deli', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Personal Care', 'Baby', 'Pets', 'Other']
+    };
   }
+
+  return {
+    id: data.id,
+    locationLabel: data.location_label,
+    zip: data.zip,
+    gasPrice: Number(data.gas_price),
+    categoryOrder: data.category_order,
+    activeVehicleId: data.active_vehicle_id,
+    sharePrices: data.share_prices,
+    familyId: data.family_id
+  };
+};
+
+export const syncProfile = async (profile: Partial<Profile>) => {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const payload: any = {};
+  if (profile.locationLabel !== undefined) payload.location_label = profile.locationLabel;
+  if (profile.zip !== undefined) payload.zip = profile.zip;
+  if (profile.gasPrice !== undefined) payload.gas_price = profile.gasPrice;
+  if (profile.categoryOrder !== undefined) payload.category_order = profile.categoryOrder;
+  if (profile.activeVehicleId !== undefined) payload.active_vehicle_id = profile.activeVehicleId;
+  if (profile.sharePrices !== undefined) payload.share_prices = profile.sharePrices;
+  if (profile.familyId !== undefined) payload.family_id = profile.familyId;
+
+  await supabase.from('profiles').upsert({ id: user.id, ...payload });
 };
 
 /**
- * AUTH FUNCTIONS
+ * FAMILY HUB
  */
-export const signInWithGoogle = async () => {
-  if (!supabase) return;
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: window.location.origin
-    }
-  });
+export const createFamily = async (name: string) => {
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const { data, error } = await supabase.from('families').insert({
+    name,
+    invite_code: inviteCode,
+    created_by: user.id
+  }).select().single();
+
   if (error) throw error;
+  await syncProfile({ familyId: data.id });
+  return data;
 };
 
-export const signOut = async () => {
-  if (!supabase) return;
-  await supabase.auth.signOut();
+export const joinFamily = async (inviteCode: string) => {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('families').select('id').eq('invite_code', inviteCode.toUpperCase()).single();
+  if (error) throw new Error('Invalid invite code');
+  await syncProfile({ familyId: data.id });
+  return data;
+};
+
+export const fetchFamilyMembers = async (familyId: string) => {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('profiles').select('id, profiles(id)').eq('family_id', familyId);
+  // This is a simplified fetch; in a real app, you'd join with auth.users if metadata is available via public.profiles
+  return data || [];
 };
 
 /**
- * FETCH FUNCTIONS
+ * VEHICLE & STORE SYNC
+ */
+export const syncVehicle = async (v: Vehicle) => {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('vehicles').upsert({ id: v.id, user_id: user.id, name: v.name, mpg: v.mpg });
+};
+
+export const deleteVehicle = async (id: string) => {
+  if (!supabase) return;
+  await supabase.from('vehicles').delete().eq('id', id);
+};
+
+export const syncStore = async (s: StoreLocation) => {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('stores').upsert({ 
+    id: s.id, user_id: user.id, name: s.name, address: s.address, 
+    lat: s.lat, lng: s.lng, phone: s.phone, hours: s.hours, zip: s.zip 
+  });
+};
+
+/**
+ * DATA FETCHING
  */
 export const fetchUserData = async () => {
   if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [inventory, storage, subs] = await Promise.all([
-    supabase.from('inventory').select('*').eq('user_id', user.id),
-    supabase.from('storage_locations').select('*').eq('user_id', user.id),
-    supabase.from('sub_locations').select('*').eq('user_id', user.id)
+  const profile = await fetchProfile();
+  const familyId = profile?.familyId;
+
+  // We fetch inventory and list items belonging to the user OR their family
+  // The RLS policy handles the family security, but we can be explicit here too
+  const [inventory, storage, subs, stores, vehicles] = await Promise.all([
+    supabase.from('inventory').select('*'),
+    supabase.from('storage_locations').select('*'),
+    supabase.from('sub_locations').select('*'),
+    supabase.from('stores').select('*'),
+    supabase.from('vehicles').select('*')
   ]);
 
   return {
+    profile,
     inventory: inventory.data || [],
     storageLocations: storage.data || [],
-    subLocations: subs.data || []
+    subLocations: subs.data || [],
+    stores: stores.data || [],
+    vehicles: vehicles.data || []
   };
 };
 
 /**
- * DATA FUNCTIONS
+ * LEGACY / DATA SYNC
  */
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase || !item.userId) return;
-  try {
-    const { error } = await supabase
-      .from('inventory')
-      .upsert({
-        id: item.id,
-        product_id: item.productId,
-        item_name: item.itemName,
-        category: item.category,
-        variety: item.variety,
-        sub_location: item.subLocation,
-        quantity: item.quantity,
-        unit: item.unit,
-        location_id: item.locationId,
-        updated_at: item.updatedAt,
-        user_id: item.userId 
-      });
-    if (error) throw error;
-  } catch (err) {
-    console.error('Supabase Inventory Sync Error:', err);
-  }
+  await supabase.from('inventory').upsert({
+    id: item.id, product_id: item.productId, item_name: item.itemName, category: item.category,
+    variety: item.variety, sub_location: item.subLocation, quantity: item.quantity,
+    unit: item.unit, location_id: item.locationId, updated_at: item.updatedAt, user_id: item.userId 
+  });
 };
 
+// Fix: Corrected property mapping from InventoryItem (camelCase) to Supabase payload keys
 export const bulkSyncInventory = async (items: InventoryItem[]) => {
   if (!supabase) return;
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const payload = items.map(item => ({
-      id: item.id,
-      product_id: item.productId,
-      item_name: item.itemName,
-      category: item.category,
-      variety: item.variety,
-      sub_location: item.subLocation,
-      quantity: item.quantity,
-      unit: item.unit,
-      location_id: item.locationId,
-      updated_at: item.updatedAt,
-      user_id: user.id
-    }));
-    const { error } = await supabase.from('inventory').upsert(payload);
-    if (error) throw error;
-  } catch (err) {
-    console.error('Supabase Bulk Inventory Sync Error:', err);
-  }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  const payload = items.map(item => ({
+    id: item.id, product_id: item.productId, item_name: item.itemName, category: item.category,
+    variety: item.variety, sub_location: item.subLocation, quantity: item.quantity,
+    unit: item.unit, location_id: item.locationId, updated_at: item.updatedAt, user_id: user.id
+  }));
+  await supabase.from('inventory').upsert(payload);
 };
 
 export const syncStorageLocation = async (loc: StorageLocation) => {
   if (!supabase) return;
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('storage_locations')
-      .upsert({
-        id: loc.id,
-        name: loc.name,
-        user_id: user.id
-      });
-    if (error) throw error;
-  } catch (err) {
-    console.error('Supabase Storage Location Sync Error:', err);
-  }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('storage_locations').upsert({ id: loc.id, name: loc.name, user_id: user.id });
 };
 
 export const deleteStorageLocation = async (id: string) => {
   if (!supabase) return;
-  try {
-    const { error } = await supabase.from('storage_locations').delete().eq('id', id);
-    if (error) throw error;
-  } catch (err) {
-    console.error('Supabase Storage Location Delete Error:', err);
-  }
+  await supabase.from('storage_locations').delete().eq('id', id);
 };
 
 export const syncSubLocation = async (sub: SubLocation) => {
   if (!supabase) return;
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('sub_locations')
-      .upsert({
-        id: sub.id,
-        location_id: sub.locationId,
-        name: sub.name,
-        user_id: user.id
-      });
-    if (error) throw error;
-  } catch (err) {
-    console.error('Supabase Sub-location Sync Error:', err);
-  }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('sub_locations').upsert({ id: sub.id, location_id: sub.locationId, name: sub.name, user_id: user.id });
 };
 
 export const deleteSubLocation = async (id: string) => {
   if (!supabase) return;
+  await supabase.from('sub_locations').delete().eq('id', id);
+};
+
+export const testDatabaseConnection = async () => {
+  if (!supabase) return { success: false, error: 'No Supabase client' };
   try {
-    const { error } = await supabase.from('sub_locations').delete().eq('id', id);
-    if (error) throw error;
-  } catch (err) {
-    console.error('Supabase Sub-location Delete Error:', err);
+    const { error } = await supabase.from('profiles').select('id').limit(1);
+    return { success: !error, error: error?.message };
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
+};
+
+export const signInWithGoogle = async () => {
+  if (!supabase) return;
+  await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+};
+
+export const signOut = async () => {
+  if (!supabase) return;
+  await supabase.auth.signOut();
 };

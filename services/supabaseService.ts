@@ -2,55 +2,28 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
- * Hardened environment variable discovery.
- * Build tools look for these EXACT literal strings to perform static replacement.
+ * STATIC ENVIRONMENT CONSTANTS
+ * Bundlers like Vite/esbuild look for these EXACT literal strings 
+ * at the top level to perform build-time replacement.
  */
-const discoverSupabaseUrl = (): string => {
-  try {
-    // 1. Check for NEXT_PUBLIC prefix (Vercel standard)
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_URL) return process.env.NEXT_PUBLIC_SUPABASE_URL;
-    // 2. Check for standard name
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env.SUPABASE_URL) return process.env.SUPABASE_URL;
-    // 3. Check import.meta (Vite standard)
-    // @ts-ignore
-    if (import.meta.env?.NEXT_PUBLIC_SUPABASE_URL) return import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
-    // @ts-ignore
-    if (import.meta.env?.SUPABASE_URL) return import.meta.env.SUPABASE_URL;
-  } catch (e) {}
-  return '';
-};
 
-const discoverSupabaseKey = (): string => {
-  try {
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env.SUPABASE_ANON_KEY) return process.env.SUPABASE_ANON_KEY;
-    // @ts-ignore
-    if (import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) return import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    // @ts-ignore
-    if (import.meta.env?.SUPABASE_ANON_KEY) return import.meta.env.SUPABASE_ANON_KEY;
-  } catch (e) {}
-  return '';
-};
+// @ts-ignore
+const RAW_URL = (import.meta.env?.NEXT_PUBLIC_SUPABASE_URL) || (import.meta.env?.SUPABASE_URL) || (import.meta.env?.VITE_SUPABASE_URL) || '';
+// @ts-ignore
+const PROC_URL = (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) : '');
+export const SUPABASE_URL = RAW_URL || PROC_URL || '';
 
-const discoverApiKey = (): string => {
-  try {
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env.API_KEY) return process.env.API_KEY;
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
-    // @ts-ignore
-    if (import.meta.env?.API_KEY) return import.meta.env.API_KEY;
-  } catch (e) {}
-  return '';
-};
+// @ts-ignore
+const RAW_KEY = (import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) || (import.meta.env?.SUPABASE_ANON_KEY) || (import.meta.env?.VITE_SUPABASE_ANON_KEY) || '';
+// @ts-ignore
+const PROC_KEY = (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY) : '');
+export const SUPABASE_ANON_KEY = RAW_KEY || PROC_KEY || '';
 
-const SUPABASE_URL = discoverSupabaseUrl();
-const SUPABASE_ANON_KEY = discoverSupabaseKey();
-const API_KEY = discoverApiKey();
+// @ts-ignore
+const RAW_API = (import.meta.env?.API_KEY) || (import.meta.env?.NEXT_PUBLIC_API_KEY) || (import.meta.env?.VITE_API_KEY) || '';
+// @ts-ignore
+const PROC_API = (typeof process !== 'undefined' ? (process.env.API_KEY || process.env.NEXT_PUBLIC_API_KEY || process.env.VITE_API_KEY) : '');
+export const API_KEY = RAW_API || PROC_API || '';
 
 export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_URL') return SUPABASE_URL;
@@ -59,7 +32,7 @@ export const getEnv = (key: string): string => {
   return '';
 };
 
-// Initialize only if keys exist
+// Initialize Supabase only if keys were successfully injected at build time
 export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
   : null;
@@ -68,7 +41,7 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
  * HEALTH CHECK
  */
 export const testDatabaseConnection = async () => {
-  if (!supabase) return { success: false, error: 'Supabase keys missing in environment' };
+  if (!supabase) return { success: false, error: 'Cloud keys missing. Build replacement failed.' };
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No user session found. Please sign in.' };

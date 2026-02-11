@@ -2,13 +2,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Product, ShoppingItem, InventoryItem, StorageLocation, 
-  SubLocation, StoreLocation, Vehicle, Profile 
+  SubLocation, StoreLocation, Vehicle, Profile, Family 
 } from '../types';
 import { 
   fetchUserData, syncInventoryItem, syncStorageLocation, 
   deleteStorageLocation, syncSubLocation, deleteSubLocation,
   syncProfile, syncVehicle, deleteVehicle, syncStore,
-  syncProduct, syncPriceRecord, supabase, bulkSyncInventory
+  syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily
 } from '../services/supabaseService';
 import { DEFAULT_CATEGORIES, DEFAULT_STORAGE } from '../constants';
 
@@ -22,6 +22,7 @@ export const useAppData = () => {
   const [subLocations, setSubLocations] = useState<SubLocation[]>([]);
   const [stores, setStores] = useState<StoreLocation[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [activeFamily, setActiveFamily] = useState<Family | null>(null);
   const [profile, setProfile] = useState<Profile>({ 
     id: '', locationLabel: '', zip: '', gasPrice: 3.50, 
     categoryOrder: DEFAULT_CATEGORIES, sharePrices: false 
@@ -32,7 +33,13 @@ export const useAppData = () => {
     setLoading(true);
     const data = await fetchUserData();
     if (data) {
-      if (data.profile) setProfile(data.profile);
+      if (data.profile) {
+        setProfile(data.profile);
+        if (data.profile.familyId) {
+          const familyDetails = await fetchFamily(data.profile.familyId);
+          setActiveFamily(familyDetails);
+        }
+      }
       if (data.products) setProducts(data.products);
       if (data.inventory.length) {
         setInventory(data.inventory.map(i => ({
@@ -68,6 +75,12 @@ export const useAppData = () => {
     const newProfile = { ...profile, ...updates };
     setProfile(newProfile);
     if (user) await syncProfile(updates);
+    if (updates.familyId) {
+       const familyDetails = await fetchFamily(updates.familyId);
+       setActiveFamily(familyDetails);
+    } else if (updates.familyId === undefined && !newProfile.familyId) {
+       setActiveFamily(null);
+    }
   };
 
   const updateInventoryQty = async (id: string, delta: number) => {
@@ -130,7 +143,7 @@ export const useAppData = () => {
   return {
     user, loading, products, shoppingList, setShoppingList, inventory, 
     storageLocations, setStorageLocations, subLocations, setSubLocations,
-    stores, setStores, vehicles, setVehicles, profile, 
+    stores, setStores, vehicles, setVehicles, profile, activeFamily,
     updateProfile, updateInventoryQty, addPriceRecord, addToList, addToInventory, 
     importBulkInventory, refresh: loadAllData
   };

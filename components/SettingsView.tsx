@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
-import { StoreLocation, Vehicle, StorageLocation, SubLocation, Profile } from '../types';
+import { StoreLocation, Vehicle, StorageLocation, SubLocation, Profile, Family } from '../types';
 import { supabase, createFamily, joinFamily, fetchGlobalStores, syncStore, deleteStore } from '../services/supabaseService';
 import { searchStoreDetails } from '../services/geminiService';
 
 interface SettingsViewProps {
   user?: any;
   profile: Profile;
+  activeFamily: Family | null;
   onProfileChange: (updates: Partial<Profile>) => void;
   stores: StoreLocation[];
   onStoresChange: (stores: StoreLocation[]) => void;
@@ -18,7 +20,7 @@ interface SettingsViewProps {
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ 
-  user, profile, onProfileChange,
+  user, profile, activeFamily, onProfileChange,
   stores, onStoresChange, vehicles, onVehiclesChange,
   storageLocations, onStorageLocationsChange,
   subLocations, onSubLocationsChange
@@ -35,6 +37,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [familyInviteCode, setFamilyInviteCode] = useState('');
   const [familyName, setFamilyName] = useState('');
   const [familyLoading, setFamilyLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    // Detect invite code in URL
+    const params = new URLSearchParams(window.location.search);
+    const invite = params.get('invite');
+    if (invite && !profile.familyId) {
+      setFamilyInviteCode(invite.toUpperCase());
+    }
+  }, [profile.familyId]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -55,7 +67,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     setFamilyLoading(true);
     try {
       await createFamily(familyName);
-      alert('Family created! Share your code with others.');
+      alert('Family Hub created!');
       window.location.reload();
     } catch (e: any) { alert(`Creation failed: ${e.message}`); }
     setFamilyLoading(false);
@@ -70,6 +82,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       window.location.reload();
     } catch (e: any) { alert(`Join failed: ${e.message}`); }
     setFamilyLoading(false);
+  };
+
+  const shareInviteLink = () => {
+    if (!activeFamily) return;
+    const url = `${window.location.origin}${window.location.pathname}?invite=${activeFamily.invite_code}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleStoreSearch = async () => {
@@ -136,38 +156,64 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Family Hub</h3>
           </div>
           
-          {profile.familyId ? (
-            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 text-center relative overflow-hidden group">
-               <div className="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-100 transition-opacity">
-                 <button onClick={() => onProfileChange({ familyId: undefined })} className="text-[8px] font-black text-emerald-900 uppercase">Leave Group</button>
+          {activeFamily ? (
+            <div className="p-5 bg-emerald-50 rounded-[28px] border border-emerald-100 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-100 transition-opacity">
+                 <button onClick={() => { if(confirm('Are you sure?')) onProfileChange({ familyId: undefined }); }} className="text-[8px] font-black text-emerald-900 uppercase">Leave Hub</button>
                </div>
-              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Group Active</p>
-              <p className="text-sm font-black text-slate-800">Your household is synchronized</p>
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div>
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">Group Active</p>
+                  <p className="text-lg font-black text-slate-800 uppercase tracking-tight">{activeFamily.name}</p>
+                </div>
+                
+                <div className="w-full bg-white p-4 rounded-2xl shadow-sm border border-emerald-50 flex flex-col items-center">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Invite Code</p>
+                   <span className="text-2xl font-black text-indigo-600 tracking-[0.3em] ml-2">{activeFamily.invite_code}</span>
+                   <button 
+                    onClick={shareInviteLink}
+                    className={`mt-4 w-full flex items-center justify-center space-x-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white active:scale-95'}`}
+                   >
+                     {copied ? (
+                       <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                        <span>Copied Link</span>
+                       </>
+                     ) : (
+                       <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                        <span>Add Member (Link)</span>
+                       </>
+                     )}
+                   </button>
+                   <p className="mt-2 text-[8px] font-bold text-slate-400 uppercase">Share this link with your family to sync automatically</p>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-6">
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-wider">Join a Family</p>
+                <p className="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-wider">Join a Family Hub</p>
                 <div className="flex space-x-2">
                   <input 
-                    className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black uppercase tracking-widest" 
+                    className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.2em] placeholder:tracking-normal placeholder:font-bold" 
                     placeholder="INVITE CODE" 
                     value={familyInviteCode}
                     onChange={e => setFamilyInviteCode(e.target.value.toUpperCase())}
                   />
-                  <button onClick={handleJoinFamily} disabled={familyLoading} className="px-6 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase">Join</button>
+                  <button onClick={handleJoinFamily} disabled={familyLoading} className="px-6 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-indigo-100">Join</button>
                 </div>
               </div>
               <div className="relative py-4">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-                <div className="relative flex justify-center"><span className="bg-white px-4 text-[8px] font-black text-slate-300 uppercase">OR</span></div>
+                <div className="relative flex justify-center"><span className="bg-white px-4 text-[8px] font-black text-slate-300 uppercase tracking-widest">OR</span></div>
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-wider">Create New Hub</p>
                 <div className="flex space-x-2">
                   <input 
-                    className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold" 
-                    placeholder="Family Name" 
+                    className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-4 text-sm font-bold" 
+                    placeholder="Family Name (e.g. Smith Household)" 
                     value={familyName}
                     onChange={e => setFamilyName(e.target.value)}
                   />

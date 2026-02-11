@@ -172,9 +172,9 @@ export const fetchProfile = async (): Promise<Profile | null> => {
 };
 
 export const syncProfile = async (profile: Partial<Profile>) => {
-  if (!supabase) return;
+  if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return null;
   const payload: any = {};
   if (profile.locationLabel !== undefined) payload.location_label = profile.locationLabel;
   if (profile.zip !== undefined) payload.zip = profile.zip;
@@ -183,7 +183,10 @@ export const syncProfile = async (profile: Partial<Profile>) => {
   if (profile.activeVehicleId !== undefined) payload.active_vehicle_id = profile.activeVehicleId;
   if (profile.sharePrices !== undefined) payload.share_prices = profile.sharePrices;
   if (profile.familyId !== undefined) payload.family_id = profile.familyId;
-  await supabase.from('profiles').upsert({ id: user.id, ...payload });
+  
+  const { data, error } = await supabase.from('profiles').upsert({ id: user.id, ...payload }).select().single();
+  if (error) throw error;
+  return data;
 };
 
 export const createFamily = async (name: string) => {
@@ -199,10 +202,25 @@ export const createFamily = async (name: string) => {
 
 export const joinFamily = async (inviteCode: string) => {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('families').select('id').eq('invite_code', inviteCode.toUpperCase()).single();
-  if (error) throw new Error('Invalid invite code');
-  await syncProfile({ familyId: data.id });
-  return data;
+  // Step 1: Find the family by code
+  const { data: familyData, error: familyError } = await supabase
+    .from('families')
+    .select('id')
+    .eq('invite_code', inviteCode.trim().toUpperCase())
+    .single();
+    
+  if (familyError) {
+    throw new Error('Family not found or invalid invite code');
+  }
+  
+  // Step 2: Link user profile to this family
+  try {
+    await syncProfile({ familyId: familyData.id });
+  } catch (e: any) {
+    throw new Error(`Failed to join family hub: ${e.message}`);
+  }
+  
+  return familyData;
 };
 
 export const syncVehicle = async (v: Vehicle) => {

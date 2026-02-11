@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useRef } from 'react';
-import { InventoryItem, StorageLocation } from '../../types';
+import { InventoryItem, StorageLocation } from '../types';
 
 interface CsvImportModalProps {
   onClose: () => void;

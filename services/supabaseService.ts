@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord } from '../types';
 
@@ -19,6 +18,31 @@ export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_ANON_KEY') return SUPABASE_ANON_KEY;
   if (key === 'API_KEY') return API_KEY;
   return '';
+};
+
+/**
+ * GLOBAL DISCOVERY
+ */
+export const fetchGlobalStores = async (query: string): Promise<StoreLocation[]> => {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('stores')
+    .select('*')
+    .or(`name.ilike.%${query}%,address.ilike.%${query}%`)
+    .eq('is_public', true)
+    .limit(10);
+  
+  if (error) return [];
+  return data.map(s => ({
+    id: s.id,
+    name: s.name,
+    address: s.address,
+    lat: Number(s.lat),
+    lng: Number(s.lng),
+    phone: s.phone,
+    hours: s.hours,
+    zip: s.zip
+  }));
 };
 
 /**
@@ -57,8 +81,6 @@ export const syncProduct = async (product: Partial<Product>) => {
 
 export const fetchPriceData = async (): Promise<Product[]> => {
   if (!supabase) return [];
-  
-  // Fetch products and history together
   const { data: productsData, error: pError } = await supabase.from('products').select('*');
   const { data: historyData, error: hError } = await supabase.from('price_history').select('*').order('date', { ascending: false });
 
@@ -90,9 +112,6 @@ export const fetchPriceData = async (): Promise<Product[]> => {
   }).filter(p => p.history.length > 0);
 };
 
-/**
- * CORE FETCHING
- */
 export const fetchUserData = async () => {
   if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
@@ -118,8 +137,6 @@ export const fetchUserData = async () => {
     vehicles: vehicles.data || []
   };
 };
-
-// ... (remaining existing syncProfile, createFamily, etc functions) ...
 
 export const fetchProfile = async (): Promise<Profile | null> => {
   if (!supabase) return null;
@@ -183,11 +200,27 @@ export const deleteVehicle = async (id: string) => {
   await supabase.from('vehicles').delete().eq('id', id);
 };
 
-export const syncStore = async (s: StoreLocation) => {
+export const syncStore = async (s: StoreLocation, isPublic: boolean = false) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('stores').upsert({ id: s.id, user_id: user.id, name: s.name, address: s.address, lat: s.lat, lng: s.lng, phone: s.phone, hours: s.hours, zip: s.zip });
+  await supabase.from('stores').upsert({ 
+    id: s.id, 
+    user_id: user.id, 
+    name: s.name, 
+    address: s.address, 
+    lat: s.lat, 
+    lng: s.lng, 
+    phone: s.phone, 
+    hours: s.hours, 
+    zip: s.zip,
+    is_public: isPublic
+  });
+};
+
+export const deleteStore = async (id: string) => {
+  if (!supabase) return;
+  await supabase.from('stores').delete().eq('id', id);
 };
 
 export const syncInventoryItem = async (item: InventoryItem) => {

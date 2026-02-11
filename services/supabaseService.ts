@@ -25,24 +25,28 @@ export const getEnv = (key: string): string => {
  */
 export const fetchGlobalStores = async (query: string): Promise<StoreLocation[]> => {
   if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('stores')
-    .select('*')
-    .or(`name.ilike.%${query}%,address.ilike.%${query}%`)
-    .eq('is_public', true)
-    .limit(10);
-  
-  if (error) return [];
-  return data.map(s => ({
-    id: s.id,
-    name: s.name,
-    address: s.address,
-    lat: Number(s.lat),
-    lng: Number(s.lng),
-    phone: s.phone,
-    hours: s.hours,
-    zip: s.zip
-  }));
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .select('*')
+      .or(`name.ilike.%${query}%,address.ilike.%${query}%`)
+      .eq('is_public', true)
+      .limit(10);
+    
+    if (error) return [];
+    return data.map(s => ({
+      id: s.id,
+      name: s.name,
+      address: s.address,
+      lat: Number(s.lat),
+      lng: Number(s.lng),
+      phone: s.phone,
+      hours: s.hours,
+      zip: s.zip
+    }));
+  } catch (e) {
+    return [];
+  }
 };
 
 /**
@@ -50,13 +54,17 @@ export const fetchGlobalStores = async (query: string): Promise<StoreLocation[]>
  */
 export const fetchFamily = async (familyId: string): Promise<Family | null> => {
   if (!supabase || !familyId) return null;
-  const { data, error } = await supabase
-    .from('families')
-    .select('*')
-    .eq('id', familyId)
-    .single();
-  if (error) return null;
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from('families')
+      .select('*')
+      .eq('id', familyId)
+      .single();
+    if (error) return null;
+    return data;
+  } catch (e) {
+    return null;
+  }
 };
 
 /**
@@ -96,62 +104,71 @@ export const syncProduct = async (product: Partial<Product>) => {
 
 export const fetchPriceData = async (): Promise<Product[]> => {
   if (!supabase) return [];
-  const { data: productsData, error: pError } = await supabase.from('products').select('*');
-  const { data: historyData, error: hError } = await supabase.from('price_history').select('*').order('date', { ascending: false });
+  try {
+    const { data: productsData, error: pError } = await supabase.from('products').select('*');
+    const { data: historyData, error: hError } = await supabase.from('price_history').select('*').order('date', { ascending: false });
 
-  if (pError || hError) return [];
+    if (pError || hError) return [];
 
-  return productsData.map(p => {
-    const history = historyData
-      .filter(h => h.product_id === p.id)
-      .map(h => ({
-        id: h.id,
-        store: h.store,
-        price: Number(h.price),
-        quantity: Number(h.quantity),
-        unit: h.unit,
-        date: h.date,
-        image: h.image_url,
-        isPublic: h.is_public
-      }));
-    
-    return {
-      id: p.id,
-      category: p.category,
-      subCategory: p.sub_category,
-      itemName: p.item_name,
-      variety: p.variety,
-      brand: p.brand,
-      barcode: p.barcode,
-      history
-    };
-  }).filter(p => p.history.length > 0);
+    return (productsData || []).map(p => {
+      const history = (historyData || [])
+        .filter(h => h.product_id === p.id)
+        .map(h => ({
+          id: h.id,
+          store: h.store,
+          price: Number(h.price),
+          quantity: Number(h.quantity),
+          unit: h.unit,
+          date: h.date,
+          image: h.image_url,
+          isPublic: h.is_public
+        }));
+      
+      return {
+        id: p.id,
+        category: p.category,
+        subCategory: p.sub_category,
+        itemName: p.item_name,
+        variety: p.variety,
+        brand: p.brand,
+        barcode: p.barcode,
+        history
+      };
+    }).filter(p => p.history.length > 0);
+  } catch (e) {
+    return [];
+  }
 };
 
 export const fetchUserData = async () => {
   if (!supabase) return null;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
 
-  const [profile, products, inventory, storage, subs, stores, vehicles] = await Promise.all([
-    fetchProfile(),
-    fetchPriceData(),
-    supabase.from('inventory').select('*'),
-    supabase.from('storage_locations').select('*'),
-    supabase.from('sub_locations').select('*'),
-    supabase.from('stores').select('*'),
-    supabase.from('vehicles').select('*')
-  ]);
+    const [profile, products, inventoryRes, storageRes, subsRes, storesRes, vehiclesRes] = await Promise.all([
+      fetchProfile().catch(() => null),
+      fetchPriceData().catch(() => []),
+      supabase.from('inventory').select('*'),
+      supabase.from('storage_locations').select('*'),
+      supabase.from('sub_locations').select('*'),
+      supabase.from('stores').select('*'),
+      supabase.from('vehicles').select('*')
+    ]);
 
-  return {
-    profile,
-    products,
-    inventory: inventory.data || [],
-    storageLocations: storage.data || [],
-    subLocations: subs.data || [],
-    stores: stores.data || [],
-    vehicles: vehicles.data || []
-  };
+    return {
+      profile,
+      products,
+      inventory: inventoryRes.data || [],
+      storageLocations: storageRes.data || [],
+      subLocations: subsRes.data || [],
+      stores: storesRes.data || [],
+      vehicles: vehiclesRes.data || []
+    };
+  } catch (e) {
+    console.error("Error fetching user data:", e);
+    return null;
+  }
 };
 
 export const fetchProfile = async (): Promise<Profile | null> => {
@@ -159,15 +176,50 @@ export const fetchProfile = async (): Promise<Profile | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-  if (error && error.code !== 'PGRST116') throw error;
-  
-  if (!data) {
-    const initial = { id: user.id, location_label: '', zip: '', gas_price: 3.50, share_prices: false };
-    await supabase.from('profiles').insert(initial);
-    return { id: user.id, locationLabel: '', zip: '', gasPrice: 3.50, sharePrices: false, categoryOrder: ['Produce', 'Dairy', 'Meat', 'Seafood', 'Deli', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Personal Care', 'Baby', 'Pets', 'Other'] };
+  try {
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    
+    if (error && error.code !== 'PGRST116') {
+      console.warn("Profile fetch error:", error);
+      return null;
+    }
+    
+    if (!data) {
+      const initial = { 
+        id: user.id, 
+        location_label: '', 
+        zip: '', 
+        gas_price: 3.50, 
+        share_prices: false,
+        category_order: ['Produce', 'Dairy', 'Meat', 'Seafood', 'Deli', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Personal Care', 'Baby', 'Pets', 'Other']
+      };
+      const { error: insError } = await supabase.from('profiles').insert(initial);
+      if (insError) console.error("Could not create initial profile:", insError);
+      
+      return { 
+        id: user.id, 
+        locationLabel: '', 
+        zip: '', 
+        gasPrice: 3.50, 
+        sharePrices: false, 
+        categoryOrder: initial.category_order 
+      };
+    }
+
+    return { 
+      id: data.id, 
+      locationLabel: data.location_label, 
+      zip: data.zip, 
+      gasPrice: Number(data.gas_price), 
+      categoryOrder: data.category_order || [], 
+      activeVehicleId: data.active_vehicle_id, 
+      sharePrices: data.share_prices, 
+      familyId: data.family_id 
+    };
+  } catch (e) {
+    console.error("fetchProfile exception:", e);
+    return null;
   }
-  return { id: data.id, locationLabel: data.location_label, zip: data.zip, gasPrice: Number(data.gas_price), categoryOrder: data.category_order, activeVehicleId: data.active_vehicle_id, sharePrices: data.share_prices, familyId: data.family_id };
 };
 
 export const syncProfile = async (profile: Partial<Profile>) => {
@@ -201,10 +253,7 @@ export const createFamily = async (name: string) => {
 
 export const joinFamily = async (inviteCode: string) => {
   if (!supabase) return null;
-  
   const normalizedCode = inviteCode.trim().toUpperCase();
-  
-  // Step 1: Find the family by code
   const { data: familyData, error: familyError } = await supabase
     .from('families')
     .select('id')
@@ -212,18 +261,13 @@ export const joinFamily = async (inviteCode: string) => {
     .single();
     
   if (familyError) {
-    console.error("Family join error:", familyError);
-    if (familyError.code === 'PGRST116') {
-      throw new Error('Family not found. Please double-check the invite code.');
-    }
+    if (familyError.code === 'PGRST116') throw new Error('Family not found. Please double-check the invite code.');
     throw new Error('Connection error. Could not verify invite code.');
   }
   
-  // Step 2: Link user profile to this family
   try {
     await syncProfile({ familyId: familyData.id });
   } catch (e: any) {
-    console.error("Profile sync error during join:", e);
     throw new Error(`Failed to link your account to the family hub: ${e.message}`);
   }
   

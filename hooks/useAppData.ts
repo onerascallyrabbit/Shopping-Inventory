@@ -8,7 +8,8 @@ import {
   fetchUserData, syncInventoryItem, syncStorageLocation, 
   deleteStorageLocation, syncSubLocation, deleteSubLocation,
   syncProfile, syncVehicle, deleteVehicle, syncStore,
-  syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily
+  syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily,
+  deleteInventoryItem
 } from '../services/supabaseService';
 import { DEFAULT_CATEGORIES, DEFAULT_STORAGE } from '../constants';
 
@@ -44,6 +45,7 @@ export const useAppData = () => {
       if (data.inventory.length) {
         setInventory(data.inventory.map(i => ({
           id: i.id, productId: i.product_id, itemName: i.item_name, category: i.category,
+          subCategory: i.sub_category,
           variety: i.variety, subLocation: i.sub_location, quantity: Number(i.quantity),
           unit: i.unit, locationId: i.location_id, updatedAt: i.updated_at, userId: i.user_id
         })));
@@ -84,33 +86,55 @@ export const useAppData = () => {
   };
 
   const updateInventoryQty = async (id: string, delta: number) => {
+    setInventory(prev => {
+      const updatedList = prev.map(item => {
+        if (item.id === id) {
+          const newQty = Math.max(0, item.quantity + delta);
+          const updated = { ...item, quantity: newQty, updatedAt: new Date().toISOString(), userId: user?.id };
+          if (user) {
+            if (newQty === 0) deleteInventoryItem(id);
+            else syncInventoryItem(updated);
+          }
+          return updated;
+        }
+        return item;
+      }).filter(item => item.quantity > 0);
+      return updatedList;
+    });
+  };
+
+  const updateInventoryItem = async (id: string, updates: Partial<InventoryItem>) => {
     setInventory(prev => prev.map(item => {
       if (item.id === id) {
-        const newQty = Math.max(0, item.quantity + delta);
-        const updated = { ...item, quantity: newQty, updatedAt: new Date().toISOString(), userId: user?.id };
+        const updated = { ...item, ...updates, updatedAt: new Date().toISOString(), userId: user?.id };
         if (user) syncInventoryItem(updated);
         return updated;
       }
       return item;
-    }).filter(item => item.quantity > 0));
+    }));
   };
 
-  const addPriceRecord = async (category: string, itemName: string, variety: string, record: any, brand?: string, barcode?: string) => {
+  const removeInventoryItem = async (id: string) => {
+    setInventory(prev => prev.filter(i => i.id !== id));
+    if (user) await deleteInventoryItem(id);
+  };
+
+  const addPriceRecord = async (category: string, itemName: string, variety: string, record: any, brand?: string, barcode?: string, subCategory?: string) => {
     const newRecord = { ...record, id: crypto.randomUUID(), date: new Date().toISOString(), isPublic: profile.sharePrices };
     const existingProduct = products.find(p => (barcode && p.barcode === barcode) || (p.itemName.toLowerCase() === itemName.toLowerCase() && (p.variety || '').toLowerCase() === (variety || '').toLowerCase() && (p.brand || '').toLowerCase() === (brand || '').toLowerCase()));
     
     let productId = existingProduct?.id;
     if (user) {
-      const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode });
+      const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode, subCategory });
       productId = syncedProduct.id;
       await syncPriceRecord(productId, newRecord, user.id);
     }
 
     setProducts(prev => {
       if (existingProduct) {
-        return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history], brand: brand || p.brand, barcode: barcode || p.barcode, category } : p);
+        return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history], brand: brand || p.brand, barcode: barcode || p.barcode, category, subCategory: subCategory || p.subCategory } : p);
       }
-      return [...prev, { id: productId || crypto.randomUUID(), category, itemName, variety, brand, barcode, history: [newRecord] }];
+      return [...prev, { id: productId || crypto.randomUUID(), category, subCategory, itemName, variety, brand, barcode, history: [newRecord] }];
     });
   };
 
@@ -121,9 +145,9 @@ export const useAppData = () => {
     }]);
   };
 
-  const addToInventory = async (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string) => {
+  const addToInventory = async (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => {
     const newItem: InventoryItem = {
-      id: crypto.randomUUID(), productId, itemName, category, variety, subLocation, 
+      id: crypto.randomUUID(), productId, itemName, category, subCategory, variety, subLocation, 
       quantity: qty, unit, locationId, updatedAt: new Date().toISOString(), userId: user?.id
     };
     setInventory(prev => [...prev, newItem]);
@@ -144,7 +168,7 @@ export const useAppData = () => {
     user, loading, products, shoppingList, setShoppingList, inventory, 
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
-    updateProfile, updateInventoryQty, addPriceRecord, addToList, addToInventory, 
+    updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, addPriceRecord, addToList, addToInventory, 
     importBulkInventory, refresh: loadAllData
   };
 };

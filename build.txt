@@ -7,3 +7,4 @@ Now storing price-history in database
 Added better "family" hub features
 Added Add Family Link*****
 Moved STOCK storage to database*
+Correcting to allow family to see STOCK

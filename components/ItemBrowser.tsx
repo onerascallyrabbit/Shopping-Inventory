@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Product } from '../types';
 import { lookupMarketDetails } from '../services/geminiService';
@@ -24,6 +23,7 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
     return products.filter(p => {
       const matchesSearch = p.itemName.toLowerCase().includes(search.toLowerCase()) || 
                            (p.variety && p.variety.toLowerCase().includes(search.toLowerCase())) ||
+                           (p.subCategory && p.subCategory.toLowerCase().includes(search.toLowerCase())) ||
                            p.brand?.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = search.length > 0 ? true : p.category === activeCategory;
       return matchesSearch && matchesCategory;
@@ -47,7 +47,7 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
       <div className="relative">
         <input 
           type="text"
-          placeholder="Search items..."
+          placeholder="Search items, brands, sub-categories..."
           className="w-full bg-white border border-slate-200 rounded-2xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 text-sm shadow-sm"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -102,9 +102,14 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] font-bold text-emerald-600 truncate mt-0.5">
-                    ${best.price.toFixed(2)}/{best.quantity}{best.unit} @ {best.store}
-                  </p>
+                  <div className="flex items-center space-x-2 mt-0.5">
+                    <p className="text-[10px] font-bold text-emerald-600 truncate">
+                      ${best.price.toFixed(2)}/{best.quantity}{best.unit}
+                    </p>
+                    {product.subCategory && (
+                      <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">• {product.subCategory}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="shrink-0">
                   <svg className={`w-4 h-4 text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

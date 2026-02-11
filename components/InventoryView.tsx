@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { InventoryItem, StorageLocation, Product, SubLocation } from '../types';
 import CsvImportModal from './CsvImportModal';
@@ -14,17 +15,19 @@ interface InventoryViewProps {
   onRemoveItem: (id: string) => void;
   onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
   onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => void;
+  onAddToList: (name: string, qty: number, unit: string, productId?: string) => void;
 }
 
 const InventoryView: React.FC<InventoryViewProps> = ({ 
   inventory, locations, subLocations, products, categoryOrder, 
-  onUpdateQty, onUpdateItem, onRemoveItem, onAddToInventory, onBulkAdd 
+  onUpdateQty, onUpdateItem, onRemoveItem, onAddToInventory, onBulkAdd, onAddToList
 }) => {
   const [activeLocationId, setActiveLocationId] = useState<string>(locations[0]?.id || '');
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [isAdding, setIsAdding] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [depletedItem, setDepletedItem] = useState<InventoryItem | null>(null);
   const [search, setSearch] = useState('');
   
   const [newItem, setNewItem] = useState({
@@ -86,6 +89,16 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     }
   };
 
+  const handleDepletionConfirm = (addToList: boolean) => {
+    if (!depletedItem) return;
+    if (addToList) {
+      const fullName = `${depletedItem.itemName}${depletedItem.variety ? ` (${depletedItem.variety})` : ''}`;
+      onAddToList(fullName, 1, depletedItem.unit, depletedItem.productId);
+    }
+    onUpdateQty(depletedItem.id, -1);
+    setDepletedItem(null);
+  };
+
   return (
     <div className="space-y-6 pb-24">
       <div className="flex items-center justify-between px-1">
@@ -141,7 +154,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   
                   <div className="flex items-center bg-slate-50 rounded-2xl p-0.5 border border-slate-100/50 shrink-0">
                     <button 
-                      onClick={(e) => { e.stopPropagation(); onUpdateQty(item.id, -1); }} 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (item.quantity === 1) {
+                          setDepletedItem(item);
+                        } else {
+                          onUpdateQty(item.id, -1);
+                        }
+                      }} 
                       className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-500 active:scale-90 transition-all font-black text-lg"
                     >−</button>
                     
@@ -171,6 +191,47 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Depletion Prompt Modal */}
+      {depletedItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden p-6 animate-in zoom-in-95 duration-200">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 uppercase">Out of Stock?</h3>
+                <p className="text-sm text-slate-500 mt-2 font-medium">
+                  "{depletedItem.itemName}" is now depleted. Add it to your shopping list?
+                </p>
+              </div>
+              <div className="space-y-2 pt-4">
+                <button 
+                  onClick={() => handleDepletionConfirm(true)}
+                  className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs shadow-lg shadow-indigo-100 active:scale-[0.98] transition-all"
+                >
+                  Yes, Add to List
+                </button>
+                <button 
+                  onClick={() => handleDepletionConfirm(false)}
+                  className="w-full py-4 bg-slate-50 text-slate-400 font-black rounded-2xl uppercase tracking-widest text-[10px] active:scale-[0.98] transition-all"
+                >
+                  Just Remove
+                </button>
+                <button 
+                  onClick={() => setDepletedItem(null)}
+                  className="w-full py-2 text-slate-300 font-black uppercase tracking-widest text-[9px]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Item Modal */}
       {editingItem && (

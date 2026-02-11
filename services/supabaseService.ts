@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family } from '../types';
 
@@ -202,22 +201,30 @@ export const createFamily = async (name: string) => {
 
 export const joinFamily = async (inviteCode: string) => {
   if (!supabase) return null;
+  
+  const normalizedCode = inviteCode.trim().toUpperCase();
+  
   // Step 1: Find the family by code
   const { data: familyData, error: familyError } = await supabase
     .from('families')
     .select('id')
-    .eq('invite_code', inviteCode.trim().toUpperCase())
+    .eq('invite_code', normalizedCode)
     .single();
     
   if (familyError) {
-    throw new Error('Family not found or invalid invite code');
+    console.error("Family join error:", familyError);
+    if (familyError.code === 'PGRST116') {
+      throw new Error('Family not found. Please double-check the invite code.');
+    }
+    throw new Error('Connection error. Could not verify invite code.');
   }
   
   // Step 2: Link user profile to this family
   try {
     await syncProfile({ familyId: familyData.id });
   } catch (e: any) {
-    throw new Error(`Failed to join family hub: ${e.message}`);
+    console.error("Profile sync error during join:", e);
+    throw new Error(`Failed to link your account to the family hub: ${e.message}`);
   }
   
   return familyData;

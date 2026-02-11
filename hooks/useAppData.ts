@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Product, ShoppingItem, InventoryItem, StorageLocation, 
@@ -43,21 +44,33 @@ export const useAppData = () => {
           if (data.profile.familyId) {
             const familyDetails = await fetchFamily(data.profile.familyId);
             setActiveFamily(familyDetails);
+          } else {
+            setActiveFamily(null);
           }
         }
-        if (data.products) setProducts(data.products);
-        if (data.inventory?.length) {
+        
+        // Products
+        setProducts(data.products || []);
+        
+        // Inventory
+        if (data.inventory) {
           setInventory(data.inventory.map(i => ({
             id: i.id, productId: i.product_id, itemName: i.item_name, category: i.category,
             subCategory: i.sub_category,
             variety: i.variety, subLocation: i.sub_location, quantity: Number(i.quantity),
             unit: i.unit, locationId: i.location_id, updatedAt: i.updated_at, userId: i.user_id
           })));
+        } else {
+          setInventory([]);
         }
-        if (data.storageLocations?.length) setStorageLocations(data.storageLocations.map(s => ({ id: s.id, name: s.name })));
-        if (data.subLocations?.length) setSubLocations(data.subLocations.map(s => ({ id: s.id, locationId: s.location_id, name: s.name })));
-        if (data.stores?.length) setStores(data.stores.map(s => ({ id: s.id, name: s.name, address: s.address, lat: Number(s.lat), lng: Number(s.lng), phone: s.phone, hours: s.hours, zip: s.zip })));
-        if (data.vehicles?.length) setVehicles(data.vehicles.map(v => ({ id: v.id, name: v.name, mpg: Number(v.mpg) })));
+
+        // Locations
+        if (data.storageLocations) setStorageLocations(data.storageLocations.map(s => ({ id: s.id, name: s.name })));
+        if (data.subLocations) setSubLocations(data.subLocations.map(s => ({ id: s.id, locationId: s.location_id, name: s.name })));
+        
+        // Metadata
+        if (data.stores) setStores(data.stores.map(s => ({ id: s.id, name: s.name, address: s.address, lat: Number(s.lat), lng: Number(s.lng), phone: s.phone, hours: s.hours, zip: s.zip })));
+        if (data.vehicles) setVehicles(data.vehicles.map(v => ({ id: v.id, name: v.name, mpg: Number(v.mpg) })));
       }
     } catch (err) {
       console.error("Failed to load user data:", err);
@@ -90,14 +103,24 @@ export const useAppData = () => {
   }, [loadAllData]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    const newProfile = { ...profile, ...updates };
-    setProfile(newProfile);
-    if (user) await syncProfile(updates);
-    if (updates.familyId) {
-       const familyDetails = await fetchFamily(updates.familyId);
-       setActiveFamily(familyDetails);
-    } else if (updates.familyId === undefined && !newProfile.familyId) {
-       setActiveFamily(null);
+    const isFamilyChange = updates.familyId !== undefined && updates.familyId !== profile.familyId;
+    
+    try {
+      if (user) await syncProfile(updates);
+      
+      // Update local profile state
+      setProfile(prev => ({ ...prev, ...updates }));
+
+      // If they joined or left a family, we must re-fetch EVERYTHING
+      // because RLS now allows/denies access to a whole new set of records.
+      if (isFamilyChange) {
+        await loadAllData();
+      } else if (updates.familyId === undefined && profile.familyId) {
+         setActiveFamily(null);
+      }
+    } catch (e) {
+      console.error("Profile update failed:", e);
+      throw e;
     }
   };
 
@@ -106,7 +129,7 @@ export const useAppData = () => {
       const updatedList = prev.map(item => {
         if (item.id === id) {
           const newQty = Math.max(0, item.quantity + delta);
-          const updated = { ...item, quantity: newQty, updatedAt: new Date().toISOString(), userId: user?.id };
+          const updated = { ...item, quantity: newQty, updatedAt: new Date().toISOString(), userId: item.userId || user?.id };
           if (user) {
             if (newQty === 0) deleteInventoryItem(id);
             else syncInventoryItem(updated);
@@ -122,7 +145,7 @@ export const useAppData = () => {
   const updateInventoryItem = async (id: string, updates: Partial<InventoryItem>) => {
     setInventory(prev => prev.map(item => {
       if (item.id === id) {
-        const updated = { ...item, ...updates, updatedAt: new Date().toISOString(), userId: user?.id };
+        const updated = { ...item, ...updates, updatedAt: new Date().toISOString(), userId: item.userId || user?.id };
         if (user) syncInventoryItem(updated);
         return updated;
       }

@@ -20,7 +20,9 @@ import {
   testDatabaseConnection,
   supabase, 
   signInWithGoogle,
-  getEnv
+  getEnv,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
 } from './services/supabaseService';
 
 const DEFAULT_CATEGORIES = [
@@ -295,8 +297,8 @@ const App: React.FC = () => {
 
   // AUTH GATE: Show if no user and not in guest mode
   if (!user && !isGuest) {
-    const sUrl = getEnv('SUPABASE_URL');
-    const sKey = getEnv('SUPABASE_ANON_KEY');
+    const sUrl = SUPABASE_URL;
+    const sKey = SUPABASE_ANON_KEY;
 
     return (
       <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center overflow-y-auto">
@@ -312,32 +314,30 @@ const App: React.FC = () => {
             onClick={signInWithGoogle}
             className={`w-full flex items-center justify-center space-x-3 text-white font-black py-5 rounded-[24px] shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs ${supabase ? 'bg-slate-900 hover:bg-black' : 'bg-slate-300'}`}
           >
-            <span>{supabase ? 'Sign In with Google' : 'Cloud Link Error'}</span>
+            <span>{supabase ? 'Sign In with Google' : 'Link Failed (Check Info)'}</span>
           </button>
 
           {!supabase && (
              <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 text-left space-y-3">
-                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Environment Status:</p>
+                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Build Injection Status:</p>
                 <div className="space-y-1">
                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-bold text-slate-500">SUPABASE_URL:</span>
-                      <span className={`text-[10px] font-black ${sUrl ? 'text-emerald-500' : 'text-red-500'}`}>{sUrl ? 'DETECTED' : 'MISSING'}</span>
+                      <span className="text-[9px] font-bold text-slate-500">Cloud URL:</span>
+                      <span className={`text-[10px] font-black ${sUrl ? 'text-emerald-500' : 'text-red-500'}`}>{sUrl ? 'OK' : 'MISSING'}</span>
                    </div>
                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-bold text-slate-500">SUPABASE_ANON_KEY:</span>
-                      <span className={`text-[10px] font-black ${sKey ? 'text-emerald-500' : 'text-red-500'}`}>{sKey ? 'DETECTED' : 'MISSING'}</span>
+                      <span className="text-[9px] font-bold text-slate-500">Cloud Key:</span>
+                      <span className={`text-[10px] font-black ${sKey ? 'text-emerald-500' : 'text-red-500'}`}>{sKey ? 'OK' : 'MISSING'}</span>
                    </div>
                 </div>
                 <div className="pt-2 border-t border-amber-100 mt-2">
                    <p className="text-[9px] font-medium text-amber-800 italic leading-relaxed">
-                     <b>Vercel Integration Info:</b> Your integration is set to prefix with <code>NEXT_PUBLIC_</code>.
+                     <b>Developer Note:</b> Vite requires variables to be prefixed correctly. If they show MISSING, the build engine didn't swap the placeholders. 
                      <br/><br/>
-                     Ensure your Vercel Dashboard shows:
-                     <br/><code>NEXT_PUBLIC_SUPABASE_URL</code>
-                     <br/><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>
+                     <b>Action Required:</b> Re-deploy in Vercel. Ensure integration names match <code>NEXT_PUBLIC_SUPABASE_URL</code> exactly.
                    </p>
                 </div>
-                <button onClick={() => window.location.reload()} className="w-full mt-2 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95">Re-Check Connection</button>
+                <button onClick={() => window.location.reload()} className="w-full mt-2 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95">Re-Check App</button>
              </div>
           )}
 

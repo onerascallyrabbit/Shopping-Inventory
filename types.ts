@@ -76,6 +76,13 @@ export interface Vehicle {
   userId?: string;
 }
 
+export interface Family {
+  id: string;
+  name: string;
+  invite_code: string;
+  created_by: string;
+}
+
 export interface Profile {
   id: string;
   locationLabel: string;

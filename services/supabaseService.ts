@@ -1,14 +1,18 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
-import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation } from '../types';
+import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord } from '../types';
 
-// Environment variables handled by Vite/Vercel static replacement
+// Environment variables
 // @ts-ignore
 export const SUPABASE_URL = (import.meta.env?.VITE_SUPABASE_URL) || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : '') || '';
 // @ts-ignore
 export const SUPABASE_ANON_KEY = (import.meta.env?.VITE_SUPABASE_ANON_KEY) || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : '') || '';
 // @ts-ignore
 export const API_KEY = (import.meta.env?.VITE_API_KEY) || (typeof process !== 'undefined' ? process.env.VITE_API_KEY : '') || '';
+
+export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+  : null;
 
 export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_URL') return SUPABASE_URL;
@@ -17,13 +21,106 @@ export const getEnv = (key: string): string => {
   return '';
 };
 
-export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
-  : null;
+/**
+ * PRICE TRACKING SYNC
+ */
+export const syncPriceRecord = async (productId: string, record: PriceRecord, userId: string) => {
+  if (!supabase) return;
+  await supabase.from('price_history').insert({
+    id: record.id,
+    product_id: productId,
+    user_id: userId,
+    store: record.store,
+    price: record.price,
+    quantity: record.quantity,
+    unit: record.unit,
+    date: record.date,
+    image_url: record.image,
+    is_public: record.isPublic || false
+  });
+};
+
+export const syncProduct = async (product: Partial<Product>) => {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('products').upsert({
+    id: product.id || crypto.randomUUID(),
+    category: product.category,
+    item_name: product.itemName,
+    variety: product.variety,
+    brand: product.brand,
+    barcode: product.barcode
+  }).select().single();
+  
+  if (error) throw error;
+  return data;
+};
+
+export const fetchPriceData = async (): Promise<Product[]> => {
+  if (!supabase) return [];
+  
+  // Fetch products and history together
+  const { data: productsData, error: pError } = await supabase.from('products').select('*');
+  const { data: historyData, error: hError } = await supabase.from('price_history').select('*').order('date', { ascending: false });
+
+  if (pError || hError) return [];
+
+  return productsData.map(p => {
+    const history = historyData
+      .filter(h => h.product_id === p.id)
+      .map(h => ({
+        id: h.id,
+        store: h.store,
+        price: Number(h.price),
+        quantity: Number(h.quantity),
+        unit: h.unit,
+        date: h.date,
+        image: h.image_url,
+        isPublic: h.is_public
+      }));
+    
+    return {
+      id: p.id,
+      category: p.category,
+      itemName: p.item_name,
+      variety: p.variety,
+      brand: p.brand,
+      barcode: p.barcode,
+      history
+    };
+  }).filter(p => p.history.length > 0);
+};
 
 /**
- * PROFILE & SETTINGS SYNC
+ * CORE FETCHING
  */
+export const fetchUserData = async () => {
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const [profile, products, inventory, storage, subs, stores, vehicles] = await Promise.all([
+    fetchProfile(),
+    fetchPriceData(),
+    supabase.from('inventory').select('*'),
+    supabase.from('storage_locations').select('*'),
+    supabase.from('sub_locations').select('*'),
+    supabase.from('stores').select('*'),
+    supabase.from('vehicles').select('*')
+  ]);
+
+  return {
+    profile,
+    products,
+    inventory: inventory.data || [],
+    storageLocations: storage.data || [],
+    subLocations: subs.data || [],
+    stores: stores.data || [],
+    vehicles: vehicles.data || []
+  };
+};
+
+// ... (remaining existing syncProfile, createFamily, etc functions) ...
+
 export const fetchProfile = async (): Promise<Profile | null> => {
   if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
@@ -33,36 +130,17 @@ export const fetchProfile = async (): Promise<Profile | null> => {
   if (error && error.code !== 'PGRST116') throw error;
   
   if (!data) {
-    // Initialize profile if missing
     const initial = { id: user.id, location_label: '', zip: '', gas_price: 3.50, share_prices: false };
     await supabase.from('profiles').insert(initial);
-    return { 
-      id: user.id, 
-      locationLabel: '', 
-      zip: '', 
-      gasPrice: 3.50, 
-      sharePrices: false, 
-      categoryOrder: ['Produce', 'Dairy', 'Meat', 'Seafood', 'Deli', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Personal Care', 'Baby', 'Pets', 'Other']
-    };
+    return { id: user.id, locationLabel: '', zip: '', gasPrice: 3.50, sharePrices: false, categoryOrder: ['Produce', 'Dairy', 'Meat', 'Seafood', 'Deli', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Personal Care', 'Baby', 'Pets', 'Other'] };
   }
-
-  return {
-    id: data.id,
-    locationLabel: data.location_label,
-    zip: data.zip,
-    gasPrice: Number(data.gas_price),
-    categoryOrder: data.category_order,
-    activeVehicleId: data.active_vehicle_id,
-    sharePrices: data.share_prices,
-    familyId: data.family_id
-  };
+  return { id: data.id, locationLabel: data.location_label, zip: data.zip, gasPrice: Number(data.gas_price), categoryOrder: data.category_order, activeVehicleId: data.active_vehicle_id, sharePrices: data.share_prices, familyId: data.family_id };
 };
 
 export const syncProfile = async (profile: Partial<Profile>) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-
   const payload: any = {};
   if (profile.locationLabel !== undefined) payload.location_label = profile.locationLabel;
   if (profile.zip !== undefined) payload.zip = profile.zip;
@@ -71,25 +149,15 @@ export const syncProfile = async (profile: Partial<Profile>) => {
   if (profile.activeVehicleId !== undefined) payload.active_vehicle_id = profile.activeVehicleId;
   if (profile.sharePrices !== undefined) payload.share_prices = profile.sharePrices;
   if (profile.familyId !== undefined) payload.family_id = profile.familyId;
-
   await supabase.from('profiles').upsert({ id: user.id, ...payload });
 };
 
-/**
- * FAMILY HUB
- */
 export const createFamily = async (name: string) => {
   if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-
   const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const { data, error } = await supabase.from('families').insert({
-    name,
-    invite_code: inviteCode,
-    created_by: user.id
-  }).select().single();
-
+  const { data, error } = await supabase.from('families').insert({ name, invite_code: inviteCode, created_by: user.id }).select().single();
   if (error) throw error;
   await syncProfile({ familyId: data.id });
   return data;
@@ -103,16 +171,6 @@ export const joinFamily = async (inviteCode: string) => {
   return data;
 };
 
-export const fetchFamilyMembers = async (familyId: string) => {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from('profiles').select('id, profiles(id)').eq('family_id', familyId);
-  // This is a simplified fetch; in a real app, you'd join with auth.users if metadata is available via public.profiles
-  return data || [];
-};
-
-/**
- * VEHICLE & STORE SYNC
- */
 export const syncVehicle = async (v: Vehicle) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
@@ -129,65 +187,19 @@ export const syncStore = async (s: StoreLocation) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('stores').upsert({ 
-    id: s.id, user_id: user.id, name: s.name, address: s.address, 
-    lat: s.lat, lng: s.lng, phone: s.phone, hours: s.hours, zip: s.zip 
-  });
+  await supabase.from('stores').upsert({ id: s.id, user_id: user.id, name: s.name, address: s.address, lat: s.lat, lng: s.lng, phone: s.phone, hours: s.hours, zip: s.zip });
 };
 
-/**
- * DATA FETCHING
- */
-export const fetchUserData = async () => {
-  if (!supabase) return null;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const profile = await fetchProfile();
-  const familyId = profile?.familyId;
-
-  // We fetch inventory and list items belonging to the user OR their family
-  // The RLS policy handles the family security, but we can be explicit here too
-  const [inventory, storage, subs, stores, vehicles] = await Promise.all([
-    supabase.from('inventory').select('*'),
-    supabase.from('storage_locations').select('*'),
-    supabase.from('sub_locations').select('*'),
-    supabase.from('stores').select('*'),
-    supabase.from('vehicles').select('*')
-  ]);
-
-  return {
-    profile,
-    inventory: inventory.data || [],
-    storageLocations: storage.data || [],
-    subLocations: subs.data || [],
-    stores: stores.data || [],
-    vehicles: vehicles.data || []
-  };
-};
-
-/**
- * LEGACY / DATA SYNC
- */
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase || !item.userId) return;
-  await supabase.from('inventory').upsert({
-    id: item.id, product_id: item.productId, item_name: item.itemName, category: item.category,
-    variety: item.variety, sub_location: item.subLocation, quantity: item.quantity,
-    unit: item.unit, location_id: item.locationId, updated_at: item.updatedAt, user_id: item.userId 
-  });
+  await supabase.from('inventory').upsert({ id: item.id, product_id: item.productId, item_name: item.itemName, category: item.category, variety: item.variety, sub_location: item.subLocation, quantity: item.quantity, unit: item.unit, location_id: item.locationId, updated_at: item.updatedAt, user_id: item.userId });
 };
 
-// Fix: Corrected property mapping from InventoryItem (camelCase) to Supabase payload keys
 export const bulkSyncInventory = async (items: InventoryItem[]) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  const payload = items.map(item => ({
-    id: item.id, product_id: item.productId, item_name: item.itemName, category: item.category,
-    variety: item.variety, sub_location: item.subLocation, quantity: item.quantity,
-    unit: item.unit, location_id: item.locationId, updated_at: item.updatedAt, user_id: user.id
-  }));
+  const payload = items.map(item => ({ id: item.id, product_id: item.productId, item_name: item.itemName, category: item.category, variety: item.variety, sub_location: item.subLocation, quantity: item.quantity, unit: item.unit, location_id: item.locationId, updated_at: item.updatedAt, user_id: user.id }));
   await supabase.from('inventory').upsert(payload);
 };
 

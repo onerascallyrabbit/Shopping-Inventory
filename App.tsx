@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AppTab } from './types';
 import Dashboard from './components/Dashboard';
@@ -18,7 +19,7 @@ const App: React.FC = () => {
     user, loading, products, shoppingList, setShoppingList, inventory, 
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
-    updateProfile, updateInventoryQty, addPriceRecord, addToList, 
+    updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, addPriceRecord, addToList, 
     addToInventory, importBulkInventory, refresh 
   } = useAppData();
 
@@ -69,7 +70,10 @@ const App: React.FC = () => {
           <InventoryView 
             inventory={inventory} locations={storageLocations} subLocations={subLocations} 
             products={products} categoryOrder={profile.categoryOrder} 
-            onUpdateQty={updateInventoryQty} onAddToInventory={addToInventory} 
+            onUpdateQty={updateInventoryQty} 
+            onUpdateItem={updateInventoryItem}
+            onRemoveItem={removeInventoryItem}
+            onAddToInventory={addToInventory} 
             onBulkAdd={importBulkInventory} 
           />
         )}

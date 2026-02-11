@@ -26,7 +26,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   
   const [newItem, setNewItem] = useState({
     productId: '', itemName: '', category: 'Pantry', variety: '', subLocation: '',
-    quantity: '1', unit: 'pc', locationId: activeLocationId
+    quantity: '1', unit: 'pc', locationId: activeLocationId || (locations[0]?.id || '')
   });
 
   const filteredInventory = useMemo(() => {
@@ -44,6 +44,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     if (newItem.itemName.length < 2) return [];
     return products.filter(p => p.itemName.toLowerCase().includes(newItem.itemName.toLowerCase())).slice(0, 5);
   }, [newItem.itemName, products]);
+
+  const availableSubLocations = useMemo(() => {
+    return subLocations.filter(sl => sl.locationId === newItem.locationId);
+  }, [subLocations, newItem.locationId]);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,15 +123,21 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
 
       {isAdding && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-6 overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-6 overflow-y-auto max-h-[90vh] animate-in slide-in-from-bottom-20">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-black text-slate-900">Add Stock</h3>
-              <button onClick={() => setIsAdding(false)} className="text-slate-300"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+              <div className="flex flex-col">
+                <h3 className="text-xl font-black text-slate-900">Add Stock</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Manual Entry</p>
+              </div>
+              <button onClick={() => setIsAdding(false)} className="text-slate-300 p-2 hover:text-red-500 transition-colors">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
             </div>
             <form onSubmit={handleAdd} className="space-y-4">
               <div className="relative">
-                <input required className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" placeholder="Item Name" value={newItem.itemName} onChange={e => setNewItem({...newItem, itemName: e.target.value})} />
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Item Details</label>
+                <input required className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold shadow-sm" placeholder="Item Name" value={newItem.itemName} onChange={e => setNewItem({...newItem, itemName: e.target.value})} />
                 {productSuggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl z-20 overflow-hidden">
                     {productSuggestions.map(p => (
@@ -137,18 +147,57 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 )}
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <select className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})}>
-                  {categoryOrder.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
-                <input className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" placeholder="Variety" value={newItem.variety} onChange={e => setNewItem({...newItem, variety: e.target.value})} />
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
+                  <select className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold appearance-none" value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})}>
+                    {categoryOrder.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Variety</label>
+                  <input className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" placeholder="Variety (Optional)" value={newItem.variety} onChange={e => setNewItem({...newItem, variety: e.target.value})} />
+                </div>
               </div>
+
+              <div className="p-4 bg-indigo-50/50 rounded-[32px] border border-indigo-100 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Target Storage</label>
+                    <select 
+                      className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-xs font-bold appearance-none text-indigo-700"
+                      value={newItem.locationId}
+                      onChange={e => setNewItem({...newItem, locationId: e.target.value, subLocation: ''})}
+                    >
+                      {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Specific Shelf</label>
+                    <select 
+                      className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-xs font-bold appearance-none text-indigo-700"
+                      value={newItem.subLocation}
+                      onChange={e => setNewItem({...newItem, subLocation: e.target.value})}
+                    >
+                      <option value="">No Shelf / General</option>
+                      {availableSubLocations.map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
-                <input type="number" className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})} />
-                <select className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})}>
-                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantity</label>
+                  <input type="number" className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit</label>
+                  <select className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold appearance-none" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})}>
+                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
               </div>
-              <button type="submit" className="w-full bg-indigo-600 text-white font-black py-5 rounded-[24px] uppercase tracking-widest">Save Stock</button>
+              <button type="submit" className="w-full bg-indigo-600 text-white font-black py-5 rounded-[24px] uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all">Add to Inventory</button>
             </form>
           </div>
         </div>
@@ -159,6 +208,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           onClose={() => setIsImporting(false)} 
           onImport={(items) => { onBulkAdd(items); setIsImporting(false); }} 
           locations={locations} 
+          subLocations={subLocations}
           activeLocationId={activeLocationId} 
           categoryOrder={categoryOrder} 
         />

@@ -22,12 +22,12 @@ import {
   supabase, 
   signInWithGoogle,
   getEnv,
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY,
   syncProfile,
   syncVehicle,
   deleteVehicle,
-  syncStore
+  syncStore,
+  syncProduct,
+  syncPriceRecord
 } from './services/supabaseService';
 
 const DEFAULT_CATEGORIES = [
@@ -82,7 +82,6 @@ const App: React.FC = () => {
   const [isGuest, setIsGuest] = useState(() => localStorage.getItem('pricewise_is_guest') === 'true');
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   
-  // App State
   const [products, setProducts] = useState<Product[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -90,22 +89,18 @@ const App: React.FC = () => {
   const [subLocations, setSubLocations] = useState<SubLocation[]>([]);
   const [stores, setStores] = useState<StoreLocation[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  
-  // Profile / Settings State
-  const [profile, setProfile] = useState<Profile>({
-    id: '', locationLabel: '', zip: '', gasPrice: 3.50, categoryOrder: DEFAULT_CATEGORIES, sharePrices: false
-  });
+  const [profile, setProfile] = useState<Profile>({ id: '', locationLabel: '', zip: '', gasPrice: 3.50, categoryOrder: DEFAULT_CATEGORIES, sharePrices: false });
 
   const [lastUsedStore, setLastUsedStore] = useState<string>('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [initialMode, setInitialMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('tag');
 
-  // Fix: Moved loadCloudData to component scope and corrected Inventory mapping property names
   const loadCloudData = async () => {
     if (!supabase) return;
     const data = await fetchUserData();
     if (data) {
       if (data.profile) setProfile(data.profile);
+      if (data.products) setProducts(data.products);
       if (data.inventory.length) {
         setInventory(data.inventory.map(i => ({
           id: i.id, productId: i.product_id, itemName: i.item_name, category: i.category,
@@ -120,33 +115,27 @@ const App: React.FC = () => {
     }
   };
 
-  // Load Data
   useEffect(() => {
     if (!supabase) return;
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) { setIsGuest(false); loadCloudData(); }
     });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) { setIsGuest(false); loadCloudData(); }
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  // Sync Profile Changes
   const handleUpdateProfile = (updates: Partial<Profile>) => {
     const newProfile = { ...profile, ...updates };
     setProfile(newProfile);
     if (user) syncProfile(updates);
   };
 
-  // Sync Inventory
   const handleUpdateInventory = (id: string, delta: number) => {
     setInventory(prev => prev.map(item => {
       if (item.id === id) {
@@ -188,37 +177,51 @@ const App: React.FC = () => {
     }
   };
 
+  // Fix: Added missing handler for updating storage locations with cloud sync
   const handleUpdateStorageLocations = (newLocs: StorageLocation[]) => {
-    const currentIds = storageLocations.map(s => s.id);
-    const newIds = newLocs.map(s => s.id);
+    const deleted = storageLocations.filter(l => !newLocs.find(nl => nl.id === l.id));
     setStorageLocations(newLocs);
     if (user) {
-      newLocs.forEach(loc => syncStorageLocation(loc));
-      currentIds.forEach(id => { if (!newIds.includes(id)) deleteStorageLocation(id); });
+      newLocs.forEach(l => syncStorageLocation(l));
+      deleted.forEach(l => deleteStorageLocation(l.id));
     }
   };
 
+  // Fix: Added missing handler for updating sub locations with cloud sync
   const handleUpdateSubLocations = (newSubs: SubLocation[]) => {
-    const currentIds = subLocations.map(s => s.id);
-    const newIds = newSubs.map(s => s.id);
+    const deleted = subLocations.filter(s => !newSubs.find(ns => ns.id === s.id));
     setSubLocations(newSubs);
     if (user) {
       newSubs.forEach(s => syncSubLocation(s));
-      currentIds.forEach(id => { if (!newIds.includes(id)) deleteSubLocation(id); });
+      deleted.forEach(s => deleteSubLocation(s.id));
     }
   };
 
-  const handleAddPriceRecord = (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string) => {
+  const handleAddPriceRecord = async (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string) => {
     const newRecord: PriceRecord = { ...record, id: crypto.randomUUID(), date: new Date().toISOString(), isPublic: profile.sharePrices };
-    setProducts(prev => {
-      const existingIdx = prev.findIndex(p => (barcode && p.barcode === barcode) || (p.itemName.toLowerCase() === itemName.toLowerCase() && p.variety?.toLowerCase() === (variety || '').toLowerCase()));
-      if (existingIdx > -1) {
-        const updated = [...prev];
-        updated[existingIdx] = { ...updated[existingIdx], history: [newRecord, ...updated[existingIdx].history], brand: brand || updated[existingIdx].brand, barcode: barcode || updated[existingIdx].barcode, category: category };
-        return updated;
+    
+    // 1. Sync Product definition
+    const existingProduct = products.find(p => (barcode && p.barcode === barcode) || (p.itemName.toLowerCase() === itemName.toLowerCase() && (p.variety || '').toLowerCase() === (variety || '').toLowerCase() && (p.brand || '').toLowerCase() === (brand || '').toLowerCase()));
+    
+    let productId = existingProduct?.id;
+    if (user) {
+      try {
+        const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode });
+        productId = syncedProduct.id;
+        // 2. Sync History
+        await syncPriceRecord(productId, newRecord, user.id);
+      } catch (err) {
+        console.error("Cloud Sync Failed, falling back to local only", err);
       }
-      return [...prev, { id: crypto.randomUUID(), category, itemName, variety, brand, barcode, history: [newRecord] }];
+    }
+
+    setProducts(prev => {
+      if (existingProduct) {
+        return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history], brand: brand || p.brand, barcode: barcode || p.barcode, category } : p);
+      }
+      return [...prev, { id: productId || crypto.randomUUID(), category, itemName, variety, brand, barcode, history: [newRecord] }];
     });
+    
     setLastUsedStore(record.store);
     setIsAddModalOpen(false);
   };

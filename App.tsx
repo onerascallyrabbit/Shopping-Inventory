@@ -314,30 +314,30 @@ const App: React.FC = () => {
             onClick={signInWithGoogle}
             className={`w-full flex items-center justify-center space-x-3 text-white font-black py-5 rounded-[24px] shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs ${supabase ? 'bg-slate-900 hover:bg-black' : 'bg-slate-300'}`}
           >
-            <span>{supabase ? 'Sign In with Google' : 'Link Failed (Check Info)'}</span>
+            <span>{supabase ? 'Sign In with Google' : 'Setup Required'}</span>
           </button>
 
           {!supabase && (
              <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 text-left space-y-3">
-                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Build Injection Status:</p>
+                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Environment Status:</p>
                 <div className="space-y-1">
                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-bold text-slate-500">Cloud URL:</span>
+                      <span className="text-[9px] font-bold text-slate-500">SUPABASE_URL:</span>
                       <span className={`text-[10px] font-black ${sUrl ? 'text-emerald-500' : 'text-red-500'}`}>{sUrl ? 'OK' : 'MISSING'}</span>
                    </div>
                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-bold text-slate-500">Cloud Key:</span>
+                      <span className="text-[9px] font-bold text-slate-500">SUPABASE_ANON_KEY:</span>
                       <span className={`text-[10px] font-black ${sKey ? 'text-emerald-500' : 'text-red-500'}`}>{sKey ? 'OK' : 'MISSING'}</span>
                    </div>
                 </div>
                 <div className="pt-2 border-t border-amber-100 mt-2">
                    <p className="text-[9px] font-medium text-amber-800 italic leading-relaxed">
-                     <b>Developer Note:</b> Vite requires variables to be prefixed correctly. If they show MISSING, the build engine didn't swap the placeholders. 
+                     <b>Vite Prefix Required:</b> This app uses the Vite build engine. It <u>ignores</u> variables starting with <code>NEXT_PUBLIC_</code>.
                      <br/><br/>
-                     <b>Action Required:</b> Re-deploy in Vercel. Ensure integration names match <code>NEXT_PUBLIC_SUPABASE_URL</code> exactly.
+                     <b>Action:</b> In Vercel integration settings, change your prefix to <code>VITE_</code> and re-deploy.
                    </p>
                 </div>
-                <button onClick={() => window.location.reload()} className="w-full mt-2 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95">Re-Check App</button>
+                <button onClick={() => window.location.reload()} className="w-full mt-2 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95">Verify Cloud Setup</button>
              </div>
           )}
 

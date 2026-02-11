@@ -40,6 +40,16 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     });
   }, [inventory, activeLocationId, search, activeCategory]);
 
+  const groupedInventory = useMemo(() => {
+    const groups: Record<string, InventoryItem[]> = {};
+    filteredInventory.forEach(item => {
+      const shelf = item.subLocation || 'Loose / General';
+      if (!groups[shelf]) groups[shelf] = [];
+      groups[shelf].push(item);
+    });
+    return groups;
+  }, [filteredInventory]);
+
   const productSuggestions = useMemo(() => {
     if (newItem.itemName.length < 2) return [];
     return products.filter(p => p.itemName.toLowerCase().includes(newItem.itemName.toLowerCase())).slice(0, 5);
@@ -51,7 +61,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newItem.itemName) {
+    if (newItem.itemName && newItem.locationId) {
       onAddToInventory(
         newItem.productId || 'manual', 
         newItem.itemName, 
@@ -59,11 +69,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         newItem.variety, 
         parseFloat(newItem.quantity) || 0, 
         newItem.unit, 
-        newItem.locationId || activeLocationId, 
+        newItem.locationId, 
         newItem.subLocation
       );
       setIsAdding(false);
       setNewItem({ ...newItem, productId: '', itemName: '', variety: '', subLocation: '', quantity: '1' });
+    } else if (!newItem.locationId) {
+      alert("Please select a target storage location.");
     }
   };
 
@@ -98,34 +110,60 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       </div>
 
-      <div className="space-y-3">
-        {filteredInventory.map(item => (
-          <div key={item.id} className="bg-white border border-slate-100 p-5 rounded-[32px] shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex-1 min-w-0 pr-4">
-                <div className="flex items-center space-x-2">
-                   <h4 className="font-black text-slate-800 text-sm truncate uppercase">{item.itemName}</h4>
-                   {item.variety && <span className="text-[10px] font-bold text-slate-400">({item.variety})</span>}
+      <div className="space-y-8">
+        {Object.keys(groupedInventory).length > 0 ? Object.entries(groupedInventory).map(([shelf, items]) => (
+          <div key={shelf} className="space-y-3">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>
+              {shelf}
+            </h3>
+            <div className="space-y-2">
+              {items.map(item => (
+                <div key={item.id} className="bg-white border border-slate-100 p-4 rounded-[28px] shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-colors">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <div className="flex items-center space-x-2">
+                       <h4 className="font-black text-slate-800 text-xs truncate uppercase tracking-tight leading-tight">{item.itemName}</h4>
+                       {item.variety && <span className="text-[9px] font-bold text-slate-400">({item.variety})</span>}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center bg-slate-50 rounded-2xl p-0.5 border border-slate-100/50 shrink-0">
+                    <button 
+                      onClick={() => onUpdateQty(item.id, -1)} 
+                      className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-500 active:scale-90 transition-all font-black text-lg"
+                    >−</button>
+                    
+                    <button 
+                      onClick={() => { const v = prompt('Enter new total quantity:'); if(v) onUpdateQty(item.id, parseFloat(v) - item.quantity); }}
+                      className="px-3 flex flex-col items-center justify-center min-w-[50px] group/qty"
+                    >
+                       <span className="text-sm font-black text-indigo-600 leading-none">{item.quantity}</span>
+                       <span className="text-[8px] text-slate-400 uppercase font-black tracking-tighter mt-0.5">{item.unit}</span>
+                    </button>
+
+                    <button 
+                      onClick={() => onUpdateQty(item.id, 1)} 
+                      className="w-9 h-9 flex items-center justify-center text-indigo-600 hover:text-indigo-700 active:scale-90 transition-all font-black text-lg"
+                    >+</button>
+                  </div>
                 </div>
-                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-1">
-                  {locations.find(l => l.id === item.locationId)?.name} {item.subLocation && `• ${item.subLocation}`}
-                </p>
-              </div>
-              <p className="text-xl font-black text-indigo-600">{item.quantity} <span className="text-[10px] text-slate-400 uppercase">{item.unit}</span></p>
-            </div>
-            <div className="flex items-center bg-slate-50 rounded-2xl p-1">
-              <button onClick={() => onUpdateQty(item.id, -1)} className="w-10 h-10 flex items-center justify-center text-slate-400 font-black">-1</button>
-              <button onClick={() => { const v = prompt('Subtract:'); if(v) onUpdateQty(item.id, -parseFloat(v)); }} className="flex-1 text-[9px] font-black text-slate-400 uppercase">Custom</button>
-              <button onClick={() => onUpdateQty(item.id, 1)} className="w-10 h-10 flex items-center justify-center text-indigo-600 font-black">+1</button>
+              ))}
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="py-20 text-center flex flex-col items-center">
+             <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mb-4 text-slate-300">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+             </div>
+             <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">No items found in this section</p>
+          </div>
+        )}
       </div>
 
       {isAdding && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-6 overflow-y-auto max-h-[90vh] animate-in slide-in-from-bottom-20">
-            <div className="flex justify-between items-center mb-6">
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-20">
+            <div className="p-6 shrink-0 border-b border-slate-50 flex justify-between items-center">
               <div className="flex flex-col">
                 <h3 className="text-xl font-black text-slate-900">Add Stock</h3>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Manual Entry</p>
@@ -134,10 +172,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
-            <form onSubmit={handleAdd} className="space-y-4">
+            
+            <form onSubmit={handleAdd} className="flex-1 overflow-y-auto p-6 space-y-6">
               <div className="relative">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Item Details</label>
-                <input required className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold shadow-sm" placeholder="Item Name" value={newItem.itemName} onChange={e => setNewItem({...newItem, itemName: e.target.value})} />
+                <input required className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-500/20 transition-all" placeholder="Item Name" value={newItem.itemName} onChange={e => setNewItem({...newItem, itemName: e.target.value})} />
                 {productSuggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl z-20 overflow-hidden">
                     {productSuggestions.map(p => (
@@ -146,6 +185,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
                 )}
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
@@ -162,12 +202,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <div className="p-4 bg-indigo-50/50 rounded-[32px] border border-indigo-100 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Target Storage</label>
+                    <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Target Storage (Req)</label>
                     <select 
+                      required
                       className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-xs font-bold appearance-none text-indigo-700"
                       value={newItem.locationId}
                       onChange={e => setNewItem({...newItem, locationId: e.target.value, subLocation: ''})}
                     >
+                      <option value="">Select Location...</option>
                       {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
                     </select>
                   </div>
@@ -188,7 +230,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantity</label>
-                  <input type="number" className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})} />
+                  <input type="number" step="0.1" className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit</label>
@@ -197,6 +239,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   </select>
                 </div>
               </div>
+              
               <button type="submit" className="w-full bg-indigo-600 text-white font-black py-5 rounded-[24px] uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all">Add to Inventory</button>
             </form>
           </div>

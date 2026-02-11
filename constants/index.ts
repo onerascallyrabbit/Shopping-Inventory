@@ -7,6 +7,20 @@ export const DEFAULT_CATEGORIES = [
   "Baby", "Pets", "Other"
 ];
 
+export const SUB_CATEGORIES: Record<string, string[]> = {
+  "Produce": ["Fruits", "Vegetables", "Herbs", "Organic"],
+  "Dairy": ["Milk", "Cheese", "Yogurt", "Butter", "Eggs", "Alternatives"],
+  "Meat": ["Beef", "Poultry", "Pork", "Lamb", "Sausage", "Deli Meat"],
+  "Seafood": ["Fish", "Shellfish", "Frozen Fish"],
+  "Bakery": ["Bread", "Pastries", "Tortillas", "Cakes"],
+  "Frozen": ["Meals", "Vegetables", "Ice Cream", "Pizza"],
+  "Pantry": ["Grains", "Canned Goods", "Baking", "Spices", "Snacks", "Pasta"],
+  "Beverages": ["Water", "Soda", "Juice", "Coffee", "Tea", "Alcohol"],
+  "Household": ["Cleaning", "Paper Products", "Laundry", "Kitchen"],
+  "Personal Care": ["Hygiene", "Skincare", "First Aid", "Vitamins"],
+  "Other": ["General"]
+};
+
 export const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
 
 export const DEFAULT_STORAGE: StorageLocation[] = [

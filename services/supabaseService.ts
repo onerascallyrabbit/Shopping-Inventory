@@ -3,27 +3,34 @@ import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
  * STATIC ENVIRONMENT CONSTANTS
- * Bundlers like Vite/esbuild look for these EXACT literal strings 
- * at the top level to perform build-time replacement.
+ * Vite strictly requires the VITE_ prefix to expose variables to the client.
+ * If you are using NEXT_PUBLIC_, Vite will strip them during the build.
  */
 
+// 1. Check VITE_ prefix (Highest priority for this build environment)
 // @ts-ignore
-const RAW_URL = (import.meta.env?.NEXT_PUBLIC_SUPABASE_URL) || (import.meta.env?.SUPABASE_URL) || (import.meta.env?.VITE_SUPABASE_URL) || '';
+const VITE_URL = (import.meta.env?.VITE_SUPABASE_URL) || '';
 // @ts-ignore
-const PROC_URL = (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) : '');
-export const SUPABASE_URL = RAW_URL || PROC_URL || '';
+const VITE_KEY = (import.meta.env?.VITE_SUPABASE_ANON_KEY) || '';
 
+// 2. Check NEXT_PUBLIC_ prefix (Requires specific Vite config, often fails in standard builds)
 // @ts-ignore
-const RAW_KEY = (import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) || (import.meta.env?.SUPABASE_ANON_KEY) || (import.meta.env?.VITE_SUPABASE_ANON_KEY) || '';
+const NEXT_URL = (import.meta.env?.NEXT_PUBLIC_SUPABASE_URL) || (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL : '');
 // @ts-ignore
-const PROC_KEY = (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY) : '');
-export const SUPABASE_ANON_KEY = RAW_KEY || PROC_KEY || '';
+const NEXT_KEY = (import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) || (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : '');
 
+// 3. Check Standard Names
 // @ts-ignore
-const RAW_API = (import.meta.env?.API_KEY) || (import.meta.env?.NEXT_PUBLIC_API_KEY) || (import.meta.env?.VITE_API_KEY) || '';
+const STD_URL = (import.meta.env?.SUPABASE_URL) || (typeof process !== 'undefined' ? process.env.SUPABASE_URL : '');
 // @ts-ignore
-const PROC_API = (typeof process !== 'undefined' ? (process.env.API_KEY || process.env.NEXT_PUBLIC_API_KEY || process.env.VITE_API_KEY) : '');
-export const API_KEY = RAW_API || PROC_API || '';
+const STD_KEY = (import.meta.env?.SUPABASE_ANON_KEY) || (typeof process !== 'undefined' ? process.env.SUPABASE_ANON_KEY : '');
+
+export const SUPABASE_URL = VITE_URL || NEXT_URL || STD_URL || '';
+export const SUPABASE_ANON_KEY = VITE_KEY || NEXT_KEY || STD_KEY || '';
+
+// API Key detection
+// @ts-ignore
+export const API_KEY = (import.meta.env?.VITE_API_KEY) || (import.meta.env?.API_KEY) || (typeof process !== 'undefined' ? (process.env.API_KEY || process.env.VITE_API_KEY) : '') || '';
 
 export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_URL') return SUPABASE_URL;
@@ -41,7 +48,7 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
  * HEALTH CHECK
  */
 export const testDatabaseConnection = async () => {
-  if (!supabase) return { success: false, error: 'Cloud keys missing. Build replacement failed.' };
+  if (!supabase) return { success: false, error: 'Cloud keys missing. Ensure your Vercel/Supabase prefix is set to VITE_' };
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No user session found. Please sign in.' };

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Product, ShoppingItem, InventoryItem, StorageLocation, 
@@ -30,46 +29,63 @@ export const useAppData = () => {
   });
 
   const loadAllData = useCallback(async () => {
-    if (!supabase) return;
-    setLoading(true);
-    const data = await fetchUserData();
-    if (data) {
-      if (data.profile) {
-        setProfile(data.profile);
-        if (data.profile.familyId) {
-          const familyDetails = await fetchFamily(data.profile.familyId);
-          setActiveFamily(familyDetails);
-        }
-      }
-      if (data.products) setProducts(data.products);
-      if (data.inventory.length) {
-        setInventory(data.inventory.map(i => ({
-          id: i.id, productId: i.product_id, itemName: i.item_name, category: i.category,
-          subCategory: i.sub_category,
-          variety: i.variety, subLocation: i.sub_location, quantity: Number(i.quantity),
-          unit: i.unit, locationId: i.location_id, updatedAt: i.updated_at, userId: i.user_id
-        })));
-      }
-      if (data.storageLocations.length) setStorageLocations(data.storageLocations.map(s => ({ id: s.id, name: s.name })));
-      if (data.subLocations.length) setSubLocations(data.subLocations.map(s => ({ id: s.id, locationId: s.location_id, name: s.name })));
-      if (data.stores.length) setStores(data.stores.map(s => ({ id: s.id, name: s.name, address: s.address, lat: Number(s.lat), lng: Number(s.lng), phone: s.phone, hours: s.hours, zip: s.zip })));
-      if (data.vehicles.length) setVehicles(data.vehicles.map(v => ({ id: v.id, name: v.name, mpg: Number(v.mpg) })));
+    if (!supabase) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+    
+    setLoading(true);
+    try {
+      const data = await fetchUserData();
+      if (data) {
+        if (data.profile) {
+          setProfile(data.profile);
+          if (data.profile.familyId) {
+            const familyDetails = await fetchFamily(data.profile.familyId);
+            setActiveFamily(familyDetails);
+          }
+        }
+        if (data.products) setProducts(data.products);
+        if (data.inventory?.length) {
+          setInventory(data.inventory.map(i => ({
+            id: i.id, productId: i.product_id, itemName: i.item_name, category: i.category,
+            subCategory: i.sub_category,
+            variety: i.variety, subLocation: i.sub_location, quantity: Number(i.quantity),
+            unit: i.unit, locationId: i.location_id, updatedAt: i.updated_at, userId: i.user_id
+          })));
+        }
+        if (data.storageLocations?.length) setStorageLocations(data.storageLocations.map(s => ({ id: s.id, name: s.name })));
+        if (data.subLocations?.length) setSubLocations(data.subLocations.map(s => ({ id: s.id, locationId: s.location_id, name: s.name })));
+        if (data.stores?.length) setStores(data.stores.map(s => ({ id: s.id, name: s.name, address: s.address, lat: Number(s.lat), lng: Number(s.lng), phone: s.phone, hours: s.hours, zip: s.zip })));
+        if (data.vehicles?.length) setVehicles(data.vehicles.map(v => ({ id: v.id, name: v.name, mpg: Number(v.mpg) })));
+      }
+    } catch (err) {
+      console.error("Failed to load user data:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) loadAllData();
+      else setLoading(false);
     });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) loadAllData();
+      else setLoading(false);
     });
+    
     return () => subscription.unsubscribe();
   }, [loadAllData]);
 

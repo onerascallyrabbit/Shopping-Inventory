@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { InventoryItem, StorageLocation, Product, SubLocation } from '../types';
 import CsvImportModal from './CsvImportModal';
@@ -135,7 +134,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     </div>
                     {(item.subCategory || item.category) && (
                       <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-0.5">
-                        {item.category} {item.subCategory && `> ${item.subCategory}`}
+                        {item.category} {item.subCategory && <span className="text-slate-300">{" > "} {item.subCategory}</span>}
                       </p>
                     )}
                   </div>

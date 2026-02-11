@@ -7,6 +7,7 @@ export interface PriceRecord {
   unit: string; // e.g., 'oz', 'lb', 'count', 'ml'
   date: string;
   image?: string; // base64
+  isPublic?: boolean;
 }
 
 export interface Product {
@@ -28,6 +29,7 @@ export interface ShoppingItem {
   unit: string;
   isCompleted: boolean;
   manualStore?: string;
+  userId?: string;
 }
 
 export interface StoreLocation {
@@ -39,6 +41,7 @@ export interface StoreLocation {
   hours?: string;
   phone?: string;
   zip?: string;
+  userId?: string;
 }
 
 export interface SubLocation {
@@ -63,20 +66,31 @@ export interface InventoryItem {
   unit: string;
   locationId: string;
   updatedAt: string;
-  userId?: string; // Track who owns/created this record
+  userId?: string; 
 }
 
 export interface Vehicle {
   id: string;
   name: string;
   mpg: number;
+  userId?: string;
 }
 
-export interface UserSettings {
+export interface Profile {
+  id: string;
   locationLabel: string;
-  zip?: string;
+  zip: string;
+  gasPrice: number;
+  categoryOrder: string[];
   activeVehicleId?: string;
-  gasPrice?: number;
+  sharePrices: boolean;
+  familyId?: string;
+}
+
+export interface FamilyMember {
+  id: string;
+  email: string;
+  avatar_url?: string;
 }
 
 export type AppTab = 'dashboard' | 'items' | 'inventory' | 'list' | 'shop' | 'settings';

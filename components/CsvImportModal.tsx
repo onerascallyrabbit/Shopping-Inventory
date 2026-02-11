@@ -80,8 +80,8 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl p-6 overflow-hidden flex flex-col h-full max-h-[90vh]">
-        <div className="flex justify-between items-center mb-6 shrink-0">
+      <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col h-full max-h-[85vh]">
+        <div className="p-6 shrink-0 border-b border-slate-50 flex justify-between items-center">
           <div className="flex flex-col">
             <h3 className="text-xl font-black text-slate-900">Bulk Import</h3>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inventory Management</p>
@@ -91,43 +91,13 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
           </button>
         </div>
 
-        {/* Global Destination Selector (Always visible after upload) */}
-        {step !== 'upload' && (
-          <div className="grid grid-cols-2 gap-3 mb-6 p-4 bg-indigo-50/50 rounded-3xl border border-indigo-100 shrink-0">
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Destination</label>
-              <select 
-                className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-xs font-bold text-indigo-700 appearance-none"
-                value={targetLocationId}
-                onChange={e => {
-                  setTargetLocationId(e.target.value);
-                  setTargetSubLocation('');
-                }}
-              >
-                {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Sub-Destination</label>
-              <select 
-                className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-xs font-bold text-indigo-700 appearance-none"
-                value={targetSubLocation}
-                onChange={e => setTargetSubLocation(e.target.value)}
-              >
-                <option value="">None / General</option>
-                {availableSubLocations.map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {step === 'upload' && (
-            <div className="h-full flex flex-col items-center justify-center py-12 space-y-4 border-2 border-dashed border-slate-100 rounded-[32px] bg-slate-50">
+            <div className="h-64 flex flex-col items-center justify-center py-12 space-y-4 border-2 border-dashed border-slate-100 rounded-[32px] bg-slate-50">
               <div className="bg-white p-6 rounded-full shadow-sm text-indigo-500">
                 <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
               </div>
-              <div className="text-center">
+              <div className="text-center px-4">
                 <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Drop your inventory CSV</p>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Headers required: Item Name, Qty, Unit</p>
               </div>
@@ -136,57 +106,87 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
             </div>
           )}
 
-          {step === 'map' && (
-            <div className="space-y-4 animate-in fade-in">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Configure Mapping</p>
-              <div className="space-y-2">
-                {csvHeaders.map((header, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-colors">
-                    <span className="text-xs font-black text-slate-700 truncate max-w-[200px] uppercase tracking-tight">{header}</span>
-                    <select 
-                      className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-[10px] font-black text-indigo-600 appearance-none shadow-sm focus:ring-2 focus:ring-indigo-500/10" 
-                      value={mappings[idx]} 
-                      onChange={e => setMappings({...mappings, [idx]: e.target.value as MappingField})}
-                    >
-                      <option value="ignore">Skip Column</option>
-                      <option value="itemName">Item Name</option>
-                      <option value="variety">Variety</option>
-                      <option value="quantity">Quantity</option>
-                      <option value="unit">Unit</option>
-                      <option value="category">Category</option>
-                    </select>
-                  </div>
-                ))}
+          {step !== 'upload' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-3 p-4 bg-indigo-50/50 rounded-3xl border border-indigo-100">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Destination</label>
+                  <select 
+                    className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2.5 text-xs font-bold text-indigo-700 appearance-none focus:ring-2 focus:ring-indigo-500/20"
+                    value={targetLocationId}
+                    onChange={e => {
+                      setTargetLocationId(e.target.value);
+                      setTargetSubLocation('');
+                    }}
+                  >
+                    {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Sub-Destination</label>
+                  <select 
+                    className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2.5 text-xs font-bold text-indigo-700 appearance-none focus:ring-2 focus:ring-indigo-500/20"
+                    value={targetSubLocation}
+                    onChange={e => setTargetSubLocation(e.target.value)}
+                  >
+                    <option value="">None / General</option>
+                    {availableSubLocations.map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+                  </select>
+                </div>
               </div>
-            </div>
-          )}
 
-          {step === 'review' && (
-            <div className="space-y-3 animate-in fade-in">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Import Preview ({finalItems.length})</p>
-              <div className="space-y-2">
-                {finalItems.map((item, idx) => (
-                  <div key={idx} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
-                    <div className="min-w-0 pr-4">
-                      <span className="block text-xs font-black text-slate-800 truncate uppercase tracking-tight">{item.itemName}</span>
-                      <div className="flex items-center space-x-2 mt-0.5">
-                        <span className="text-[8px] font-bold text-slate-400 uppercase">{item.category}</span>
-                        {item.variety && <span className="text-[8px] font-bold text-indigo-400 uppercase">• {item.variety}</span>}
+              {step === 'map' && (
+                <div className="space-y-4 animate-in fade-in">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Configure Mapping</p>
+                  <div className="space-y-2">
+                    {csvHeaders.map((header, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-colors shadow-sm">
+                        <span className="text-xs font-black text-slate-700 truncate max-w-[150px] uppercase tracking-tight">{header}</span>
+                        <select 
+                          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-black text-indigo-600 appearance-none shadow-sm focus:ring-2 focus:ring-indigo-500/10" 
+                          value={mappings[idx]} 
+                          onChange={e => setMappings({...mappings, [idx]: e.target.value as MappingField})}
+                        >
+                          <option value="ignore">Skip Column</option>
+                          <option value="itemName">Item Name</option>
+                          <option value="variety">Variety</option>
+                          <option value="quantity">Quantity</option>
+                          <option value="unit">Unit</option>
+                          <option value="category">Category</option>
+                        </select>
                       </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-sm font-black text-slate-900">{item.quantity}</span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase ml-1">{item.unit}</span>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
+
+              {step === 'review' && (
+                <div className="space-y-3 animate-in fade-in">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Import Preview ({finalItems.length})</p>
+                  <div className="space-y-2">
+                    {finalItems.map((item, idx) => (
+                      <div key={idx} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
+                        <div className="min-w-0 pr-4">
+                          <span className="block text-xs font-black text-slate-800 truncate uppercase tracking-tight">{item.itemName}</span>
+                          <div className="flex items-center space-x-2 mt-0.5">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase">{item.category}</span>
+                            {item.variety && <span className="text-[8px] font-bold text-indigo-400 uppercase">• {item.variety}</span>}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-sm font-black text-slate-900">{item.quantity}</span>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase ml-1">{item.unit}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="mt-6 pt-6 border-t border-slate-50 shrink-0">
+        <div className="p-6 shrink-0 border-t border-slate-50 bg-slate-50/50">
           {step === 'map' && (
             <button 
               onClick={() => setStep('review')} 
@@ -199,13 +199,14 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
             <div className="flex space-x-3">
               <button 
                 onClick={() => setStep('map')} 
-                className="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl uppercase tracking-widest text-[10px]"
+                className="flex-1 bg-white border border-slate-200 text-slate-600 font-black py-4 rounded-2xl uppercase tracking-widest text-[10px]"
               >
                 Back
               </button>
               <button 
                 onClick={() => onImport(finalItems)} 
-                className="flex-[2] bg-emerald-600 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg shadow-emerald-100 active:scale-[0.98] transition-all"
+                disabled={!targetLocationId}
+                className={`flex-[2] text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg transition-all active:scale-[0.98] ${targetLocationId ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-300 cursor-not-allowed shadow-none'}`}
               >
                 Import to {locations.find(l => l.id === targetLocationId)?.name || 'Stock'}
               </button>

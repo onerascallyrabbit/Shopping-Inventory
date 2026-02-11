@@ -2,4 +2,4 @@ added Google User login and user tracking
 added supabase auth and gemini key
 Google sign-in working
 Added additional database and "family" features
-
+Now storing price-history in database

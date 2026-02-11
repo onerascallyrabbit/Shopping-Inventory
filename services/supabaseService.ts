@@ -84,6 +84,7 @@ export const syncProduct = async (product: Partial<Product>) => {
   const { data, error } = await supabase.from('products').upsert({
     id: product.id || crypto.randomUUID(),
     category: product.category,
+    sub_category: product.subCategory,
     item_name: product.itemName,
     variety: product.variety,
     brand: product.brand,
@@ -118,6 +119,7 @@ export const fetchPriceData = async (): Promise<Product[]> => {
     return {
       id: p.id,
       category: p.category,
+      subCategory: p.sub_category,
       itemName: p.item_name,
       variety: p.variety,
       brand: p.brand,
@@ -240,14 +242,45 @@ export const deleteStore = async (id: string) => {
 
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase || !item.userId) return;
-  await supabase.from('inventory').upsert({ id: item.id, product_id: item.productId, item_name: item.itemName, category: item.category, variety: item.variety, sub_location: item.subLocation, quantity: item.quantity, unit: item.unit, location_id: item.locationId, updated_at: item.updatedAt, user_id: item.userId });
+  await supabase.from('inventory').upsert({ 
+    id: item.id, 
+    product_id: item.productId, 
+    item_name: item.itemName, 
+    category: item.category, 
+    sub_category: item.subCategory,
+    variety: item.variety, 
+    sub_location: item.subLocation, 
+    quantity: item.quantity, 
+    unit: item.unit, 
+    location_id: item.locationId, 
+    updated_at: item.updatedAt, 
+    user_id: item.userId 
+  });
+};
+
+export const deleteInventoryItem = async (id: string) => {
+  if (!supabase) return;
+  await supabase.from('inventory').delete().eq('id', id);
 };
 
 export const bulkSyncInventory = async (items: InventoryItem[]) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  const payload = items.map(item => ({ id: item.id, product_id: item.productId, item_name: item.itemName, category: item.category, variety: item.variety, sub_location: item.subLocation, quantity: item.quantity, unit: item.unit, location_id: item.locationId, updated_at: item.updatedAt, user_id: user.id }));
+  const payload = items.map(item => ({ 
+    id: item.id, 
+    product_id: item.productId, 
+    item_name: item.itemName, 
+    category: item.category, 
+    sub_category: item.subCategory,
+    variety: item.variety, 
+    sub_location: item.subLocation, 
+    quantity: item.quantity, 
+    unit: item.unit, 
+    location_id: item.locationId, 
+    updated_at: item.updatedAt, 
+    user_id: user.id 
+  }));
   await supabase.from('inventory').upsert(payload);
 };
 

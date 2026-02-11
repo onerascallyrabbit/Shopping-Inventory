@@ -1,5 +1,7 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import { InventoryItem, StorageLocation, SubLocation } from '../types';
+import { UNITS, SUB_CATEGORIES } from '../constants';
 
 interface CsvImportModalProps {
   onClose: () => void;
@@ -20,6 +22,8 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
   
   const [targetLocationId, setTargetLocationId] = useState(activeLocationId || (locations[0]?.id || ''));
   const [targetSubLocation, setTargetSubLocation] = useState('');
+  
+  const [reviewItems, setReviewItems] = useState<Omit<InventoryItem, 'id' | 'updatedAt'>[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,9 +62,8 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
     reader.readAsText(file);
   };
 
-  const finalItems = useMemo(() => {
-    if (step !== 'review') return [];
-    return csvRows.map(row => {
+  const generateReviewItems = () => {
+    const items = csvRows.map(row => {
       const item: any = { productId: 'manual', subLocation: targetSubLocation };
       csvHeaders.forEach((_, idx) => {
         const field = mappings[idx];
@@ -76,7 +79,18 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
       if (!item.unit) item.unit = 'pc';
       return item as Omit<InventoryItem, 'id' | 'updatedAt'>;
     }).filter(item => item.itemName);
-  }, [csvRows, mappings, step, targetLocationId, targetSubLocation, categoryOrder, csvHeaders]);
+    
+    setReviewItems(items);
+    setStep('review');
+  };
+
+  const updateReviewItem = (index: number, updates: Partial<Omit<InventoryItem, 'id' | 'updatedAt'>>) => {
+    setReviewItems(prev => prev.map((item, idx) => idx === index ? { ...item, ...updates } : item));
+  };
+
+  const removeReviewItem = (index: number) => {
+    setReviewItems(prev => prev.filter((_, idx) => idx !== index));
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -115,8 +129,12 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
                     className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2.5 text-xs font-bold text-indigo-700 appearance-none focus:ring-2 focus:ring-indigo-500/20"
                     value={targetLocationId}
                     onChange={e => {
-                      setTargetLocationId(e.target.value);
+                      const newId = e.target.value;
+                      setTargetLocationId(newId);
                       setTargetSubLocation('');
+                      if (step === 'review') {
+                        setReviewItems(prev => prev.map(item => ({ ...item, locationId: newId, subLocation: '' })));
+                      }
                     }}
                   >
                     {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
@@ -127,7 +145,13 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
                   <select 
                     className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2.5 text-xs font-bold text-indigo-700 appearance-none focus:ring-2 focus:ring-indigo-500/20"
                     value={targetSubLocation}
-                    onChange={e => setTargetSubLocation(e.target.value)}
+                    onChange={e => {
+                      const newSub = e.target.value;
+                      setTargetSubLocation(newSub);
+                      if (step === 'review') {
+                        setReviewItems(prev => prev.map(item => ({ ...item, subLocation: newSub })));
+                      }
+                    }}
                   >
                     <option value="">None / General</option>
                     {availableSubLocations.map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
@@ -161,21 +185,43 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
               )}
 
               {step === 'review' && (
-                <div className="space-y-3 animate-in fade-in">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Import Preview ({finalItems.length})</p>
-                  <div className="space-y-2">
-                    {finalItems.map((item, idx) => (
-                      <div key={idx} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
-                        <div className="min-w-0 pr-4">
-                          <span className="block text-xs font-black text-slate-800 truncate uppercase tracking-tight">{item.itemName}</span>
-                          <div className="flex items-center space-x-2 mt-0.5">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">{item.category}</span>
-                            {item.variety && <span className="text-[8px] font-bold text-indigo-400 uppercase">• {item.variety}</span>}
+                <div className="space-y-4 animate-in fade-in">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Verify Items ({reviewItems.length})</p>
+                  <div className="space-y-4">
+                    {reviewItems.map((item, idx) => (
+                      <div key={idx} className="p-5 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-4 relative group border-l-4 border-l-indigo-500">
+                        <button onClick={() => removeReviewItem(idx)} className="absolute top-4 right-4 text-slate-200 hover:text-red-500 transition-colors">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="col-span-2">
+                            <label className="text-[8px] font-black text-slate-400 uppercase">Item Name</label>
+                            <input className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold" value={item.itemName} onChange={e => updateReviewItem(idx, { itemName: e.target.value })} />
                           </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className="text-sm font-black text-slate-900">{item.quantity}</span>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase ml-1">{item.unit}</span>
+                          <div>
+                            <label className="text-[8px] font-black text-slate-400 uppercase">Category</label>
+                            <select className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold appearance-none" value={item.category} onChange={e => updateReviewItem(idx, { category: e.target.value, subCategory: '' })}>
+                              {categoryOrder.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-black text-slate-400 uppercase">Sub-Category</label>
+                            <select className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold appearance-none" value={item.subCategory} onChange={e => updateReviewItem(idx, { subCategory: e.target.value })}>
+                              <option value="">General</option>
+                              {(SUB_CATEGORIES[item.category] || []).map(sc => <option key={sc} value={sc}>{sc}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-black text-slate-400 uppercase">Qty</label>
+                            <input type="number" step="0.1" className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold" value={item.quantity} onChange={e => updateReviewItem(idx, { quantity: parseFloat(e.target.value) || 0 })} />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-black text-slate-400 uppercase">Unit</label>
+                            <select className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold appearance-none" value={item.unit} onChange={e => updateReviewItem(idx, { unit: e.target.value })}>
+                              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -189,7 +235,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
         <div className="p-6 shrink-0 border-t border-slate-50 bg-slate-50/50">
           {step === 'map' && (
             <button 
-              onClick={() => setStep('review')} 
+              onClick={generateReviewItems} 
               className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg active:scale-[0.98] transition-all"
             >
               Verify Items
@@ -204,11 +250,11 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
                 Back
               </button>
               <button 
-                onClick={() => onImport(finalItems)} 
-                disabled={!targetLocationId}
-                className={`flex-[2] text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg transition-all active:scale-[0.98] ${targetLocationId ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-300 cursor-not-allowed shadow-none'}`}
+                onClick={() => onImport(reviewItems)} 
+                disabled={!targetLocationId || reviewItems.length === 0}
+                className={`flex-[2] text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg transition-all active:scale-[0.98] ${targetLocationId && reviewItems.length > 0 ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-300 cursor-not-allowed shadow-none'}`}
               >
-                Import to {locations.find(l => l.id === targetLocationId)?.name || 'Stock'}
+                Import {reviewItems.length} Items to {locations.find(l => l.id === targetLocationId)?.name || 'Stock'}
               </button>
             </div>
           )}

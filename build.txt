@@ -1,3 +1,5 @@
 added Google User login and user tracking
 added supabase auth and gemini key
-Auth Gate Refactor 14  
+Google sign-in working
+Added additional database and "family" features
+

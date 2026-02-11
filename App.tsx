@@ -18,7 +18,7 @@ const App: React.FC = () => {
   const { 
     user, loading, products, shoppingList, setShoppingList, inventory, 
     storageLocations, setStorageLocations, subLocations, setSubLocations,
-    stores, setStores, vehicles, setVehicles, profile, 
+    stores, setStores, vehicles, setVehicles, profile, activeFamily,
     updateProfile, updateInventoryQty, addPriceRecord, addToList, 
     addToInventory, importBulkInventory, refresh 
   } = useAppData();
@@ -81,7 +81,7 @@ const App: React.FC = () => {
         )}
         {activeTab === 'settings' && (
           <SettingsView 
-            user={user} profile={profile} onProfileChange={updateProfile}
+            user={user} profile={profile} activeFamily={activeFamily} onProfileChange={updateProfile}
             stores={stores} onStoresChange={setStores}
             vehicles={vehicles} onVehiclesChange={setVehicles}
             storageLocations={storageLocations} onStorageLocationsChange={setStorageLocations}

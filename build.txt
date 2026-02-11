@@ -1,3 +1,3 @@
 added Google User login and user tracking
 added supabase auth and gemini key
-Auth Gate Refactor 11
+Auth Gate Refactor 12

@@ -75,6 +75,7 @@ const App: React.FC = () => {
             onRemoveItem={removeInventoryItem}
             onAddToInventory={addToInventory} 
             onBulkAdd={importBulkInventory} 
+            onAddToList={addToList}
           />
         )}
         {activeTab === 'list' && (

@@ -88,7 +88,7 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
               <h3 className="mt-3 font-bold text-slate-900 truncate text-sm">{getFullName(deal.product)}</h3>
               {deal.product.subCategory && (
                 <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-1">
-                  {deal.product.category} > {deal.product.subCategory}
+                  {deal.product.category} {" > "} {deal.product.subCategory}
                 </p>
               )}
               <p className="text-[10px] text-slate-400 mt-0.5">{deal.store}</p>
@@ -173,7 +173,7 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
                     <h3 className="font-bold text-slate-900 text-sm leading-tight truncate">{getFullName(record.product)}</h3>
                     {record.product.subCategory && (
                       <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-0.5">
-                        {record.product.category} > {record.product.subCategory}
+                        {record.product.category} {" > "} {record.product.subCategory}
                       </p>
                     )}
                     <p className="text-[10px] text-slate-400 mt-1 font-medium uppercase tracking-wide">{record.store} • {new Date(record.date).toLocaleDateString()}</p>

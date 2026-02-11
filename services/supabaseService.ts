@@ -2,14 +2,55 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation } from '../types';
 
 /**
- * Direct environment variable access matching user's successful project pattern.
+ * Hardened environment variable discovery.
+ * Build tools look for these EXACT literal strings to perform static replacement.
  */
-// @ts-ignore
-const SUPABASE_URL = (typeof process !== 'undefined' ? process.env.SUPABASE_URL : undefined) || (import.meta as any).env?.SUPABASE_URL || '';
-// @ts-ignore
-const SUPABASE_ANON_KEY = (typeof process !== 'undefined' ? process.env.SUPABASE_ANON_KEY : undefined) || (import.meta as any).env?.SUPABASE_ANON_KEY || '';
-// @ts-ignore
-const API_KEY = (typeof process !== 'undefined' ? process.env.API_KEY : undefined) || (import.meta as any).env?.API_KEY || '';
+const discoverSupabaseUrl = (): string => {
+  try {
+    // 1. Check for NEXT_PUBLIC prefix (Vercel standard)
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_URL) return process.env.NEXT_PUBLIC_SUPABASE_URL;
+    // 2. Check for standard name
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env.SUPABASE_URL) return process.env.SUPABASE_URL;
+    // 3. Check import.meta (Vite standard)
+    // @ts-ignore
+    if (import.meta.env?.NEXT_PUBLIC_SUPABASE_URL) return import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
+    // @ts-ignore
+    if (import.meta.env?.SUPABASE_URL) return import.meta.env.SUPABASE_URL;
+  } catch (e) {}
+  return '';
+};
+
+const discoverSupabaseKey = (): string => {
+  try {
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env.SUPABASE_ANON_KEY) return process.env.SUPABASE_ANON_KEY;
+    // @ts-ignore
+    if (import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) return import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // @ts-ignore
+    if (import.meta.env?.SUPABASE_ANON_KEY) return import.meta.env.SUPABASE_ANON_KEY;
+  } catch (e) {}
+  return '';
+};
+
+const discoverApiKey = (): string => {
+  try {
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env.API_KEY) return process.env.API_KEY;
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+    // @ts-ignore
+    if (import.meta.env?.API_KEY) return import.meta.env.API_KEY;
+  } catch (e) {}
+  return '';
+};
+
+const SUPABASE_URL = discoverSupabaseUrl();
+const SUPABASE_ANON_KEY = discoverSupabaseKey();
+const API_KEY = discoverApiKey();
 
 export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_URL') return SUPABASE_URL;

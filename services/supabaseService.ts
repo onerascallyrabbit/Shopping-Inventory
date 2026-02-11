@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family } from '../types';
 
@@ -72,7 +73,7 @@ export const fetchFamily = async (familyId: string): Promise<Family | null> => {
  */
 export const syncPriceRecord = async (productId: string, record: PriceRecord, userId: string) => {
   if (!supabase) return;
-  await supabase.from('price_history').insert({
+  const { error } = await supabase.from('price_history').insert({
     id: record.id,
     product_id: productId,
     user_id: userId,
@@ -84,6 +85,7 @@ export const syncPriceRecord = async (productId: string, record: PriceRecord, us
     image_url: record.image,
     is_public: record.isPublic || false
   });
+  if (error) console.error("syncPriceRecord error:", error);
 };
 
 export const syncProduct = async (product: Partial<Product>) => {
@@ -98,7 +100,10 @@ export const syncProduct = async (product: Partial<Product>) => {
     barcode: product.barcode
   }).select().single();
   
-  if (error) throw error;
+  if (error) {
+    console.error("syncProduct error:", error);
+    throw error;
+  }
   return data;
 };
 
@@ -155,6 +160,8 @@ export const fetchUserData = async () => {
       supabase.from('stores').select('*'),
       supabase.from('vehicles').select('*')
     ]);
+
+    if (inventoryRes.error) console.warn("fetchUserData: inventory error", inventoryRes.error);
 
     return {
       profile,
@@ -236,7 +243,10 @@ export const syncProfile = async (profile: Partial<Profile>) => {
   if (profile.familyId !== undefined) payload.family_id = profile.familyId;
   
   const { data, error } = await supabase.from('profiles').upsert({ id: user.id, ...payload }).select().single();
-  if (error) throw error;
+  if (error) {
+    console.error("syncProfile error:", error);
+    throw error;
+  }
   return data;
 };
 
@@ -310,8 +320,11 @@ export const deleteStore = async (id: string) => {
 };
 
 export const syncInventoryItem = async (item: InventoryItem) => {
-  if (!supabase || !item.userId) return;
-  await supabase.from('inventory').upsert({ 
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase.from('inventory').upsert({ 
     id: item.id, 
     product_id: item.productId, 
     item_name: item.itemName, 
@@ -323,8 +336,13 @@ export const syncInventoryItem = async (item: InventoryItem) => {
     unit: item.unit, 
     location_id: item.locationId, 
     updated_at: item.updatedAt, 
-    user_id: item.userId 
+    user_id: item.userId || user.id 
   });
+
+  if (error) {
+    console.error("syncInventoryItem error:", error);
+    throw error;
+  }
 };
 
 export const deleteInventoryItem = async (id: string) => {
@@ -348,9 +366,10 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
     unit: item.unit, 
     location_id: item.locationId, 
     updated_at: item.updatedAt, 
-    user_id: user.id 
+    user_id: item.userId || user.id 
   }));
-  await supabase.from('inventory').upsert(payload);
+  const { error } = await supabase.from('inventory').upsert(payload);
+  if (error) console.error("bulkSyncInventory error:", error);
 };
 
 export const syncStorageLocation = async (loc: StorageLocation) => {

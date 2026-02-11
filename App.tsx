@@ -310,9 +310,9 @@ const App: React.FC = () => {
           <button 
             disabled={!supabase}
             onClick={signInWithGoogle}
-            className={`w-full flex items-center justify-center space-x-3 text-white font-black py-5 rounded-[24px] shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs ${supabase ? 'bg-slate-900' : 'bg-slate-300'}`}
+            className={`w-full flex items-center justify-center space-x-3 text-white font-black py-5 rounded-[24px] shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs ${supabase ? 'bg-slate-900 hover:bg-black' : 'bg-slate-300'}`}
           >
-            <span>{supabase ? 'Sign In with Google' : 'Cloud Setup Required'}</span>
+            <span>{supabase ? 'Sign In with Google' : 'Cloud Link Error'}</span>
           </button>
 
           {!supabase && (
@@ -328,14 +328,20 @@ const App: React.FC = () => {
                       <span className={`text-[10px] font-black ${sKey ? 'text-emerald-500' : 'text-red-500'}`}>{sKey ? 'DETECTED' : 'MISSING'}</span>
                    </div>
                 </div>
-                <p className="text-[9px] font-medium text-amber-800 italic leading-relaxed pt-2 border-t border-amber-100 mt-2">
-                  <b>Vercel Note:</b> After setting variables in the dashboard, you <u>must</u> trigger a <b>new deployment</b> for the changes to take effect.
-                </p>
-                <button onClick={() => window.location.reload()} className="w-full mt-2 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest">Reload App</button>
+                <div className="pt-2 border-t border-amber-100 mt-2">
+                   <p className="text-[9px] font-medium text-amber-800 italic leading-relaxed">
+                     <b>Vercel Integration Info:</b> Your integration is set to prefix with <code>NEXT_PUBLIC_</code>.
+                     <br/><br/>
+                     Ensure your Vercel Dashboard shows:
+                     <br/><code>NEXT_PUBLIC_SUPABASE_URL</code>
+                     <br/><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>
+                   </p>
+                </div>
+                <button onClick={() => window.location.reload()} className="w-full mt-2 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95">Re-Check Connection</button>
              </div>
           )}
 
-          <button onClick={() => setIsGuest(true)} className="w-full text-slate-400 font-black py-4 uppercase tracking-[0.2em] text-[10px] hover:text-indigo-600">Continue as Guest (Local Only)</button>
+          <button onClick={() => setIsGuest(true)} className="w-full text-slate-400 font-black py-4 uppercase tracking-[0.2em] text-[10px] hover:text-indigo-600 transition-colors">Continue as Guest (Local Only)</button>
         </div>
       </div>
     );

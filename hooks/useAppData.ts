@@ -125,37 +125,60 @@ export const useAppData = () => {
   };
 
   const updateInventoryQty = async (id: string, delta: number) => {
+    const target = inventory.find(i => i.id === id);
+    if (!target) return;
+
+    const newQty = Math.max(0, target.quantity + delta);
+    const updated = { ...target, quantity: newQty, updatedAt: new Date().toISOString() };
+
+    // Update local state immediately for responsiveness
     setInventory(prev => {
-      const updatedList = prev.map(item => {
-        if (item.id === id) {
-          const newQty = Math.max(0, item.quantity + delta);
-          const updated = { ...item, quantity: newQty, updatedAt: new Date().toISOString(), userId: item.userId || user?.id };
-          if (user) {
-            if (newQty === 0) deleteInventoryItem(id);
-            else syncInventoryItem(updated);
-          }
-          return updated;
-        }
-        return item;
-      }).filter(item => item.quantity > 0);
-      return updatedList;
+        if (newQty === 0) return prev.filter(i => i.id !== id);
+        return prev.map(i => i.id === id ? updated : i);
     });
+
+    if (user) {
+        try {
+            if (newQty === 0) {
+                await deleteInventoryItem(id);
+            } else {
+                await syncInventoryItem(updated);
+            }
+        } catch (err) {
+            console.error("Failed to sync inventory qty update:", err);
+            loadAllData(); // Revert to cloud state on error
+        }
+    }
   };
 
   const updateInventoryItem = async (id: string, updates: Partial<InventoryItem>) => {
-    setInventory(prev => prev.map(item => {
-      if (item.id === id) {
-        const updated = { ...item, ...updates, updatedAt: new Date().toISOString(), userId: item.userId || user?.id };
-        if (user) syncInventoryItem(updated);
-        return updated;
-      }
-      return item;
-    }));
+    const target = inventory.find(i => i.id === id);
+    if (!target) return;
+
+    const updated = { ...target, ...updates, updatedAt: new Date().toISOString() };
+    
+    setInventory(prev => prev.map(item => item.id === id ? updated : item));
+
+    if (user) {
+        try {
+            await syncInventoryItem(updated);
+        } catch (err) {
+            console.error("Failed to sync inventory item update:", err);
+            loadAllData(); // Revert to cloud state
+        }
+    }
   };
 
   const removeInventoryItem = async (id: string) => {
     setInventory(prev => prev.filter(i => i.id !== id));
-    if (user) await deleteInventoryItem(id);
+    if (user) {
+        try {
+            await deleteInventoryItem(id);
+        } catch (err) {
+            console.error("Failed to delete inventory item:", err);
+            loadAllData();
+        }
+    }
   };
 
   const addPriceRecord = async (category: string, itemName: string, variety: string, record: any, brand?: string, barcode?: string, subCategory?: string) => {
@@ -164,9 +187,13 @@ export const useAppData = () => {
     
     let productId = existingProduct?.id;
     if (user) {
-      const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode, subCategory });
-      productId = syncedProduct.id;
-      await syncPriceRecord(productId, newRecord, user.id);
+      try {
+        const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode, subCategory });
+        productId = syncedProduct.id;
+        await syncPriceRecord(productId, newRecord, user.id);
+      } catch (err) {
+        console.error("Failed to add price record to cloud:", err);
+      }
     }
 
     setProducts(prev => {
@@ -189,8 +216,18 @@ export const useAppData = () => {
       id: crypto.randomUUID(), productId, itemName, category, subCategory, variety, subLocation, 
       quantity: qty, unit, locationId, updatedAt: new Date().toISOString(), userId: user?.id
     };
+    
+    // Add to local state
     setInventory(prev => [...prev, newItem]);
-    if (user) await syncInventoryItem(newItem);
+    
+    if (user) {
+        try {
+            await syncInventoryItem(newItem);
+        } catch (err) {
+            console.error("Failed to add inventory to cloud:", err);
+            loadAllData(); // Refresh if sync fails
+        }
+    }
   };
 
   const importBulkInventory = async (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => {
@@ -200,7 +237,14 @@ export const useAppData = () => {
     })) as InventoryItem[];
     
     setInventory(prev => [...prev, ...newItems]);
-    if (user) await bulkSyncInventory(newItems);
+    if (user) {
+        try {
+            await bulkSyncInventory(newItems);
+        } catch (err) {
+            console.error("Bulk sync failed:", err);
+            loadAllData();
+        }
+    }
   };
 
   return {

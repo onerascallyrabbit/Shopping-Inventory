@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { StoreLocation, Vehicle, StorageLocation, SubLocation, Profile, Family } from '../types';
-import { supabase, createFamily, joinFamily, fetchGlobalStores, syncStore, deleteStore } from '../services/supabaseService';
+import { supabase, createFamily, joinFamily, fetchGlobalStores, syncStore, deleteStore, syncStorageLocation, deleteStorageLocation, syncSubLocation, deleteSubLocation } from '../services/supabaseService';
 import { searchStoreDetails } from '../services/geminiService';
 
 interface SettingsViewProps {
@@ -27,6 +26,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [newStore, setNewStore] = useState({ name: '', lat: '', lng: '', address: '', hours: '', phone: '', isPublic: false });
   const [newVehicle, setNewVehicle] = useState({ name: '', mpg: '' });
+  const [newStorageName, setNewStorageName] = useState('');
+  const [newSubName, setNewSubName] = useState('');
+  const [selectedParentId, setSelectedParentId] = useState('');
   
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +49,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       setFamilyInviteCode(invite.toUpperCase());
     }
   }, [profile.familyId]);
+
+  useEffect(() => {
+    if (storageLocations.length > 0 && !selectedParentId) {
+      setSelectedParentId(storageLocations[0].id);
+    }
+  }, [storageLocations, selectedParentId]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -128,6 +136,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const removeStore = async (id: string) => {
     onStoresChange(stores.filter(s => s.id !== id));
     if (user) await deleteStore(id);
+  };
+
+  const addStorage = async () => {
+    if (!newStorageName) return;
+    const loc = { id: crypto.randomUUID(), name: newStorageName };
+    onStorageLocationsChange([...storageLocations, loc]);
+    if (user) await syncStorageLocation(loc);
+    setNewStorageName('');
+  };
+
+  const addSubLocation = async () => {
+    if (!newSubName || !selectedParentId) return;
+    const sub = { id: crypto.randomUUID(), locationId: selectedParentId, name: newSubName };
+    onSubLocationsChange([...subLocations, sub]);
+    if (user) await syncSubLocation(sub);
+    setNewSubName('');
   };
 
   return (
@@ -224,6 +248,70 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </section>
       )}
+
+      {/* Household Storage Section */}
+      <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
+        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Stock Locations</h3>
+        
+        <div className="space-y-6">
+          <div className="space-y-3">
+             <div className="flex space-x-2">
+                <input 
+                  className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold" 
+                  placeholder="New Location (e.g. Garage Fridge)" 
+                  value={newStorageName}
+                  onChange={e => setNewStorageName(e.target.value)}
+                />
+                <button onClick={addStorage} className="px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest">Add</button>
+             </div>
+             <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {storageLocations.map(loc => (
+                  <div key={loc.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <span className="text-xs font-bold text-slate-700 uppercase">{loc.name}</span>
+                    <button onClick={async () => {
+                      onStorageLocationsChange(storageLocations.filter(l => l.id !== loc.id));
+                      if (user) await deleteStorageLocation(loc.id);
+                    }} className="text-slate-300 hover:text-red-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                  </div>
+                ))}
+             </div>
+          </div>
+
+          <div className="pt-6 border-t border-slate-100 space-y-4">
+             <div className="flex flex-col space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sub-Locations / Shelves</p>
+                <div className="grid grid-cols-2 gap-2">
+                   <select 
+                    className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-3 text-xs font-bold appearance-none text-slate-700"
+                    value={selectedParentId}
+                    onChange={e => setSelectedParentId(e.target.value)}
+                   >
+                     {storageLocations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                   </select>
+                   <input 
+                    className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold" 
+                    placeholder="Shelf name..." 
+                    value={newSubName}
+                    onChange={e => setNewSubName(e.target.value)}
+                   />
+                </div>
+                <button onClick={addSubLocation} className="w-full py-3.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest">Add Sub-Location</button>
+             </div>
+             
+             <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {subLocations.filter(sl => sl.locationId === selectedParentId).map(sub => (
+                  <div key={sub.id} className="flex items-center justify-between bg-indigo-50/30 p-3 rounded-xl border border-indigo-100/50">
+                    <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-tight">{sub.name}</span>
+                    <button onClick={async () => {
+                      onSubLocationsChange(subLocations.filter(sl => sl.id !== sub.id));
+                      if (user) await deleteSubLocation(sub.id);
+                    }} className="text-indigo-200 hover:text-red-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                  </div>
+                ))}
+             </div>
+          </div>
+        </div>
+      </section>
 
       {/* Stores Section */}
       <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">

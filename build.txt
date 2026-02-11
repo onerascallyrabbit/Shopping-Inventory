@@ -8,3 +8,4 @@ Added better "family" hub features
 Added Add Family Link*****
 Moved STOCK storage to database*
 Correcting to allow family to see STOCK
+New: depleted inventory gets added to list

@@ -5,5 +5,5 @@ Added additional database and "family" features
 Now storing price-history in database
 **Major Refactor**
 Added better "family" hub features
-Added Add Family Link**
+Added Add Family Link***
 Moved STOCK storage to database*

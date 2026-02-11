@@ -1,22 +1,31 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { InventoryItem, StorageLocation } from '../types';
+import { InventoryItem, StorageLocation, SubLocation } from '../types';
 
 interface CsvImportModalProps {
   onClose: () => void;
   onImport: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => void;
   locations: StorageLocation[];
+  subLocations: SubLocation[];
   activeLocationId: string;
   categoryOrder: string[];
 }
 
 type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'ignore';
 
-const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, locations, activeLocationId, categoryOrder }) => {
+const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, locations, subLocations, activeLocationId, categoryOrder }) => {
   const [step, setStep] = useState<'upload' | 'map' | 'review'>('upload');
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [mappings, setMappings] = useState<Record<number, MappingField>>({});
+  
+  const [targetLocationId, setTargetLocationId] = useState(activeLocationId || (locations[0]?.id || ''));
+  const [targetSubLocation, setTargetSubLocation] = useState('');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const availableSubLocations = useMemo(() => {
+    return subLocations.filter(sl => sl.locationId === targetLocationId);
+  }, [subLocations, targetLocationId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -52,7 +61,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
   const finalItems = useMemo(() => {
     if (step !== 'review') return [];
     return csvRows.map(row => {
-      const item: any = { productId: 'manual', subLocation: '' };
+      const item: any = { productId: 'manual', subLocation: targetSubLocation };
       csvHeaders.forEach((_, idx) => {
         const field = mappings[idx];
         if (field && field !== 'ignore') {
@@ -63,62 +72,146 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
         }
       });
       if (!item.category) item.category = "Other";
-      if (!item.locationId) item.locationId = activeLocationId || locations[0]?.id;
+      item.locationId = targetLocationId;
       if (!item.unit) item.unit = 'pc';
       return item as Omit<InventoryItem, 'id' | 'updatedAt'>;
     }).filter(item => item.itemName);
-  }, [csvRows, mappings, step, locations, activeLocationId, categoryOrder, csvHeaders]);
+  }, [csvRows, mappings, step, targetLocationId, targetSubLocation, categoryOrder, csvHeaders]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-black text-slate-900">Bulk Import Inventory</h3>
-          <button onClick={onClose} className="text-slate-300"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl p-6 overflow-hidden flex flex-col h-full max-h-[90vh]">
+        <div className="flex justify-between items-center mb-6 shrink-0">
+          <div className="flex flex-col">
+            <h3 className="text-xl font-black text-slate-900">Bulk Import</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inventory Management</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
         </div>
 
-        {step === 'upload' && (
-          <div className="flex-1 flex flex-col items-center justify-center py-12 space-y-4 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50">
-            <svg className="w-12 h-12 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-            <p className="text-sm font-bold text-slate-500">Select a CSV file to begin</p>
-            <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">Browse Files</button>
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv" />
-          </div>
-        )}
-
-        {step === 'map' && (
-          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-            <p className="text-xs font-bold text-slate-400 uppercase px-1">Map your CSV columns</p>
-            {csvHeaders.map((header, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                <span className="text-xs font-black text-slate-700 truncate max-w-[150px]">{header}</span>
-                <select className="bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-[10px] font-bold text-indigo-600 appearance-none" value={mappings[idx]} onChange={e => setMappings({...mappings, [idx]: e.target.value as MappingField})}>
-                  <option value="ignore">Ignore</option>
-                  <option value="itemName">Item Name</option>
-                  <option value="variety">Variety</option>
-                  <option value="quantity">Quantity</option>
-                  <option value="unit">Unit</option>
-                  <option value="category">Category</option>
-                </select>
-              </div>
-            ))}
-            <button onClick={() => setStep('review')} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase tracking-widest mt-4">Preview Items</button>
-          </div>
-        )}
-
-        {step === 'review' && (
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-               {finalItems.map((item, idx) => (
-                 <div key={idx} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center text-[10px]">
-                   <span className="font-black text-slate-700">{item.itemName}</span>
-                   <span className="font-bold text-slate-400">{item.quantity} {item.unit}</span>
-                 </div>
-               ))}
+        {/* Global Destination Selector (Always visible after upload) */}
+        {step !== 'upload' && (
+          <div className="grid grid-cols-2 gap-3 mb-6 p-4 bg-indigo-50/50 rounded-3xl border border-indigo-100 shrink-0">
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Destination</label>
+              <select 
+                className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-xs font-bold text-indigo-700 appearance-none"
+                value={targetLocationId}
+                onChange={e => {
+                  setTargetLocationId(e.target.value);
+                  setTargetSubLocation('');
+                }}
+              >
+                {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+              </select>
             </div>
-            <button onClick={() => onImport(finalItems)} className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl uppercase tracking-widest">Import {finalItems.length} Items</button>
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Sub-Destination</label>
+              <select 
+                className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-xs font-bold text-indigo-700 appearance-none"
+                value={targetSubLocation}
+                onChange={e => setTargetSubLocation(e.target.value)}
+              >
+                <option value="">None / General</option>
+                {availableSubLocations.map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+              </select>
+            </div>
           </div>
         )}
+
+        <div className="flex-1 overflow-y-auto">
+          {step === 'upload' && (
+            <div className="h-full flex flex-col items-center justify-center py-12 space-y-4 border-2 border-dashed border-slate-100 rounded-[32px] bg-slate-50">
+              <div className="bg-white p-6 rounded-full shadow-sm text-indigo-500">
+                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Drop your inventory CSV</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Headers required: Item Name, Qty, Unit</p>
+              </div>
+              <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all">Select File</button>
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv" />
+            </div>
+          )}
+
+          {step === 'map' && (
+            <div className="space-y-4 animate-in fade-in">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Configure Mapping</p>
+              <div className="space-y-2">
+                {csvHeaders.map((header, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-colors">
+                    <span className="text-xs font-black text-slate-700 truncate max-w-[200px] uppercase tracking-tight">{header}</span>
+                    <select 
+                      className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-[10px] font-black text-indigo-600 appearance-none shadow-sm focus:ring-2 focus:ring-indigo-500/10" 
+                      value={mappings[idx]} 
+                      onChange={e => setMappings({...mappings, [idx]: e.target.value as MappingField})}
+                    >
+                      <option value="ignore">Skip Column</option>
+                      <option value="itemName">Item Name</option>
+                      <option value="variety">Variety</option>
+                      <option value="quantity">Quantity</option>
+                      <option value="unit">Unit</option>
+                      <option value="category">Category</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {step === 'review' && (
+            <div className="space-y-3 animate-in fade-in">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Import Preview ({finalItems.length})</p>
+              <div className="space-y-2">
+                {finalItems.map((item, idx) => (
+                  <div key={idx} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100">
+                    <div className="min-w-0 pr-4">
+                      <span className="block text-xs font-black text-slate-800 truncate uppercase tracking-tight">{item.itemName}</span>
+                      <div className="flex items-center space-x-2 mt-0.5">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase">{item.category}</span>
+                        {item.variety && <span className="text-[8px] font-bold text-indigo-400 uppercase">• {item.variety}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-black text-slate-900">{item.quantity}</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase ml-1">{item.unit}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="mt-6 pt-6 border-t border-slate-50 shrink-0">
+          {step === 'map' && (
+            <button 
+              onClick={() => setStep('review')} 
+              className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg active:scale-[0.98] transition-all"
+            >
+              Verify Items
+            </button>
+          )}
+          {step === 'review' && (
+            <div className="flex space-x-3">
+              <button 
+                onClick={() => setStep('map')} 
+                className="flex-1 bg-slate-100 text-slate-600 font-black py-4 rounded-2xl uppercase tracking-widest text-[10px]"
+              >
+                Back
+              </button>
+              <button 
+                onClick={() => onImport(finalItems)} 
+                className="flex-[2] bg-emerald-600 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg shadow-emerald-100 active:scale-[0.98] transition-all"
+              >
+                Import to {locations.find(l => l.id === targetLocationId)?.name || 'Stock'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

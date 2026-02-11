@@ -13,6 +13,7 @@ export interface PriceRecord {
 export interface Product {
   id: string;
   category: string; 
+  subCategory?: string;
   itemName: string; 
   variety?: string; 
   brand?: string;
@@ -60,6 +61,7 @@ export interface InventoryItem {
   productId: string;
   itemName: string;
   category: string;
+  subCategory?: string;
   variety?: string;
   subLocation?: string; 
   quantity: number;

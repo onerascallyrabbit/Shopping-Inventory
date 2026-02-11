@@ -1,280 +1,150 @@
 
-import React, { useState, useEffect } from 'react';
-import { AppTab, Product, PriceRecord, ShoppingItem, StoreLocation, Vehicle, StorageLocation, InventoryItem, SubLocation, Profile } from './types';
-import Dashboard from './components/Dashboard';
-import ItemBrowser from './components/ItemBrowser';
-import ShoppingList from './components/ShoppingList';
-import ShopPlan from './components/ShopPlan';
-import BottomNav from './components/BottomNav';
-import Header from './components/Header';
-import AddItemModal from './components/AddItemModal';
-import SettingsView from './components/SettingsView';
-import InventoryView from './components/InventoryView';
-import { 
-  syncInventoryItem, 
-  bulkSyncInventory, 
-  syncSubLocation, 
-  deleteSubLocation, 
-  syncStorageLocation,
-  deleteStorageLocation,
-  fetchUserData,
-  testDatabaseConnection,
-  supabase, 
-  signInWithGoogle,
-  getEnv,
-  syncProfile,
-  syncVehicle,
-  deleteVehicle,
-  syncStore,
-  syncProduct,
-  syncPriceRecord
-} from './services/supabaseService';
+import React, { useState, useMemo } from 'react';
+import { InventoryItem, StorageLocation, Product, SubLocation } from '../../types';
+import CsvImportModal from './CsvImportModal';
+import { UNITS } from '../../constants';
 
-const DEFAULT_CATEGORIES = [
-  "Produce", "Dairy", "Meat", "Seafood", "Deli", "Bakery", 
-  "Frozen", "Pantry", "Beverages", "Household", "Personal Care", 
-  "Baby", "Pets", "Other"
-];
+interface InventoryViewProps {
+  inventory: InventoryItem[];
+  locations: StorageLocation[];
+  subLocations: SubLocation[];
+  products: Product[];
+  categoryOrder: string[];
+  onUpdateQty: (id: string, delta: number) => void;
+  onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string) => void;
+  onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => void;
+}
 
-const DEFAULT_STORAGE: StorageLocation[] = [
-  { id: '1', name: 'Pantry - Main' },
-  { id: '2', name: 'Refrigerator #1' },
-  { id: '3', name: 'Freezer #1' }
-];
-
-const DiagnosticBanner: React.FC<{ user?: any, isGuest: boolean, onExitGuest: () => void }> = ({ user, isGuest, onExitGuest }) => {
-  const hasApiKey = !!getEnv('API_KEY');
-  const [dbStatus, setDbStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
-  const [dbError, setDbError] = useState<string>('');
-
-  const checkConnection = async () => {
-    setDbStatus('checking');
-    const result = await testDatabaseConnection();
-    if (result.success) setDbStatus('success');
-    else { setDbStatus('error'); setDbError(result.error || 'Unknown error'); }
-  };
-
-  if (!isGuest && user && dbStatus === 'success') return null;
-
-  return (
-    <div className="bg-slate-900 border-b border-slate-800 p-3 flex flex-col items-center space-y-3 text-center z-50 animate-in slide-in-from-top duration-300">
-      <div className="flex items-center space-x-2">
-        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isGuest ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Diagnostic Console</span>
-      </div>
-      <div className="flex flex-wrap justify-center gap-1.5">
-        {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 uppercase tracking-wider">AI Offline</span>}
-        {isGuest ? (
-          <button onClick={onExitGuest} className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 tracking-wider">Guest Mode (Link Cloud)</button>
-        ) : (
-          <button onClick={checkConnection} className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${dbStatus === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
-            {dbStatus === 'checking' ? 'Linking...' : dbStatus === 'success' ? 'Cloud Linked' : 'Verify Cloud'}
-          </button>
-        )}
-      </div>
-      {dbStatus === 'error' && <p className="text-[9px] font-medium text-red-400/80 italic">DB Error: {dbError}</p>}
-    </div>
-  );
-};
-
-const App: React.FC = () => {
-  const [user, setUser] = useState<any>(null);
-  const [isGuest, setIsGuest] = useState(() => localStorage.getItem('pricewise_is_guest') === 'true');
-  const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
+const InventoryView: React.FC<InventoryViewProps> = ({ inventory, locations, subLocations, products, categoryOrder, onUpdateQty, onAddToInventory, onBulkAdd }) => {
+  const [activeLocationId, setActiveLocationId] = useState<string>(locations[0]?.id || '');
+  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [isAdding, setIsAdding] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [search, setSearch] = useState('');
   
-  const [products, setProducts] = useState<Product[]>([]);
-  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [storageLocations, setStorageLocations] = useState<StorageLocation[]>(DEFAULT_STORAGE);
-  const [subLocations, setSubLocations] = useState<SubLocation[]>([]);
-  const [stores, setStores] = useState<StoreLocation[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [profile, setProfile] = useState<Profile>({ id: '', locationLabel: '', zip: '', gasPrice: 3.50, categoryOrder: DEFAULT_CATEGORIES, sharePrices: false });
+  const [newItem, setNewItem] = useState({
+    productId: '', itemName: '', category: 'Pantry', variety: '', subLocation: '',
+    quantity: '1', unit: 'pc', locationId: activeLocationId
+  });
 
-  const [lastUsedStore, setLastUsedStore] = useState<string>('');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [initialMode, setInitialMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('tag');
-
-  const loadCloudData = async () => {
-    if (!supabase) return;
-    const data = await fetchUserData();
-    if (data) {
-      if (data.profile) setProfile(data.profile);
-      if (data.products) setProducts(data.products);
-      if (data.inventory.length) {
-        setInventory(data.inventory.map(i => ({
-          id: i.id, productId: i.product_id, itemName: i.item_name, category: i.category,
-          variety: i.variety, subLocation: i.sub_location, quantity: Number(i.quantity),
-          unit: i.unit, locationId: i.location_id, updatedAt: i.updated_at, userId: i.user_id
-        })));
-      }
-      if (data.storageLocations.length) setStorageLocations(data.storageLocations.map(s => ({ id: s.id, name: s.name })));
-      if (data.subLocations.length) setSubLocations(data.subLocations.map(s => ({ id: s.id, locationId: s.location_id, name: s.name })));
-      if (data.stores.length) setStores(data.stores.map(s => ({ id: s.id, name: s.name, address: s.address, lat: Number(s.lat), lng: Number(s.lng), phone: s.phone, hours: s.hours, zip: s.zip })));
-      if (data.vehicles.length) setVehicles(data.vehicles.map(v => ({ id: v.id, name: v.name, mpg: Number(v.mpg) })));
-    }
-  };
-
-  useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const u = session?.user ?? null;
-      setUser(u);
-      if (u) { setIsGuest(false); loadCloudData(); }
+  const filteredInventory = useMemo(() => {
+    return inventory.filter(item => {
+      const matchesSearch = item.itemName.toLowerCase().includes(search.toLowerCase()) || 
+                           (item.variety && item.variety.toLowerCase().includes(search.toLowerCase())) ||
+                           (item.subLocation && item.subLocation.toLowerCase().includes(search.toLowerCase()));
+      const matchesLocation = (search || activeCategory !== 'All') ? true : item.locationId === activeLocationId;
+      const matchesCategory = activeCategory === 'All' ? true : item.category === activeCategory;
+      return matchesSearch && matchesLocation && matchesCategory;
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const u = session?.user ?? null;
-      setUser(u);
-      if (u) { setIsGuest(false); loadCloudData(); }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  }, [inventory, activeLocationId, search, activeCategory]);
 
-  const handleUpdateProfile = (updates: Partial<Profile>) => {
-    const newProfile = { ...profile, ...updates };
-    setProfile(newProfile);
-    if (user) syncProfile(updates);
-  };
+  const productSuggestions = useMemo(() => {
+    if (newItem.itemName.length < 2) return [];
+    return products.filter(p => p.itemName.toLowerCase().includes(newItem.itemName.toLowerCase())).slice(0, 5);
+  }, [newItem.itemName, products]);
 
-  const handleUpdateInventory = (id: string, delta: number) => {
-    setInventory(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = Math.max(0, item.quantity + delta);
-        const updated = { ...item, quantity: newQty, updatedAt: new Date().toISOString(), userId: user?.id };
-        if (user) syncInventoryItem(updated);
-        return updated;
-      }
-      return item;
-    }).filter(item => item.quantity > 0));
-  };
-
-  const handleAddToInventory = (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string) => {
-    setInventory(prev => {
-      const existingIndex = prev.findIndex(i => i.productId === productId && i.locationId === locationId && i.subLocation === subLocation);
-      let updatedItem: InventoryItem;
-      if (existingIndex > -1) {
-        updatedItem = { ...prev[existingIndex], quantity: prev[existingIndex].quantity + qty, updatedAt: new Date().toISOString(), userId: user?.id };
-        if (user) syncInventoryItem(updatedItem);
-        const next = [...prev]; next[existingIndex] = updatedItem; return next;
-      }
-      updatedItem = { id: crypto.randomUUID(), productId, itemName, category, variety, subLocation, quantity: qty, unit, locationId, updatedAt: new Date().toISOString(), userId: user?.id };
-      if (user) syncInventoryItem(updatedItem);
-      return [...prev, updatedItem];
-    });
-  };
-
-  const handleUpdateStores = (newStores: StoreLocation[]) => {
-    setStores(newStores);
-    if (user) newStores.forEach(s => syncStore(s));
-  };
-
-  const handleUpdateVehicles = (newVehicles: Vehicle[]) => {
-    const deleted = vehicles.filter(v => !newVehicles.find(nv => nv.id === v.id));
-    setVehicles(newVehicles);
-    if (user) {
-      newVehicles.forEach(v => syncVehicle(v));
-      deleted.forEach(v => deleteVehicle(v.id));
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newItem.itemName) {
+      onAddToInventory(newItem.productId || 'manual', newItem.itemName, newItem.category, newItem.variety, parseFloat(newItem.quantity) || 0, newItem.unit, newItem.locationId || activeLocationId, newItem.subLocation);
+      setIsAdding(false);
+      setNewItem({ ...newItem, productId: '', itemName: '', variety: '', subLocation: '', quantity: '1' });
     }
   };
-
-  // Fix: Added missing handler for updating storage locations with cloud sync
-  const handleUpdateStorageLocations = (newLocs: StorageLocation[]) => {
-    const deleted = storageLocations.filter(l => !newLocs.find(nl => nl.id === l.id));
-    setStorageLocations(newLocs);
-    if (user) {
-      newLocs.forEach(l => syncStorageLocation(l));
-      deleted.forEach(l => deleteStorageLocation(l.id));
-    }
-  };
-
-  // Fix: Added missing handler for updating sub locations with cloud sync
-  const handleUpdateSubLocations = (newSubs: SubLocation[]) => {
-    const deleted = subLocations.filter(s => !newSubs.find(ns => ns.id === s.id));
-    setSubLocations(newSubs);
-    if (user) {
-      newSubs.forEach(s => syncSubLocation(s));
-      deleted.forEach(s => deleteSubLocation(s.id));
-    }
-  };
-
-  const handleAddPriceRecord = async (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string) => {
-    const newRecord: PriceRecord = { ...record, id: crypto.randomUUID(), date: new Date().toISOString(), isPublic: profile.sharePrices };
-    
-    // 1. Sync Product definition
-    const existingProduct = products.find(p => (barcode && p.barcode === barcode) || (p.itemName.toLowerCase() === itemName.toLowerCase() && (p.variety || '').toLowerCase() === (variety || '').toLowerCase() && (p.brand || '').toLowerCase() === (brand || '').toLowerCase()));
-    
-    let productId = existingProduct?.id;
-    if (user) {
-      try {
-        const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode });
-        productId = syncedProduct.id;
-        // 2. Sync History
-        await syncPriceRecord(productId, newRecord, user.id);
-      } catch (err) {
-        console.error("Cloud Sync Failed, falling back to local only", err);
-      }
-    }
-
-    setProducts(prev => {
-      if (existingProduct) {
-        return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history], brand: brand || p.brand, barcode: barcode || p.barcode, category } : p);
-      }
-      return [...prev, { id: productId || crypto.randomUUID(), category, itemName, variety, brand, barcode, history: [newRecord] }];
-    });
-    
-    setLastUsedStore(record.store);
-    setIsAddModalOpen(false);
-  };
-
-  if (!user && !isGuest) {
-    return (
-      <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center overflow-y-auto">
-        <div className="bg-indigo-600 p-6 rounded-[40px] shadow-2xl shadow-indigo-200 mb-8 transform hover:scale-105 transition-transform">
-          <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-        </div>
-        <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Aisle Be Back</h1>
-        <p className="text-slate-400 font-medium mb-12 max-w-[280px] leading-relaxed text-sm">Sign in to sync your prices, pantry stock, and share lists with family.</p>
-        <div className="w-full max-w-xs space-y-4">
-          <button disabled={!supabase} onClick={signInWithGoogle} className={`w-full flex items-center justify-center space-x-3 text-white font-black py-5 rounded-[24px] shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs ${supabase ? 'bg-slate-900 hover:bg-black' : 'bg-slate-300'}`}>
-            <span>{supabase ? 'Connect Cloud Identity' : 'Cloud Setup Required'}</span>
-          </button>
-          {!supabase && (
-             <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 text-left space-y-3">
-                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Setup Instructions:</p>
-                <p className="text-[9px] font-medium text-amber-800 italic leading-relaxed">Ensure Vercel integration is using <code>VITE_</code> prefix for <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>.</p>
-                <button onClick={() => window.location.reload()} className="w-full mt-2 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest">Re-Check Connection</button>
-             </div>
-          )}
-          <button onClick={() => setIsGuest(true)} className="w-full text-slate-400 font-black py-4 uppercase tracking-[0.2em] text-[10px] hover:text-indigo-600 transition-colors">Continue as Guest (Local Only)</button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
-      <DiagnosticBanner user={user} isGuest={isGuest} onExitGuest={() => setIsGuest(false)} />
-      <Header user={user} onSettingsClick={() => setActiveTab('settings')} />
-      <main className="flex-1 overflow-y-auto pb-32 px-4 pt-6">
-        {activeTab === 'dashboard' && <Dashboard products={products} onAddToList={(name, qty, unit, pid) => setShoppingList(prev => [...prev, { id: crypto.randomUUID(), productId: pid || 'manual', name, neededQuantity: qty, unit, isCompleted: false, userId: user?.id }])} />}
-        {activeTab === 'items' && <ItemBrowser products={products} categoryOrder={profile.categoryOrder} onAddToList={(name, qty, unit, pid) => setShoppingList(prev => [...prev, { id: crypto.randomUUID(), productId: pid || 'manual', name, neededQuantity: qty, unit, isCompleted: false, userId: user?.id }])} />}
-        {activeTab === 'inventory' && <InventoryView inventory={inventory} locations={storageLocations} subLocations={subLocations} products={products} categoryOrder={profile.categoryOrder} onUpdateQty={handleUpdateInventory} onAddToInventory={handleAddToInventory} onBulkAdd={(items) => { bulkSyncInventory(items.map(i => ({...i, id: crypto.randomUUID(), updatedAt: new Date().toISOString(), userId: user?.id}))); loadCloudData(); }} />}
-        {activeTab === 'list' && <ShoppingList items={shoppingList} products={products} onToggle={(id) => setShoppingList(prev => prev.map(i => i.id === id ? {...i, isCompleted: !i.isCompleted} : i))} onRemove={(id) => setShoppingList(prev => prev.filter(i => i.id !== id))} onAdd={(n, q, u) => setShoppingList(prev => [...prev, { id: crypto.randomUUID(), productId: 'manual', name: n, neededQuantity: q, unit: u, isCompleted: false, userId: user?.id }])} />}
-        {activeTab === 'shop' && <ShopPlan items={shoppingList} products={products} stores={stores} vehicles={vehicles} activeVehicleId={profile.activeVehicleId || ''} gasPrice={profile.gasPrice} onToggle={(id) => setShoppingList(prev => prev.map(i => i.id === id ? {...i, isCompleted: !i.isCompleted} : i))} onOverrideStore={(id, s) => setShoppingList(prev => prev.map(i => i.id === id ? {...i, manualStore: s} : i))} />}
-        {activeTab === 'settings' && (
-          <SettingsView 
-            user={user} profile={profile} onProfileChange={handleUpdateProfile}
-            stores={stores} onStoresChange={handleUpdateStores}
-            vehicles={vehicles} onVehiclesChange={handleUpdateVehicles}
-            storageLocations={storageLocations} onStorageLocationsChange={handleUpdateStorageLocations}
-            subLocations={subLocations} onSubLocationsChange={handleUpdateSubLocations}
-          />
-        )}
-      </main>
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} onAddClick={() => { setInitialMode('tag'); setIsAddModalOpen(true); }} />
-      {isAddModalOpen && <AddItemModal onClose={() => setIsAddModalOpen(false)} onSubmit={handleAddPriceRecord} onSaveToList={(n, q, u) => setShoppingList(prev => [...prev, { id: crypto.randomUUID(), productId: 'manual', name: n, neededQuantity: q, unit: u, isCompleted: false, userId: user?.id }])} initialMode={initialMode} products={products} location={profile.locationLabel} savedStores={stores} lastUsedStore={lastUsedStore} />}
+    <div className="space-y-6 pb-24">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-2xl font-black text-slate-900">Household Stock</h2>
+        <div className="flex space-x-2">
+          <button onClick={() => setIsImporting(true)} className="bg-white text-indigo-600 border border-indigo-100 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl active:scale-95 transition-all shadow-sm">Bulk Import</button>
+          <button onClick={() => setIsAdding(true)} className="bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl active:scale-95 transition-all shadow-lg">+ Add Stock</button>
+        </div>
+      </div>
+
+      <div className="relative">
+        <input type="text" placeholder="Search items, varieties, shelves..." className="w-full bg-white border border-slate-200 rounded-2xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 text-sm shadow-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <svg className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+          {locations.map(loc => (
+            <button key={loc.id} onClick={() => setActiveLocationId(loc.id)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>
+              {loc.name}
+            </button>
+          ))}
+        </div>
+        <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+          <button onClick={() => setActiveCategory('All')} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${activeCategory === 'All' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-transparent'}`}>All Categories</button>
+          {categoryOrder.map(cat => (
+            <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${activeCategory === cat ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-400 border-transparent'}`}>{cat}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {filteredInventory.map(item => (
+          <div key={item.id} className="bg-white border border-slate-100 p-5 rounded-[32px] shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex-1 min-w-0 pr-4">
+                <div className="flex items-center space-x-2">
+                   <h4 className="font-black text-slate-800 text-sm truncate uppercase">{item.itemName}</h4>
+                   {item.variety && <span className="text-[10px] font-bold text-slate-400">({item.variety})</span>}
+                </div>
+                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-1">
+                  {locations.find(l => l.id === item.locationId)?.name} {item.subLocation && `• ${item.subLocation}`}
+                </p>
+              </div>
+              <p className="text-xl font-black text-indigo-600">{item.quantity} <span className="text-[10px] text-slate-400 uppercase">{item.unit}</span></p>
+            </div>
+            <div className="flex items-center bg-slate-50 rounded-2xl p-1">
+              <button onClick={() => onUpdateQty(item.id, -1)} className="w-10 h-10 flex items-center justify-center text-slate-400 font-black">-1</button>
+              <button onClick={() => { const v = prompt('Subtract:'); if(v) onUpdateQty(item.id, -parseFloat(v)); }} className="flex-1 text-[9px] font-black text-slate-400 uppercase">Custom</button>
+              <button onClick={() => onUpdateQty(item.id, 1)} className="w-10 h-10 flex items-center justify-center text-indigo-600 font-black">+1</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {isAdding && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-6 overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-slate-900">Add Stock</h3>
+              <button onClick={() => setIsAdding(false)} className="text-slate-300"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <form onSubmit={handleAdd} className="space-y-4">
+              <input required className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" placeholder="Item Name" value={newItem.itemName} onChange={e => setNewItem({...newItem, itemName: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <select className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})}>
+                  {categoryOrder.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+                <input className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" placeholder="Variety" value={newItem.variety} onChange={e => setNewItem({...newItem, variety: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <input type="number" className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})} />
+                <select className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-4 text-sm font-bold" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})}>
+                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <button type="submit" className="w-full bg-indigo-600 text-white font-black py-5 rounded-[24px] uppercase tracking-widest">Save Stock</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isImporting && (
+        <CsvImportModal 
+          onClose={() => setIsImporting(false)} 
+          onImport={(items) => { onBulkAdd(items); setIsImporting(false); }} 
+          locations={locations} 
+          activeLocationId={activeLocationId} 
+          categoryOrder={categoryOrder} 
+        />
+      )}
     </div>
   );
 };
 
-export default App;
+export default InventoryView;

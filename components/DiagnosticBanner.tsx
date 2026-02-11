@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { getEnv } from '../../services/supabaseService';
+import { getEnv } from '../services/supabaseService';
 
 interface DiagnosticBannerProps {
   user?: any;

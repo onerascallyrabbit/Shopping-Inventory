@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Product } from '../types';
 
@@ -87,6 +86,11 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
             <div key={deal.id} className="min-w-[200px] bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm flex flex-col">
               <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-widest w-fit">Best Deal</span>
               <h3 className="mt-3 font-bold text-slate-900 truncate text-sm">{getFullName(deal.product)}</h3>
+              {deal.product.subCategory && (
+                <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-1">
+                  {deal.product.category} > {deal.product.subCategory}
+                </p>
+              )}
               <p className="text-[10px] text-slate-400 mt-0.5">{deal.store}</p>
               <div className="mt-3 flex items-baseline space-x-1">
                 <span className="text-xl font-black text-slate-900">${deal.price.toFixed(2)}</span>
@@ -165,12 +169,17 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
                       </svg>
                     )}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm leading-tight">{getFullName(record.product)}</h3>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-slate-900 text-sm leading-tight truncate">{getFullName(record.product)}</h3>
+                    {record.product.subCategory && (
+                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-0.5">
+                        {record.product.category} > {record.product.subCategory}
+                      </p>
+                    )}
                     <p className="text-[10px] text-slate-400 mt-1 font-medium uppercase tracking-wide">{record.store} • {new Date(record.date).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <p className="font-black text-slate-900 text-base">${record.price.toFixed(2)}</p>
                   <p className="text-[9px] font-black text-slate-400 uppercase">{record.quantity} {record.unit}</p>
                 </div>

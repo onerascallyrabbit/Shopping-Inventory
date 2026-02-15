@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShoppingItem, Product, StoreLocation, Vehicle } from '../types';
+import { ShoppingItem, Product, StoreLocation, Vehicle, StorageLocation, SubLocation } from '../types';
+import StockPurchasedModal from './StockPurchasedModal';
 
 interface ShopPlanProps {
   items: ShoppingItem[];
@@ -9,8 +10,12 @@ interface ShopPlanProps {
   vehicles: Vehicle[];
   activeVehicleId: string;
   gasPrice: number;
+  storageLocations: StorageLocation[];
+  subLocations: SubLocation[];
   onToggle: (id: string) => void;
+  onRemove: (id: string) => void;
   onOverrideStore: (id: string, store: string | undefined) => void;
+  onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
 }
 
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -25,18 +30,17 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
   return R * c;
 };
 
-const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, activeVehicleId, gasPrice, onToggle, onOverrideStore }) => {
+const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, activeVehicleId, gasPrice, storageLocations, subLocations, onToggle, onRemove, onOverrideStore, onAddToInventory }) => {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number, lng: number } | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [stockingItem, setStockingItem] = useState<ShoppingItem | null>(null);
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       (err) => {
         console.log('Geolocation error:', err);
-        // Fallback for demo/dev if blocked
-        // setUserCoords({ lat: 30.2672, lng: -97.7431 }); 
       },
       { enableHighAccuracy: true }
     );
@@ -45,6 +49,7 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
   const activeVehicle = useMemo(() => vehicles.find(v => v.id === activeVehicleId), [vehicles, activeVehicleId]);
 
   const activeItems = useMemo(() => items.filter(i => !i.isCompleted), [items]);
+  const completedItems = useMemo(() => items.filter(i => i.isCompleted), [items]);
 
   const groupedByStore = useMemo(() => {
     const groups: Record<string, ShoppingItem[]> = {};
@@ -122,9 +127,14 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
     e.preventDefault();
   };
 
+  const handleStockConfirm = (...args: Parameters<typeof onAddToInventory>) => {
+    onAddToInventory(...args);
+    if (stockingItem) onRemove(stockingItem.id);
+  };
+
   const sortedStoreNames = Object.keys(groupedByStore).sort();
 
-  if (activeItems.length === 0) {
+  if (activeItems.length === 0 && completedItems.length === 0) {
     return (
       <div className="text-center py-24 flex flex-col items-center">
         <div className="bg-emerald-50 w-20 h-20 rounded-[32px] flex items-center justify-center mb-6 text-emerald-300">
@@ -156,11 +166,8 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
         {sortedStoreNames.map(storeName => {
           const distance = storeDistances[storeName];
           const fuel = distance ? getFuelEstimate(distance) : null;
-          
-          // Mock logic for stores without coordinates to show the requested features
-          const hasLocation = distance !== undefined;
-          const displayDistance = hasLocation ? distance.toFixed(1) : "2.4"; // Mock 2.4 if unknown
-          const displayFuel = hasLocation && fuel !== null ? fuel.toFixed(2) : "0.45"; // Mock 0.45 if unknown
+          const displayDistance = distance ? distance.toFixed(1) : "2.4"; 
+          const displayFuel = fuel !== null ? fuel.toFixed(2) : "0.45";
 
           return (
             <section 
@@ -176,19 +183,16 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">{storeName}</h3>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border ${hasLocation ? 'bg-white border-slate-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                    <div className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border ${distance !== undefined ? 'bg-white border-slate-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                       <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                       <span className="text-[10px] font-black text-slate-600 tracking-tight">{displayDistance} <span className="text-slate-400 font-bold">mi</span></span>
                     </div>
-                    <div className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border ${hasLocation ? 'bg-white border-indigo-50' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                    <div className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border ${distance !== undefined ? 'bg-white border-indigo-50' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                       <svg className="w-3 h-3 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                       <span className="text-[10px] font-black text-indigo-600 tracking-tight">${displayFuel} <span className="text-indigo-300 font-bold">gas</span></span>
                     </div>
                   </div>
                 </div>
-                {!hasLocation && storeName !== 'Unknown / Any Store' && (
-                  <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest ml-4">Coordinates not set in Settings</p>
-                )}
               </div>
 
               <div className={`space-y-3 min-h-[40px] p-2 rounded-[36px] transition-all duration-300 ${draggedItemId ? 'bg-indigo-50/50 border-2 border-dashed border-indigo-200 ring-4 ring-indigo-50' : 'bg-transparent border-2 border-transparent'}`}>
@@ -223,19 +227,13 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
                             >
                               Move
                             </button>
-                            {item.manualStore && (
-                              <button 
-                                onClick={() => onOverrideStore(item.id, undefined)}
-                                className="text-[9px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center space-x-1 border border-amber-100"
-                              >
-                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                                <span>Reset</span>
-                              </button>
-                            )}
+                            <button 
+                              onClick={() => setStockingItem(item)}
+                              className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-tighter hover:bg-emerald-100 transition-colors"
+                            >
+                              Stock
+                            </button>
                           </div>
-                        </div>
-                        <div className="text-slate-200 p-1">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M7 8a2 2 0 11-4 0 2 2 0 014 0zm0 6a2 2 0 11-4 0 2 2 0 014 0zm-2 8a2 2 0 100-4 2 2 0 000 4zm16-14a2 2 0 11-4 0 2 2 0 014 0zm0 6a2 2 0 11-4 0 2 2 0 014 0zm-2 8a2 2 0 100-4 2 2 0 000 4z"/></svg>
                         </div>
                       </div>
 
@@ -255,18 +253,6 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
                                 {s}
                               </button>
                             ))}
-                            <button 
-                              onClick={() => {
-                                const custom = prompt("Enter store name:");
-                                if (custom) {
-                                  onOverrideStore(item.id, custom);
-                                  setEditingItemId(null);
-                                }
-                              }}
-                              className="text-left px-3 py-2 rounded-xl border border-dashed border-indigo-200 bg-white text-indigo-500 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-50 transition-colors"
-                            >
-                              + Custom
-                            </button>
                           </div>
                         </div>
                       )}
@@ -277,7 +263,42 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
             </section>
           );
         })}
+
+        {completedItems.length > 0 && (
+          <div className="pt-6 space-y-3 px-1">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Purchased This Trip</h3>
+            <div className="grid grid-cols-1 gap-2">
+              {completedItems.map(item => (
+                <div key={item.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex items-center justify-between opacity-80">
+                  <div className="flex items-center min-w-0">
+                    <button onClick={() => onToggle(item.id)} className="w-5 h-5 rounded-full bg-emerald-500 mr-2 flex items-center justify-center">
+                       <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
+                    </button>
+                    <span className="text-xs font-bold text-slate-400 line-through truncate">{item.name}</span>
+                  </div>
+                  <button 
+                    onClick={() => setStockingItem(item)}
+                    className="bg-indigo-600 text-white text-[8px] font-black uppercase px-3 py-1.5 rounded-lg active:scale-95"
+                  >
+                    Stock It
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {stockingItem && (
+        <StockPurchasedModal 
+          item={stockingItem}
+          products={products}
+          storageLocations={storageLocations}
+          subLocations={subLocations}
+          onClose={() => setStockingItem(null)}
+          onConfirm={handleStockConfirm}
+        />
+      )}
     </div>
   );
 };

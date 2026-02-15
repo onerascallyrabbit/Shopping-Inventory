@@ -1,12 +1,15 @@
+
 import React from 'react';
 import { signOut } from '../services/supabaseService';
+import { Family } from '../types';
 
 interface HeaderProps {
   onSettingsClick: () => void;
   user?: any;
+  activeFamily: Family | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ onSettingsClick, user }) => {
+const Header: React.FC<HeaderProps> = ({ onSettingsClick, user, activeFamily }) => {
   return (
     <header className="bg-white border-b border-slate-200 px-4 pt-6 pb-4 shrink-0">
       <div className="flex items-center justify-between">
@@ -16,7 +19,14 @@ const Header: React.FC<HeaderProps> = ({ onSettingsClick, user }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">Aisle Be Back</h1>
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-none">Aisle Be Back</h1>
+            {activeFamily && (
+              <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mt-0.5 truncate max-w-[120px]">
+                {activeFamily.name} Hub
+              </span>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center space-x-1">

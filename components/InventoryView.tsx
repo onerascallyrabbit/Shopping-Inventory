@@ -31,6 +31,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [depletedItem, setDepletedItem] = useState<InventoryItem | null>(null);
   const [search, setSearch] = useState('');
   
+  // Track recently added items for UI feedback
+  const [recentlyAddedToList, setRecentlyAddedToList] = useState<string | null>(null);
+  
   // Drag and Drop State
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [hoveringLocId, setHoveringLocId] = useState<string | null>(null);
@@ -113,7 +116,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       setActiveLocationId(locId);
       setActiveSubLocation('All');
       setHoveringLocId(null);
-    }, 500); // Fast enough to feel responsive, slow enough to be intentional
+    }, 500); 
   };
 
   const handleLocationHoverEnd = () => {
@@ -143,10 +146,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     const item = inventory.find(i => i.id === draggedItemId);
     if (!item) return;
 
-    // Determine target location: use current active view if specific, otherwise keep item's own location
     const targetLocId = activeLocationId === 'All' ? item.locationId : activeLocationId;
-    
-    // If shelfName is 'All' or general, reset subLocation
     const newShelf = (shelfName === 'Loose / General' || shelfName === 'All' || shelfName === 'General') ? '' : shelfName;
     
     onUpdateItem(draggedItemId, { 
@@ -155,6 +155,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     });
     
     handleDragEnd();
+  };
+
+  const handleAddRestockRequest = (item: InventoryItem) => {
+    const fullName = `${item.itemName}${item.variety ? ` (${item.variety})` : ''}`;
+    onAddToList(fullName, 1, item.unit, item.productId);
+    
+    // Quick visual feedback
+    setRecentlyAddedToList(item.id);
+    setTimeout(() => setRecentlyAddedToList(null), 2000);
   };
 
   const handleAdd = (e: React.FormEvent) => {
@@ -314,31 +323,46 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     </div>
                   </div>
                   
-                  <div className="flex items-center bg-slate-50 rounded-2xl p-0.5 border border-slate-100/50 shrink-0">
+                  <div className="flex items-center space-x-1.5 shrink-0">
+                    {/* Add to List Button (Restock Trigger) */}
                     <button 
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        if (item.quantity === 1) {
-                          setDepletedItem(item);
-                        } else {
-                          onUpdateQty(item.id, -1);
-                        }
-                      }} 
-                      className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-500 active:scale-90 transition-all font-black text-lg"
-                    >−</button>
-                    
-                    <button 
-                      onClick={() => setEditingItem(item)}
-                      className="px-3 flex flex-col items-center justify-center min-w-[50px] group/qty"
+                      onClick={(e) => { e.stopPropagation(); handleAddRestockRequest(item); }}
+                      className={`w-9 h-9 flex items-center justify-center rounded-2xl border transition-all relative ${recentlyAddedToList === item.id ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-100 text-slate-300 hover:text-indigo-600 hover:border-indigo-100 active:scale-90'}`}
+                      title="Add to Restock List"
                     >
-                       <span className="text-sm font-black text-indigo-600 leading-none">{item.quantity}</span>
-                       <span className="text-[8px] text-slate-400 uppercase font-black tracking-tighter mt-0.5">{item.unit}</span>
+                      {recentlyAddedToList === item.id ? (
+                        <svg className="w-4 h-4 animate-in zoom-in" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                      )}
                     </button>
 
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); onUpdateQty(item.id, 1); }} 
-                      className="w-9 h-9 flex items-center justify-center text-indigo-600 hover:text-indigo-700 active:scale-90 transition-all font-black text-lg"
-                    >+</button>
+                    <div className="flex items-center bg-slate-50 rounded-2xl p-0.5 border border-slate-100/50">
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          if (item.quantity === 1) {
+                            setDepletedItem(item);
+                          } else {
+                            onUpdateQty(item.id, -1);
+                          }
+                        }} 
+                        className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-500 active:scale-90 transition-all font-black text-lg"
+                      >−</button>
+                      
+                      <button 
+                        onClick={() => setEditingItem(item)}
+                        className="px-3 flex flex-col items-center justify-center min-w-[50px] group/qty"
+                      >
+                         <span className="text-sm font-black text-indigo-600 leading-none">{item.quantity}</span>
+                         <span className="text-[8px] text-slate-400 uppercase font-black tracking-tighter mt-0.5">{item.unit}</span>
+                      </button>
+
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onUpdateQty(item.id, 1); }} 
+                        className="w-9 h-9 flex items-center justify-center text-indigo-600 hover:text-indigo-700 active:scale-90 transition-all font-black text-lg"
+                      >+</button>
+                    </div>
                   </div>
                 </div>
               ))}

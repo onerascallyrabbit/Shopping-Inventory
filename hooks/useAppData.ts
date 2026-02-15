@@ -49,10 +49,8 @@ export const useAppData = () => {
           }
         }
         
-        // Products
         setProducts(data.products || []);
         
-        // Inventory
         if (data.inventory) {
           setInventory(data.inventory.map(i => ({
             id: i.id, productId: i.product_id, itemName: i.item_name, category: i.category,
@@ -60,15 +58,10 @@ export const useAppData = () => {
             variety: i.variety, subLocation: i.sub_location, quantity: Number(i.quantity),
             unit: i.unit, locationId: i.location_id, updatedAt: i.updated_at, userId: i.user_id
           })));
-        } else {
-          setInventory([]);
         }
 
-        // Locations
         if (data.storageLocations) setStorageLocations(data.storageLocations.map(s => ({ id: s.id, name: s.name })));
         if (data.subLocations) setSubLocations(data.subLocations.map(s => ({ id: s.id, locationId: s.location_id, name: s.name })));
-        
-        // Metadata
         if (data.stores) setStores(data.stores.map(s => ({ id: s.id, name: s.name, address: s.address, lat: Number(s.lat), lng: Number(s.lng), phone: s.phone, hours: s.hours, zip: s.zip })));
         if (data.vehicles) setVehicles(data.vehicles.map(v => ({ id: v.id, name: v.name, mpg: Number(v.mpg) })));
       }
@@ -79,27 +72,18 @@ export const useAppData = () => {
     }
   }, []);
 
-  // Realtime Subscription for Inventory Changes
+  // Realtime Subscription for Collaborative Changes
   useEffect(() => {
     if (!supabase || !user) return;
 
     const channel = supabase
-      .channel('inventory-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', table: 'inventory', schema: 'public' },
-        (payload) => {
-          console.log('Realtime Inventory Update:', payload);
-          // When any family member makes a change, just refresh the local state
-          // This is the most robust way to handle multi-user conflicts
-          loadAllData();
-        }
-      )
+      .channel('family-changes')
+      .on('postgres_changes', { event: '*', table: 'inventory', schema: 'public' }, () => loadAllData())
+      .on('postgres_changes', { event: '*', table: 'storage_locations', schema: 'public' }, () => loadAllData())
+      .on('postgres_changes', { event: '*', table: 'sub_locations', schema: 'public' }, () => loadAllData())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [supabase, user, loadAllData]);
 
   useEffect(() => {
@@ -126,20 +110,12 @@ export const useAppData = () => {
   }, [loadAllData]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    const isFamilyChange = updates.familyId !== undefined && updates.familyId !== profile.familyId;
-    
     try {
       if (user) await syncProfile(updates);
       setProfile(prev => ({ ...prev, ...updates }));
-
-      if (isFamilyChange) {
-        await loadAllData();
-      } else if (updates.familyId === undefined && profile.familyId) {
-         setActiveFamily(null);
-      }
+      if (updates.familyId !== undefined) await loadAllData();
     } catch (e) {
       console.error("Profile update failed:", e);
-      throw e;
     }
   };
 
@@ -149,19 +125,21 @@ export const useAppData = () => {
 
     const newQty = Math.max(0, target.quantity + delta);
     const updatedAt = new Date().toISOString();
+    const updatedItem = { ...target, quantity: newQty, updatedAt };
+
+    // Optimistic Update
+    setInventory(prev => {
+      if (newQty === 0) return prev.filter(i => i.id !== id);
+      return prev.map(i => i.id === id ? updatedItem : i);
+    });
 
     if (user) {
         try {
-            if (newQty === 0) {
-                await deleteInventoryItem(id);
-            } else {
-                await syncInventoryItem({ ...target, quantity: newQty, updatedAt });
-            }
-            // Note: We don't update local state manually here. 
-            // The Realtime listener will catch the DB change and update the UI.
+            if (newQty === 0) await deleteInventoryItem(id);
+            else await syncInventoryItem(updatedItem);
         } catch (err) {
-            console.error("Failed to sync inventory qty update:", err);
-            loadAllData();
+            console.error("Sync failed, rolling back:", err);
+            loadAllData(); 
         }
     }
   };
@@ -170,22 +148,26 @@ export const useAppData = () => {
     const target = inventory.find(i => i.id === id);
     if (!target) return;
 
+    const updated = { ...target, ...updates, updatedAt: new Date().toISOString() };
+    setInventory(prev => prev.map(item => item.id === id ? updated : item));
+
     if (user) {
         try {
-            await syncInventoryItem({ ...target, ...updates, updatedAt: new Date().toISOString() });
+            await syncInventoryItem(updated);
         } catch (err) {
-            console.error("Failed to sync inventory item update:", err);
+            console.error("Sync failed:", err);
             loadAllData();
         }
     }
   };
 
   const removeInventoryItem = async (id: string) => {
+    setInventory(prev => prev.filter(i => i.id !== id));
     if (user) {
         try {
             await deleteInventoryItem(id);
         } catch (err) {
-            console.error("Failed to delete inventory item:", err);
+            console.error("Delete failed:", err);
             loadAllData();
         }
     }
@@ -202,13 +184,13 @@ export const useAppData = () => {
         productId = syncedProduct.id;
         await syncPriceRecord(productId, newRecord, user.id);
       } catch (err) {
-        console.error("Failed to add price record to cloud:", err);
+        console.error("Cloud price log failed:", err);
       }
     }
 
     setProducts(prev => {
       if (existingProduct) {
-        return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history], brand: brand || p.brand, barcode: barcode || p.barcode, category, subCategory: subCategory || p.subCategory } : p);
+        return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history] } : p);
       }
       return [...prev, { id: productId || crypto.randomUUID(), category, subCategory, itemName, variety, brand, barcode, history: [newRecord] }];
     });
@@ -222,27 +204,34 @@ export const useAppData = () => {
   };
 
   const addToInventory = async (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => {
+    const newItem: InventoryItem = {
+      id: crypto.randomUUID(), productId, itemName, category, subCategory, variety, subLocation, 
+      quantity: qty, unit, locationId, updatedAt: new Date().toISOString(), userId: user?.id || ''
+    };
+
+    // Optimistic Update
+    setInventory(prev => [...prev, newItem]);
+
     if (user) {
         try {
-            const newItem: InventoryItem = {
-              id: crypto.randomUUID(), productId, itemName, category, subCategory, variety, subLocation, 
-              quantity: qty, unit, locationId, updatedAt: new Date().toISOString(), userId: user.id
-            };
             await syncInventoryItem(newItem);
         } catch (err) {
-            console.error("Failed to add inventory to cloud:", err);
+            console.error("Cloud inventory add failed, rolling back:", err);
             loadAllData();
         }
     }
   };
 
   const importBulkInventory = async (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => {
+    const timestamp = new Date().toISOString();
+    const newItems = items.map(i => ({
+      ...i, id: crypto.randomUUID(), updatedAt: timestamp, userId: user?.id || ''
+    })) as InventoryItem[];
+
+    setInventory(prev => [...prev, ...newItems]);
+
     if (user) {
         try {
-            const timestamp = new Date().toISOString();
-            const newItems = items.map(i => ({
-              ...i, id: crypto.randomUUID(), updatedAt: timestamp, userId: user.id
-            })) as InventoryItem[];
             await bulkSyncInventory(newItems);
         } catch (err) {
             console.error("Bulk sync failed:", err);

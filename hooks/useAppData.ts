@@ -251,10 +251,9 @@ export const useAppData = () => {
     }
   };
 
-  const importBulkInventory = async (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]): Promise<boolean> => {
+  const importBulkInventory = async (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]): Promise<{ success: boolean; count?: number; error?: string }> => {
     if (!user) {
-        alert("You must be signed in to sync data with your family hub.");
-        return false;
+        return { success: false, error: "You must be signed in to sync data." };
     }
 
     const timestamp = new Date().toISOString();
@@ -263,13 +262,12 @@ export const useAppData = () => {
     })) as InventoryItem[];
     
     try {
-        await bulkSyncInventory(newItems);
-        // On success, refresh and update local state
+        const count = await bulkSyncInventory(newItems);
         await loadAllData(false);
-        return true;
+        return { success: true, count };
     } catch (err: any) {
         console.error("Bulk sync failed:", err);
-        return false;
+        return { success: false, error: err.message || String(err) };
     }
   };
 

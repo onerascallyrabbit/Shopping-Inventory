@@ -16,10 +16,11 @@ import { signInWithGoogle, supabase } from './services/supabaseService';
 
 const App: React.FC = () => {
   const { 
-    user, loading, products, shoppingList, setShoppingList, inventory, 
+    user, loading, products, shoppingList, inventory, 
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
-    updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, addPriceRecord, addToList, 
+    updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
+    addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem,
     addToInventory, importBulkInventory, refresh 
   } = useAppData();
 
@@ -59,7 +60,7 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
       <DiagnosticBanner user={user} isGuest={isGuest} onExitGuest={() => { setIsGuest(false); localStorage.removeItem('pricewise_is_guest'); }} />
-      <Header user={user} onSettingsClick={() => setActiveTab('settings')} />
+      <Header user={user} onSettingsClick={() => setActiveTab('settings')} activeFamily={activeFamily} />
       
       <main className="flex-1 overflow-y-auto pb-32 px-4 pt-6">
         {loading && <div className="text-center py-20 text-slate-300 font-black animate-pulse uppercase tracking-[0.2em] text-xs italic">Synchronizing Cloud Data...</div>}
@@ -82,10 +83,11 @@ const App: React.FC = () => {
           <ShoppingList 
             items={shoppingList} products={products} 
             storageLocations={storageLocations} subLocations={subLocations}
-            onToggle={(id) => setShoppingList(prev => prev.map(i => i.id === id ? {...i, isCompleted: !i.isCompleted} : i))} 
-            onRemove={(id) => setShoppingList(prev => prev.filter(i => i.id !== id))} 
+            onToggle={toggleListItem} 
+            onRemove={removeListItem} 
             onAdd={addToList} 
             onAddToInventory={addToInventory}
+            activeFamily={activeFamily}
           />
         )}
         {activeTab === 'shop' && (
@@ -94,9 +96,9 @@ const App: React.FC = () => {
             vehicles={vehicles} activeVehicleId={profile.activeVehicleId || ''} 
             gasPrice={profile.gasPrice} 
             storageLocations={storageLocations} subLocations={subLocations}
-            onToggle={(id) => setShoppingList(prev => prev.map(i => i.id === id ? {...i, isCompleted: !i.isCompleted} : i))} 
-            onRemove={(id) => setShoppingList(prev => prev.filter(i => i.id !== id))}
-            onOverrideStore={(id, s) => setShoppingList(prev => prev.map(i => i.id === id ? {...i, manualStore: s} : i))} 
+            onToggle={toggleListItem} 
+            onRemove={removeListItem}
+            onOverrideStore={overrideStoreForListItem} 
             onAddToInventory={addToInventory}
           />
         )}

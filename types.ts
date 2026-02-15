@@ -102,4 +102,17 @@ export interface FamilyMember {
   avatar_url?: string;
 }
 
+export interface CustomCategory {
+  id: string;
+  name: string;
+  familyId: string;
+}
+
+export interface CustomSubCategory {
+  id: string;
+  categoryId: string; // name of the parent category
+  name: string;
+  familyId: string;
+}
+
 export type AppTab = 'dashboard' | 'items' | 'inventory' | 'list' | 'shop' | 'settings';

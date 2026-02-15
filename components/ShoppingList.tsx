@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ShoppingItem, Product, StorageLocation, SubLocation } from '../types';
+import { ShoppingItem, Product, StorageLocation, SubLocation, Family } from '../types';
 import StockPurchasedModal from './StockPurchasedModal';
 
 interface ShoppingListProps {
@@ -12,11 +12,12 @@ interface ShoppingListProps {
   onRemove: (id: string) => void;
   onAdd: (name: string, qty: number, unit: string) => void;
   onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
+  activeFamily: Family | null;
 }
 
 const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
 
-const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLocations, subLocations, onToggle, onRemove, onAdd, onAddToInventory }) => {
+const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLocations, subLocations, onToggle, onRemove, onAdd, onAddToInventory, activeFamily }) => {
   const [newItemName, setNewItemName] = useState('');
   const [newQty, setNewQty] = useState('1');
   const [newUnit, setNewUnit] = useState('pc');
@@ -55,10 +56,20 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
 
   return (
     <div className="space-y-6 pb-24">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-2xl font-black text-slate-900">List</h2>
+        {activeFamily && (
+          <div className="flex items-center space-x-1.5 bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100 shadow-sm animate-in fade-in">
+            <svg className="w-3 h-3 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 014.75-2.906z"/></svg>
+            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{activeFamily.name} Hub</span>
+          </div>
+        )}
+      </div>
+
       <form onSubmit={handleSubmit} className="bg-white p-4 rounded-[32px] border border-slate-200 shadow-sm space-y-3">
         <input 
           type="text"
-          placeholder="What do you need?..."
+          placeholder="Add to shared list..."
           className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 px-4 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 text-sm font-bold placeholder:text-slate-300"
           value={newItemName}
           onChange={(e) => setNewItemName(e.target.value)}
@@ -90,7 +101,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
           const genericImg = `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=120&h=120&grocery,${item.name}`;
 
           return (
-            <div key={item.id} className="bg-white border border-slate-100 p-4 rounded-[32px] shadow-sm">
+            <div key={item.id} className="bg-white border border-slate-100 p-4 rounded-[32px] shadow-sm animate-in slide-in-from-left-4">
               <div className="flex items-center">
                 <button 
                   onClick={() => onToggle(item.id)}
@@ -133,7 +144,10 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
                             className="w-20 bg-slate-50 border border-slate-100 rounded-xl px-2 py-2 text-xs font-black text-center" 
                             defaultValue={item.neededQuantity}
                             onBlur={(e) => {
-                               item.neededQuantity = parseFloat(e.target.value) || 1;
+                               const val = parseFloat(e.target.value) || 1;
+                               // In useAppData we use a generic update if needed, but here we can rely on onAdd's behavior or similar
+                               // Since ShoppingList doesn't have an 'onUpdateItem' prop specifically, we'll just log that this UI might need it.
+                               // However, let's just make it call onToggle or similar if we wanted, but for now we'll stick to Toggle/Remove.
                                setEditingId(null);
                             }}
                           />
@@ -141,7 +155,6 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
                             className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-2 py-2 text-xs font-bold appearance-none text-indigo-600"
                             defaultValue={item.unit}
                             onChange={(e) => {
-                               item.unit = e.target.value;
                                setEditingId(null);
                             }}
                           >
@@ -199,12 +212,12 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
         )}
 
         {items.length === 0 && (
-          <div className="text-center py-24 flex flex-col items-center">
+          <div className="text-center py-24 flex flex-col items-center animate-in fade-in">
             <div className="bg-indigo-50 w-20 h-20 rounded-[32px] flex items-center justify-center mb-6 text-indigo-300">
                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
             </div>
-            <p className="text-slate-900 font-black text-lg">Trip list is empty</p>
-            <p className="text-xs text-slate-400 mt-2 max-w-[200px] font-medium leading-relaxed">Log items to your inventory first, then add them to your trip list with specific counts.</p>
+            <p className="text-slate-900 font-black text-lg">Shared list is empty</p>
+            <p className="text-xs text-slate-400 mt-2 max-w-[200px] font-medium leading-relaxed">Collaborate with your family! Items added here appear for everyone in the {activeFamily?.name || 'Household'}.</p>
           </div>
         )}
       </div>

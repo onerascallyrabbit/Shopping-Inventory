@@ -12,3 +12,4 @@ New: depleted inventory gets added to list
 New: move items in inventory***
 New: add LIST/SHOP items to inventory
 Update: LIST is shared among family
+Update: category management

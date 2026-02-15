@@ -1,22 +1,27 @@
 
 import React, { useState } from 'react';
-import { ShoppingItem, Product } from '../types';
+import { ShoppingItem, Product, StorageLocation, SubLocation } from '../types';
+import StockPurchasedModal from './StockPurchasedModal';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
   products: Product[];
+  storageLocations: StorageLocation[];
+  subLocations: SubLocation[];
   onToggle: (id: string) => void;
   onRemove: (id: string) => void;
   onAdd: (name: string, qty: number, unit: string) => void;
+  onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
 }
 
 const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
 
-const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, onToggle, onRemove, onAdd }) => {
+const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLocations, subLocations, onToggle, onRemove, onAdd, onAddToInventory }) => {
   const [newItemName, setNewItemName] = useState('');
   const [newQty, setNewQty] = useState('1');
   const [newUnit, setNewUnit] = useState('pc');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [stockingItem, setStockingItem] = useState<ShoppingItem | null>(null);
 
   const getSmartSuggestion = (itemName: string) => {
     const product = products.find(p => p.itemName.toLowerCase().includes(itemName.toLowerCase()));
@@ -38,6 +43,11 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, onToggle, 
       setNewItemName('');
       setNewQty('1');
     }
+  };
+
+  const handleStockConfirm = (...args: Parameters<typeof onAddToInventory>) => {
+    onAddToInventory(...args);
+    if (stockingItem) onRemove(stockingItem.id);
   };
 
   const activeItems = items.filter(i => !i.isCompleted);
@@ -98,9 +108,18 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, onToggle, 
                     <svg className="w-3 h-3 text-slate-300 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                   </div>
                 </div>
-                <button onClick={() => onRemove(item.id)} className="text-slate-200 hover:text-red-400 p-2 shrink-0">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+                <div className="flex items-center space-x-1">
+                  <button 
+                    onClick={() => setStockingItem(item)}
+                    className="text-indigo-400 hover:text-indigo-600 p-2"
+                    title="Stock directly"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                  </button>
+                  <button onClick={() => onRemove(item.id)} className="text-slate-200 hover:text-red-400 p-2 shrink-0">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
               </div>
 
               {editingId === item.id && (
@@ -159,12 +178,21 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, onToggle, 
           <div className="pt-6 space-y-2 opacity-50">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Cart History</h3>
             {completedItems.map(item => (
-              <div key={item.id} className="flex items-center bg-slate-100 border border-slate-200 p-3 rounded-2xl">
+              <div key={item.id} className="flex items-center bg-slate-100 border border-slate-200 p-3 rounded-2xl group relative overflow-hidden">
                 <button onClick={() => onToggle(item.id)} className="w-6 h-6 rounded-full bg-emerald-500 mr-3 flex items-center justify-center shrink-0">
                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
                 </button>
                 <h4 className="flex-1 font-bold text-slate-500 text-xs line-through uppercase tracking-tight">{item.name}</h4>
-                <button onClick={() => onRemove(item.id)} className="text-slate-300"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                <div className="flex items-center space-x-1">
+                  <button 
+                    onClick={() => setStockingItem(item)}
+                    className="p-1.5 text-indigo-400 hover:text-indigo-600 transition-colors"
+                    title="Move to Stock"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                  </button>
+                  <button onClick={() => onRemove(item.id)} className="text-slate-300 p-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                </div>
               </div>
             ))}
           </div>
@@ -180,6 +208,17 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, onToggle, 
           </div>
         )}
       </div>
+
+      {stockingItem && (
+        <StockPurchasedModal 
+          item={stockingItem}
+          products={products}
+          storageLocations={storageLocations}
+          subLocations={subLocations}
+          onClose={() => setStockingItem(null)}
+          onConfirm={handleStockConfirm}
+        />
+      )}
     </div>
   );
 };

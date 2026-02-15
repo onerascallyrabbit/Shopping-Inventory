@@ -1,5 +1,4 @@
-
-import { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { InventoryItem, StorageLocation, Product, SubLocation } from '../types';
 import CsvImportModal from './CsvImportModal';
 import { UNITS, SUB_CATEGORIES } from '../constants';
@@ -75,15 +74,74 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     return groups;
   }, [filteredInventory, activeLocationId, locations]);
 
-  const productSuggestions = useMemo(() => {
-    if (newItem.itemName.length < 2) return [];
-    return products.filter(p => p.itemName.toLowerCase().includes(newItem.itemName.toLowerCase())).slice(0, 5);
-  }, [newItem.itemName, products]);
-
   const currentSubLocations = useMemo(() => {
     if (activeLocationId === 'All') return [];
     return subLocations.filter(sl => sl.locationId === activeLocationId);
   }, [subLocations, activeLocationId]);
+
+  // FIX: Added productSuggestions memo to provide autocomplete results in the add stock modal
+  const productSuggestions = useMemo(() => {
+    if (!newItem.itemName || newItem.itemName.length < 2) return [];
+    return products.filter(p => 
+      p.itemName.toLowerCase().includes(newItem.itemName.toLowerCase())
+    ).slice(0, 5);
+  }, [products, newItem.itemName]);
+
+  const handleDragStart = (id: string) => {
+    setDraggedItemId(id);
+  };
+
+  const handleLocationHoverStart = (locId: string) => {
+    if (!draggedItemId) return;
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    
+    hoverTimerRef.current = window.setTimeout(() => {
+      setActiveLocationId(locId);
+      setActiveSubLocation('All');
+    }, 600);
+  };
+
+  const handleLocationHoverEnd = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+
+  const handleDropOnLocation = (locId: string) => {
+    if (!draggedItemId) return;
+    const item = inventory.find(i => i.id === draggedItemId);
+    if (item) {
+      // If dropping on "All Stock" tab, move to the first location by default or just ignore?
+      // Moving to first location is safer.
+      const newLocId = locId === 'All' ? locations[0]?.id : locId;
+      if (newLocId && item.locationId !== newLocId) {
+        onUpdateItem(draggedItemId, { locationId: newLocId, subLocation: '' });
+      }
+    }
+    setDraggedItemId(null);
+  };
+
+  const handleDropOnShelf = (shelfName: string) => {
+    if (!draggedItemId) return;
+    const item = inventory.find(i => i.id === draggedItemId);
+    if (!item) return;
+
+    if (activeLocationId === 'All') {
+      // shelfName is actually a Location Name in the All view
+      const targetLoc = locations.find(l => l.name === shelfName);
+      if (targetLoc && item.locationId !== targetLoc.id) {
+        onUpdateItem(draggedItemId, { locationId: targetLoc.id, subLocation: '' });
+      }
+    } else {
+      // In a specific location view, shelfName is actually a shelf/sub-location
+      const newShelf = (shelfName === 'Loose / General' || shelfName === 'All') ? '' : shelfName;
+      if (item.subLocation !== newShelf) {
+        onUpdateItem(draggedItemId, { subLocation: newShelf });
+      }
+    }
+    setDraggedItemId(null);
+  };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,59 +178,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     }
     onUpdateQty(depletedItem.id, -1);
     setDepletedItem(null);
-  };
-
-  // Drag and Drop Logic
-  const handleDragStart = (id: string) => {
-    setDraggedItemId(id);
-  };
-
-  const handleLocationHoverStart = (locId: string) => {
-    if (!draggedItemId) return;
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    
-    hoverTimerRef.current = window.setTimeout(() => {
-      setActiveLocationId(locId);
-      setActiveSubLocation('All');
-    }, 600);
-  };
-
-  const handleLocationHoverEnd = () => {
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-  };
-
-  const handleDropOnLocation = (locId: string) => {
-    if (!draggedItemId) return;
-    const item = inventory.find(i => i.id === draggedItemId);
-    if (item) {
-      const newLocId = locId === 'All' ? locations[0]?.id : locId;
-      if (item.locationId !== newLocId) {
-        onUpdateItem(draggedItemId, { locationId: newLocId, subLocation: '' });
-      }
-    }
-    setDraggedItemId(null);
-  };
-
-  const handleDropOnShelf = (shelfName: string) => {
-    if (!draggedItemId) return;
-    
-    // If we're in 'All' mode, we need a specific location before we can assign a shelf
-    // This handles drops on the sub-location tabs
-    const targetLocId = activeLocationId === 'All' ? locations[0]?.id : activeLocationId;
-    if (!targetLocId) return;
-
-    const item = inventory.find(i => i.id === draggedItemId);
-    if (item) {
-      const newShelf = (shelfName === 'Loose / General' || shelfName === 'All') ? '' : shelfName;
-      onUpdateItem(draggedItemId, { 
-        locationId: targetLocId,
-        subLocation: newShelf 
-      });
-    }
-    setDraggedItemId(null);
   };
 
   return (
@@ -254,25 +259,31 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         {Object.keys(groupedInventory).length > 0 ? Object.entries(groupedInventory).map(([shelfName, items]) => (
           <div 
             key={shelfName} 
-            className={`space-y-3 p-2 rounded-[32px] transition-all ${draggedItemId ? 'bg-indigo-50/30 border-2 border-dashed border-indigo-100' : 'bg-transparent border-2 border-transparent'}`}
+            className={`space-y-3 p-2 rounded-[32px] transition-all relative ${draggedItemId ? 'bg-indigo-50/30 border-2 border-dashed border-indigo-100 ring-4 ring-indigo-50/10' : 'bg-transparent border-2 border-transparent'}`}
             onDragOver={(e) => e.preventDefault()}
-            onDrop={() => handleDropOnShelf(shelfName)}
+            onDrop={(e) => { e.preventDefault(); handleDropOnShelf(shelfName); }}
           >
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center justify-between">
+            {/* Overlay to ensure drop area works even when empty or nested */}
+            {draggedItemId && (
+              <div className="absolute inset-0 z-10 rounded-[32px]"></div>
+            )}
+            
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center justify-between relative z-20">
               <div className="flex items-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>
                 {shelfName}
               </div>
               <span className="text-slate-300">{items.length} items</span>
             </h3>
-            <div className="space-y-2">
+            
+            <div className="space-y-2 relative z-20">
               {items.map(item => (
                 <div 
                   key={item.id} 
                   draggable
                   onDragStart={() => handleDragStart(item.id)}
                   onDragEnd={() => setDraggedItemId(null)}
-                  className={`bg-white border border-slate-100 p-4 rounded-[28px] shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all cursor-grab active:cursor-grabbing ${draggedItemId === item.id ? 'opacity-40 scale-95 grayscale' : 'opacity-100 scale-100'}`}
+                  className={`bg-white border border-slate-100 p-4 rounded-[28px] shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all cursor-grab active:cursor-grabbing ${draggedItemId === item.id ? 'opacity-40 scale-95 grayscale' : 'opacity-100 scale-100'} ${draggedItemId ? 'pointer-events-none' : 'pointer-events-auto'}`}
                 >
                   <div className="flex-1 min-w-0 pr-4">
                     <div className="flex items-center space-x-2">

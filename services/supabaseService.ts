@@ -85,10 +85,7 @@ export const syncPriceRecord = async (productId: string, record: PriceRecord, us
     image_url: record.image,
     is_public: record.isPublic || false
   });
-  if (error) {
-    console.error("syncPriceRecord error:", error);
-    throw error;
-  }
+  if (error) console.error("syncPriceRecord error:", error);
 };
 
 export const syncProduct = async (product: Partial<Product>) => {
@@ -164,8 +161,6 @@ export const fetchUserData = async () => {
       supabase.from('vehicles').select('*')
     ]);
 
-    if (inventoryRes.error) console.warn("fetchUserData: inventory error", inventoryRes.error);
-
     return {
       profile,
       products,
@@ -189,10 +184,7 @@ export const fetchProfile = async (): Promise<Profile | null> => {
   try {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     
-    if (error && error.code !== 'PGRST116') {
-      console.warn("Profile fetch error:", error);
-      return null;
-    }
+    if (error && error.code !== 'PGRST116') return null;
     
     if (!data) {
       const initial = { 
@@ -203,9 +195,7 @@ export const fetchProfile = async (): Promise<Profile | null> => {
         share_prices: false,
         category_order: ['Produce', 'Dairy', 'Meat', 'Seafood', 'Deli', 'Bakery', 'Frozen', 'Pantry', 'Beverages', 'Household', 'Personal Care', 'Baby', 'Pets', 'Other']
       };
-      const { error: insError } = await supabase.from('profiles').insert(initial);
-      if (insError) console.error("Could not create initial profile:", insError);
-      
+      await supabase.from('profiles').insert(initial);
       return { 
         id: user.id, 
         locationLabel: '', 
@@ -227,7 +217,6 @@ export const fetchProfile = async (): Promise<Profile | null> => {
       familyId: data.family_id 
     };
   } catch (e) {
-    console.error("fetchProfile exception:", e);
     return null;
   }
 };
@@ -246,10 +235,7 @@ export const syncProfile = async (profile: Partial<Profile>) => {
   if (profile.familyId !== undefined) payload.family_id = profile.familyId;
   
   const { data, error } = await supabase.from('profiles').upsert({ id: user.id, ...payload }).select().single();
-  if (error) {
-    console.error("syncProfile error:", error);
-    throw error;
-  }
+  if (error) throw error;
   return data;
 };
 
@@ -266,24 +252,14 @@ export const createFamily = async (name: string) => {
 
 export const joinFamily = async (inviteCode: string) => {
   if (!supabase) return null;
-  const normalizedCode = inviteCode.trim().toUpperCase();
   const { data: familyData, error: familyError } = await supabase
     .from('families')
     .select('id')
-    .eq('invite_code', normalizedCode)
+    .eq('invite_code', inviteCode.trim().toUpperCase())
     .single();
     
-  if (familyError) {
-    if (familyError.code === 'PGRST116') throw new Error('Family not found. Please double-check the invite code.');
-    throw new Error('Connection error. Could not verify invite code.');
-  }
-  
-  try {
-    await syncProfile({ familyId: familyData.id });
-  } catch (e: any) {
-    throw new Error(`Failed to link your account to the family hub: ${e.message}`);
-  }
-  
+  if (familyError) throw new Error('Family not found.');
+  await syncProfile({ familyId: familyData.id });
   return familyData;
 };
 
@@ -291,145 +267,115 @@ export const syncVehicle = async (v: Vehicle) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  const { error } = await supabase.from('vehicles').upsert({ id: v.id, user_id: user.id, name: v.name, mpg: v.mpg });
-  if (error) throw error;
+  await supabase.from('vehicles').upsert({ id: v.id, user_id: user.id, name: v.name, mpg: v.mpg });
 };
 
 export const deleteVehicle = async (id: string) => {
   if (!supabase) return;
-  const { error } = await supabase.from('vehicles').delete().eq('id', id);
-  if (error) throw error;
+  await supabase.from('vehicles').delete().eq('id', id);
 };
 
 export const syncStore = async (s: StoreLocation, isPublic: boolean = false) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  const { error } = await supabase.from('stores').upsert({ 
-    id: s.id, 
-    user_id: user.id, 
-    name: s.name, 
-    address: s.address, 
-    lat: s.lat, 
-    lng: s.lng, 
-    phone: s.phone, 
-    hours: s.hours, 
-    zip: s.zip,
-    is_public: isPublic
+  await supabase.from('stores').upsert({ 
+    id: s.id, user_id: user.id, name: s.name, address: s.address, 
+    lat: s.lat, lng: s.lng, phone: s.phone, hours: s.hours, 
+    zip: s.zip, is_public: isPublic
   });
-  if (error) throw error;
 };
 
 export const deleteStore = async (id: string) => {
   if (!supabase) return;
-  const { error } = await supabase.from('stores').delete().eq('id', id);
-  if (error) throw error;
+  await supabase.from('stores').delete().eq('id', id);
 };
 
+/**
+ * INVENTORY SYNC (Fixed Column Handling)
+ */
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
-  const { error } = await supabase.from('inventory').upsert({ 
-    id: item.id, 
-    product_id: item.productId, 
-    item_name: item.itemName, 
-    category: item.category, 
-    sub_category: item.subCategory,
-    variety: item.variety, 
-    sub_location: item.subLocation, 
-    quantity: item.quantity, 
-    unit: item.unit, 
-    location_id: item.locationId, 
-    updated_at: item.updatedAt, 
-    user_id: item.userId || user.id 
-  });
+  // Stripping undefined values to prevent PostgREST column mapping errors
+  const payload: any = {
+    id: item.id,
+    product_id: item.productId,
+    item_name: item.itemName,
+    category: item.category,
+    quantity: item.quantity,
+    unit: item.unit,
+    location_id: item.locationId,
+    updated_at: item.updatedAt,
+    user_id: item.userId || user.id
+  };
+
+  if (item.subCategory) payload.sub_category = item.subCategory;
+  if (item.variety) payload.variety = item.variety;
+  if (item.subLocation) payload.sub_location = item.subLocation;
+
+  const { error } = await supabase.from('inventory').upsert(payload);
 
   if (error) {
-    console.error("syncInventoryItem error:", error);
+    console.error("syncInventoryItem FAILED:", error);
     throw error;
   }
 };
 
 export const deleteInventoryItem = async (id: string) => {
   if (!supabase) return;
-  const { error } = await supabase.from('inventory').delete().eq('id', id);
-  if (error) throw error;
+  await supabase.from('inventory').delete().eq('id', id);
 };
 
-export const bulkSyncInventory = async (items: InventoryItem[]): Promise<number> => {
-  if (!supabase) throw new Error("Supabase client not initialized.");
-  
+export const bulkSyncInventory = async (items: InventoryItem[]) => {
+  if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated for bulk import.");
+  if (!user) return;
   
-  const payload = items.map(item => ({ 
-    id: item.id || crypto.randomUUID(), 
-    product_id: item.productId, 
-    item_name: item.itemName, 
-    category: item.category, 
-    sub_category: item.subCategory,
-    variety: item.variety, 
-    sub_location: item.subLocation, 
-    quantity: item.quantity, 
-    unit: item.unit, 
-    location_id: item.locationId, 
-    updated_at: item.updatedAt || new Date().toISOString(), 
-    user_id: user.id 
-  }));
+  const payload = items.map(item => {
+    const row: any = { 
+      id: item.id, product_id: item.productId, item_name: item.itemName, 
+      category: item.category, quantity: item.quantity, unit: item.unit, 
+      location_id: item.locationId, updated_at: item.updatedAt, user_id: item.userId || user.id 
+    };
+    if (item.subCategory) row.sub_category = item.subCategory;
+    if (item.variety) row.variety = item.variety;
+    if (item.subLocation) row.sub_location = item.subLocation;
+    return row;
+  });
 
-  console.log(`Cloud Sync: Attempting to upload ${payload.length} items to database...`);
-  console.table(payload.slice(0, 5)); // Log sample of payload
-
-  const { error, count } = await supabase
-    .from('inventory')
-    .upsert(payload, { count: 'exact' });
-  
-  if (error) {
-    console.error("bulkSyncInventory error details:", error);
-    // Specifically handle common errors
-    if (error.code === '22P02') {
-        throw new Error("Data conversion error (Invalid UUID or Number). Ensure storage location is valid.");
-    }
-    throw new Error(error.message || "Unknown database error during sync.");
-  }
-  
-  const finalCount = count ?? payload.length;
-  console.log(`Cloud Sync: Successfully stored ${finalCount} items.`);
-  return finalCount;
+  const { error } = await supabase.from('inventory').upsert(payload);
+  if (error) console.error("bulkSyncInventory error:", error);
 };
 
 export const syncStorageLocation = async (loc: StorageLocation) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  const { error } = await supabase.from('storage_locations').upsert({ id: loc.id, name: loc.name, user_id: user.id });
-  if (error) throw error;
+  await supabase.from('storage_locations').upsert({ id: loc.id, name: loc.name, user_id: user.id });
 };
 
 export const deleteStorageLocation = async (id: string) => {
   if (!supabase) return;
-  const { error } = await supabase.from('storage_locations').delete().eq('id', id);
-  if (error) throw error;
+  await supabase.from('storage_locations').delete().eq('id', id);
 };
 
 export const syncSubLocation = async (sub: SubLocation) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  const { error } = await supabase.from('sub_locations').upsert({ id: sub.id, location_id: sub.locationId, name: sub.name, user_id: user.id });
-  if (error) throw error;
+  await supabase.from('sub_locations').upsert({ id: sub.id, location_id: sub.locationId, name: sub.name, user_id: user.id });
 };
 
 export const deleteSubLocation = async (id: string) => {
   if (!supabase) return;
-  const { error } = await supabase.from('sub_locations').delete().eq('id', id);
-  if (error) throw error;
+  await supabase.from('sub_locations').delete().eq('id', id);
 };
 
 export const testDatabaseConnection = async () => {
-  if (!supabase) return { success: false, error: 'No Supabase client' };
+  if (!supabase) return { success: false, error: 'No client' };
   try {
     const { error } = await supabase.from('profiles').select('id').limit(1);
     return { success: !error, error: error?.message };

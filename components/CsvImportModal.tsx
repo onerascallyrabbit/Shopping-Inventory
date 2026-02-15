@@ -5,7 +5,7 @@ import { UNITS, SUB_CATEGORIES } from '../constants';
 
 interface CsvImportModalProps {
   onClose: () => void;
-  onImport: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => void;
+  onImport: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<boolean>;
   locations: StorageLocation[];
   subLocations: SubLocation[];
   activeLocationId: string;
@@ -15,7 +15,7 @@ interface CsvImportModalProps {
 type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'ignore';
 
 const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, locations, subLocations, activeLocationId, categoryOrder }) => {
-  const [step, setStep] = useState<'upload' | 'map' | 'review'>('upload');
+  const [step, setStep] = useState<'upload' | 'map' | 'review' | 'processing' | 'success' | 'error'>('upload');
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [mappings, setMappings] = useState<Record<number, MappingField>>({});
@@ -98,6 +98,16 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
     setStep('review');
   };
 
+  const handleFinalImport = async () => {
+    setStep('processing');
+    const success = await onImport(reviewItems);
+    if (success) {
+      setStep('success');
+    } else {
+      setStep('error');
+    }
+  };
+
   const updateReviewItem = (index: number, updates: Partial<Omit<InventoryItem, 'id' | 'updatedAt'>>) => {
     setReviewItems(prev => prev.map((item, idx) => idx === index ? { ...item, ...updates } : item));
   };
@@ -134,7 +144,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
             </div>
           )}
 
-          {step !== 'upload' && (
+          {(step === 'map' || step === 'review') && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-3 p-4 bg-indigo-50/50 rounded-3xl border border-indigo-100">
                 <div className="space-y-1">
@@ -245,35 +255,76 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
               )}
             </div>
           )}
-        </div>
 
-        <div className="p-6 shrink-0 border-t border-slate-50 bg-slate-50/50">
-          {step === 'map' && (
-            <button 
-              onClick={generateReviewItems} 
-              className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg active:scale-[0.98] transition-all"
-            >
-              Verify Items
-            </button>
+          {step === 'processing' && (
+            <div className="h-full flex flex-col items-center justify-center space-y-6 py-20 animate-in fade-in zoom-in-95">
+               <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+               <div className="text-center">
+                  <h4 className="text-lg font-black text-slate-900 uppercase">Syncing to Cloud</h4>
+                  <p className="text-xs text-slate-400 mt-2 font-bold uppercase tracking-widest">Saving {reviewItems.length} items to your family hub...</p>
+               </div>
+            </div>
           )}
-          {step === 'review' && (
-            <div className="flex space-x-3">
-              <button 
-                onClick={() => setStep('map')} 
-                className="flex-1 bg-white border border-slate-200 text-slate-600 font-black py-4 rounded-2xl uppercase tracking-widest text-[10px]"
-              >
-                Back
-              </button>
-              <button 
-                onClick={() => onImport(reviewItems)} 
-                disabled={!targetLocationId || reviewItems.length === 0}
-                className={`flex-[2] text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg transition-all active:scale-[0.98] ${targetLocationId && reviewItems.length > 0 ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-300 cursor-not-allowed shadow-none'}`}
-              >
-                Import {reviewItems.length} Items to {locations.find(l => l.id === targetLocationId)?.name || 'Stock'}
-              </button>
+
+          {step === 'success' && (
+            <div className="h-full flex flex-col items-center justify-center space-y-6 py-20 animate-in zoom-in-95 duration-300">
+               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-emerald-50">
+                  <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>
+               </div>
+               <div className="text-center">
+                  <h4 className="text-xl font-black text-slate-900 uppercase">Import Successful</h4>
+                  <p className="text-sm text-slate-500 mt-2 font-medium">Your stock has been uploaded. Other family members will see the update instantly.</p>
+               </div>
+               <button onClick={onClose} className="bg-slate-900 text-white px-12 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">Done</button>
+            </div>
+          )}
+
+          {step === 'error' && (
+            <div className="h-full flex flex-col items-center justify-center space-y-6 py-20 animate-in zoom-in-95">
+               <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+               </div>
+               <div className="text-center px-6">
+                  <h4 className="text-xl font-black text-slate-900 uppercase">Sync Failed</h4>
+                  <p className="text-sm text-slate-500 mt-2 font-medium">We couldn't reach the database. Check your connection or RLS permissions and try again.</p>
+               </div>
+               <div className="flex space-x-3 w-full px-12">
+                  <button onClick={() => setStep('review')} className="flex-1 border border-slate-200 text-slate-600 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest">Back</button>
+                  <button onClick={handleFinalImport} className="flex-[2] bg-indigo-600 text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95">Retry Sync</button>
+               </div>
             </div>
           )}
         </div>
+
+        {(step === 'map' || step === 'review') && (
+          <div className="p-6 shrink-0 border-t border-slate-50 bg-slate-50/50">
+            {step === 'map' && (
+              <button 
+                onClick={generateReviewItems} 
+                className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg active:scale-[0.98] transition-all"
+              >
+                Verify Items
+              </button>
+            )}
+            {step === 'review' && (
+              <div className="flex space-x-3">
+                <button 
+                  onClick={() => setStep('map')} 
+                  className="flex-1 bg-white border border-slate-200 text-slate-600 font-black py-4 rounded-2xl uppercase tracking-widest text-[10px]"
+                >
+                  Back
+                </button>
+                <button 
+                  onClick={handleFinalImport} 
+                  disabled={!targetLocationId || reviewItems.length === 0}
+                  className={`flex-[2] text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg transition-all active:scale-[0.98] ${targetLocationId && reviewItems.length > 0 ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-300 cursor-not-allowed shadow-none'}`}
+                >
+                  Sync to Cloud Hub
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { InventoryItem, StorageLocation, SubLocation } from '../types';
 import { UNITS, SUB_CATEGORIES } from '../constants';
 
@@ -20,12 +20,21 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [mappings, setMappings] = useState<Record<number, MappingField>>({});
   
-  const [targetLocationId, setTargetLocationId] = useState(activeLocationId || (locations[0]?.id || ''));
+  const [targetLocationId, setTargetLocationId] = useState('');
   const [targetSubLocation, setTargetSubLocation] = useState('');
   
   const [reviewItems, setReviewItems] = useState<Omit<InventoryItem, 'id' | 'updatedAt'>[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize target location correctly
+  useEffect(() => {
+    if (activeLocationId) {
+      setTargetLocationId(activeLocationId);
+    } else if (locations.length > 0) {
+      setTargetLocationId(locations[0].id);
+    }
+  }, [activeLocationId, locations]);
 
   const availableSubLocations = useMemo(() => {
     return subLocations.filter(sl => sl.locationId === targetLocationId);
@@ -63,6 +72,11 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
   };
 
   const generateReviewItems = () => {
+    if (!targetLocationId) {
+        alert("Please select a destination location (e.g. Pantry or Fridge) before proceeding.");
+        return;
+    }
+    
     const items = csvRows.map(row => {
       const item: any = { productId: 'manual', subLocation: targetSubLocation };
       csvHeaders.forEach((_, idx) => {
@@ -137,6 +151,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
                       }
                     }}
                   >
+                    <option value="">Select Location...</option>
                     {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
                   </select>
                 </div>

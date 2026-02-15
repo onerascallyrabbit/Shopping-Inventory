@@ -1,11 +1,11 @@
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { InventoryItem, StorageLocation, SubLocation } from '../types';
 import { UNITS, SUB_CATEGORIES } from '../constants';
 
 interface CsvImportModalProps {
   onClose: () => void;
-  onImport: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<{ success: boolean; count?: number; error?: string }>;
+  onImport: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<void>;
   locations: StorageLocation[];
   subLocations: SubLocation[];
   activeLocationId: string;
@@ -15,27 +15,18 @@ interface CsvImportModalProps {
 type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'ignore';
 
 const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, locations, subLocations, activeLocationId, categoryOrder }) => {
-  const [step, setStep] = useState<'upload' | 'map' | 'review' | 'processing' | 'success' | 'error'>('upload');
+  const [step, setStep] = useState<'upload' | 'map' | 'review'>('upload');
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [mappings, setMappings] = useState<Record<number, MappingField>>({});
+  const [isSyncing, setIsSyncing] = useState(false);
   
-  const [targetLocationId, setTargetLocationId] = useState('');
+  const [targetLocationId, setTargetLocationId] = useState(activeLocationId || (locations[0]?.id || ''));
   const [targetSubLocation, setTargetSubLocation] = useState('');
   
   const [reviewItems, setReviewItems] = useState<Omit<InventoryItem, 'id' | 'updatedAt'>[]>([]);
-  const [importResult, setImportResult] = useState<{ count?: number; error?: string }>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Initialize target location correctly
-  useEffect(() => {
-    if (activeLocationId) {
-      setTargetLocationId(activeLocationId);
-    } else if (locations.length > 0) {
-      setTargetLocationId(locations[0].id);
-    }
-  }, [activeLocationId, locations]);
 
   const availableSubLocations = useMemo(() => {
     return subLocations.filter(sl => sl.locationId === targetLocationId);
@@ -73,11 +64,6 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
   };
 
   const generateReviewItems = () => {
-    if (!targetLocationId) {
-        alert("Please select a destination location (e.g. Pantry or Fridge) before proceeding.");
-        return;
-    }
-    
     const items = csvRows.map(row => {
       const item: any = { productId: 'manual', subLocation: targetSubLocation };
       csvHeaders.forEach((_, idx) => {
@@ -99,23 +85,25 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
     setStep('review');
   };
 
-  const handleFinalImport = async () => {
-    setStep('processing');
-    const result = await onImport(reviewItems);
-    setImportResult({ count: result.count, error: result.error });
-    if (result.success) {
-      setStep('success');
-    } else {
-      setStep('error');
-    }
-  };
-
   const updateReviewItem = (index: number, updates: Partial<Omit<InventoryItem, 'id' | 'updatedAt'>>) => {
     setReviewItems(prev => prev.map((item, idx) => idx === index ? { ...item, ...updates } : item));
   };
 
   const removeReviewItem = (index: number) => {
     setReviewItems(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleFinalImport = async () => {
+    if (!targetLocationId || reviewItems.length === 0 || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await onImport(reviewItems);
+      // onImport in InventoryView calls setIsImporting(false) which unmounts this modal
+    } catch (err) {
+      console.error("Import failed:", err);
+      setIsSyncing(false);
+      alert("Failed to sync some items. Check your internet connection.");
+    }
   };
 
   return (
@@ -126,7 +114,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
             <h3 className="text-xl font-black text-slate-900">Bulk Import</h3>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inventory Management</p>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+          <button onClick={onClose} disabled={isSyncing} className="p-2 text-slate-300 hover:text-red-500 transition-colors disabled:opacity-30">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
@@ -146,13 +134,14 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
             </div>
           )}
 
-          {(step === 'map' || step === 'review') && (
+          {step !== 'upload' && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-3 p-4 bg-indigo-50/50 rounded-3xl border border-indigo-100">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Destination</label>
                   <select 
-                    className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2.5 text-xs font-bold text-indigo-700 appearance-none focus:ring-2 focus:ring-indigo-500/20"
+                    disabled={isSyncing}
+                    className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2.5 text-xs font-bold text-indigo-700 appearance-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
                     value={targetLocationId}
                     onChange={e => {
                       const newId = e.target.value;
@@ -163,14 +152,14 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
                       }
                     }}
                   >
-                    <option value="">Select Location...</option>
                     {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Sub-Destination</label>
                   <select 
-                    className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2.5 text-xs font-bold text-indigo-700 appearance-none focus:ring-2 focus:ring-indigo-500/20"
+                    disabled={isSyncing}
+                    className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2.5 text-xs font-bold text-indigo-700 appearance-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
                     value={targetSubLocation}
                     onChange={e => {
                       const newSub = e.target.value;
@@ -217,35 +206,35 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
                   <div className="space-y-4">
                     {reviewItems.map((item, idx) => (
                       <div key={idx} className="p-5 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-4 relative group border-l-4 border-l-indigo-500">
-                        <button onClick={() => removeReviewItem(idx)} className="absolute top-4 right-4 text-slate-200 hover:text-red-500 transition-colors">
+                        <button disabled={isSyncing} onClick={() => removeReviewItem(idx)} className="absolute top-4 right-4 text-slate-200 hover:text-red-500 transition-colors disabled:opacity-30">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                         
                         <div className="grid grid-cols-2 gap-4">
                           <div className="col-span-2">
                             <label className="text-[8px] font-black text-slate-400 uppercase">Item Name</label>
-                            <input className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold" value={item.itemName} onChange={e => updateReviewItem(idx, { itemName: e.target.value })} />
+                            <input disabled={isSyncing} className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50" value={item.itemName} onChange={e => updateReviewItem(idx, { itemName: e.target.value })} />
                           </div>
                           <div>
                             <label className="text-[8px] font-black text-slate-400 uppercase">Category</label>
-                            <select className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold appearance-none" value={item.category} onChange={e => updateReviewItem(idx, { category: e.target.value, subCategory: '' })}>
+                            <select disabled={isSyncing} className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold appearance-none disabled:opacity-50" value={item.category} onChange={e => updateReviewItem(idx, { category: e.target.value, subCategory: '' })}>
                               {categoryOrder.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                           </div>
                           <div>
                             <label className="text-[8px] font-black text-slate-400 uppercase">Sub-Category</label>
-                            <select className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold appearance-none" value={item.subCategory} onChange={e => updateReviewItem(idx, { subCategory: e.target.value })}>
+                            <select disabled={isSyncing} className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold appearance-none disabled:opacity-50" value={item.subCategory} onChange={e => updateReviewItem(idx, { subCategory: e.target.value })}>
                               <option value="">General</option>
                               {(SUB_CATEGORIES[item.category] || []).map(sc => <option key={sc} value={sc}>{sc}</option>)}
                             </select>
                           </div>
                           <div>
                             <label className="text-[8px] font-black text-slate-400 uppercase">Qty</label>
-                            <input type="number" step="0.1" className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold" value={item.quantity} onChange={e => updateReviewItem(idx, { quantity: parseFloat(e.target.value) || 0 })} />
+                            <input disabled={isSyncing} type="number" step="0.1" className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50" value={item.quantity} onChange={e => updateReviewItem(idx, { quantity: parseFloat(e.target.value) || 0 })} />
                           </div>
                           <div>
                             <label className="text-[8px] font-black text-slate-400 uppercase">Unit</label>
-                            <select className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold appearance-none" value={item.unit} onChange={e => updateReviewItem(idx, { unit: e.target.value })}>
+                            <select disabled={isSyncing} className="w-full bg-slate-50 rounded-lg px-3 py-2 text-xs font-bold appearance-none disabled:opacity-50" value={item.unit} onChange={e => updateReviewItem(idx, { unit: e.target.value })}>
                               {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                             </select>
                           </div>
@@ -257,78 +246,43 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
               )}
             </div>
           )}
+        </div>
 
-          {step === 'processing' && (
-            <div className="h-full flex flex-col items-center justify-center space-y-6 py-20 animate-in fade-in zoom-in-95">
-               <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-               <div className="text-center">
-                  <h4 className="text-lg font-black text-slate-900 uppercase">Syncing to Cloud</h4>
-                  <p className="text-xs text-slate-400 mt-2 font-bold uppercase tracking-widest">Saving {reviewItems.length} items to your family hub...</p>
-               </div>
-            </div>
+        <div className="p-6 shrink-0 border-t border-slate-50 bg-slate-50/50">
+          {step === 'map' && (
+            <button 
+              onClick={generateReviewItems} 
+              className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg active:scale-[0.98] transition-all"
+            >
+              Verify Items
+            </button>
           )}
-
-          {step === 'success' && (
-            <div className="h-full flex flex-col items-center justify-center space-y-6 py-20 animate-in zoom-in-95 duration-300">
-               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-emerald-50">
-                  <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>
-               </div>
-               <div className="text-center">
-                  <h4 className="text-xl font-black text-slate-900 uppercase">Import Successful</h4>
-                  <p className="text-sm text-slate-500 mt-2 font-medium">Successfully stored {importResult.count || reviewItems.length} items in your cloud database.</p>
-               </div>
-               <button onClick={onClose} className="bg-slate-900 text-white px-12 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">Done</button>
-            </div>
-          )}
-
-          {step === 'error' && (
-            <div className="h-full flex flex-col items-center justify-center space-y-6 py-20 animate-in zoom-in-95">
-               <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
-                  <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
-               </div>
-               <div className="text-center px-6">
-                  <h4 className="text-xl font-black text-slate-900 uppercase">Sync Failed</h4>
-                  <p className="text-xs text-red-500 mt-2 font-bold bg-red-50 p-3 rounded-xl border border-red-100">{importResult.error || "The database rejected the upload."}</p>
-                  <p className="text-[10px] text-slate-400 mt-4 uppercase font-black tracking-widest">Helpful Tip</p>
-                  <p className="text-[11px] text-slate-500 mt-1">If using default locations, try creating a real storage location in Settings first to ensure the ID is valid.</p>
-               </div>
-               <div className="flex space-x-3 w-full px-12 pt-4">
-                  <button onClick={() => setStep('review')} className="flex-1 border border-slate-200 text-slate-600 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest">Edit Data</button>
-                  <button onClick={handleFinalImport} className="flex-[2] bg-indigo-600 text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95">Retry Sync</button>
-               </div>
+          {step === 'review' && (
+            <div className="flex space-x-3">
+              <button 
+                disabled={isSyncing}
+                onClick={() => setStep('map')} 
+                className="flex-1 bg-white border border-slate-200 text-slate-600 font-black py-4 rounded-2xl uppercase tracking-widest text-[10px] disabled:opacity-50"
+              >
+                Back
+              </button>
+              <button 
+                onClick={handleFinalImport} 
+                disabled={!targetLocationId || reviewItems.length === 0 || isSyncing}
+                className={`flex-[2] text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg transition-all active:scale-[0.98] flex items-center justify-center space-x-2 ${targetLocationId && reviewItems.length > 0 && !isSyncing ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-300 cursor-not-allowed shadow-none'}`}
+              >
+                {isSyncing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Syncing to cloud...</span>
+                  </>
+                ) : (
+                  <span>Import {reviewItems.length} Items</span>
+                )}
+              </button>
             </div>
           )}
         </div>
-
-        {(step === 'map' || step === 'review') && (
-          <div className="p-6 shrink-0 border-t border-slate-50 bg-slate-50/50">
-            {step === 'map' && (
-              <button 
-                onClick={generateReviewItems} 
-                className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg active:scale-[0.98] transition-all"
-              >
-                Verify Items
-              </button>
-            )}
-            {step === 'review' && (
-              <div className="flex space-x-3">
-                <button 
-                  onClick={() => setStep('map')} 
-                  className="flex-1 bg-white border border-slate-200 text-slate-600 font-black py-4 rounded-2xl uppercase tracking-widest text-[10px]"
-                >
-                  Back
-                </button>
-                <button 
-                  onClick={handleFinalImport} 
-                  disabled={!targetLocationId || reviewItems.length === 0}
-                  className={`flex-[2] text-white font-black py-4 rounded-2xl uppercase tracking-widest text-[11px] shadow-lg transition-all active:scale-[0.98] ${targetLocationId && reviewItems.length > 0 ? 'bg-emerald-600 shadow-emerald-100' : 'bg-slate-300 cursor-not-allowed shadow-none'}`}
-                >
-                  Sync to Cloud Hub
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

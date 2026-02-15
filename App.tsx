@@ -81,9 +81,11 @@ const App: React.FC = () => {
         {activeTab === 'list' && (
           <ShoppingList 
             items={shoppingList} products={products} 
+            storageLocations={storageLocations} subLocations={subLocations}
             onToggle={(id) => setShoppingList(prev => prev.map(i => i.id === id ? {...i, isCompleted: !i.isCompleted} : i))} 
             onRemove={(id) => setShoppingList(prev => prev.filter(i => i.id !== id))} 
             onAdd={addToList} 
+            onAddToInventory={addToInventory}
           />
         )}
         {activeTab === 'shop' && (
@@ -91,8 +93,11 @@ const App: React.FC = () => {
             items={shoppingList} products={products} stores={stores} 
             vehicles={vehicles} activeVehicleId={profile.activeVehicleId || ''} 
             gasPrice={profile.gasPrice} 
+            storageLocations={storageLocations} subLocations={subLocations}
             onToggle={(id) => setShoppingList(prev => prev.map(i => i.id === id ? {...i, isCompleted: !i.isCompleted} : i))} 
+            onRemove={(id) => setShoppingList(prev => prev.filter(i => i.id !== id))}
             onOverrideStore={(id, s) => setShoppingList(prev => prev.map(i => i.id === id ? {...i, manualStore: s} : i))} 
+            onAddToInventory={addToInventory}
           />
         )}
         {activeTab === 'settings' && (

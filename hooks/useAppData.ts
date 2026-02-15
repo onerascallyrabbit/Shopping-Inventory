@@ -251,23 +251,25 @@ export const useAppData = () => {
     }
   };
 
-  const importBulkInventory = async (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => {
+  const importBulkInventory = async (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]): Promise<boolean> => {
+    if (!user) {
+        alert("You must be signed in to sync data with your family hub.");
+        return false;
+    }
+
     const timestamp = new Date().toISOString();
     const newItems = items.map(i => ({
-      ...i, id: crypto.randomUUID(), updatedAt: timestamp, userId: user?.id
+      ...i, id: crypto.randomUUID(), updatedAt: timestamp, userId: user.id
     })) as InventoryItem[];
     
-    // Always update local state immediately so user sees their import
-    setInventory(prev => [...prev, ...newItems]);
-
-    if (user) {
-        try {
-            await bulkSyncInventory(newItems);
-        } catch (err) {
-            console.error("Bulk sync failed:", err);
-            alert("Some items could not be saved to the cloud. They are visible locally for now.");
-            loadAllData(false);
-        }
+    try {
+        await bulkSyncInventory(newItems);
+        // On success, refresh and update local state
+        await loadAllData(false);
+        return true;
+    } catch (err: any) {
+        console.error("Bulk sync failed:", err);
+        return false;
     }
   };
 

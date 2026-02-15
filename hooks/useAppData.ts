@@ -29,13 +29,13 @@ export const useAppData = () => {
     categoryOrder: DEFAULT_CATEGORIES, sharePrices: false 
   });
 
-  const loadAllData = useCallback(async () => {
+  const loadAllData = useCallback(async (silent = false) => {
     if (!supabase) {
       setLoading(false);
       return;
     }
     
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const data = await fetchUserData();
       if (data) {
@@ -68,7 +68,7 @@ export const useAppData = () => {
     } catch (err) {
       console.error("Failed to load user data:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -78,9 +78,17 @@ export const useAppData = () => {
 
     const channel = supabase
       .channel('family-changes')
-      .on('postgres_changes', { event: '*', table: 'inventory', schema: 'public' }, () => loadAllData())
-      .on('postgres_changes', { event: '*', table: 'storage_locations', schema: 'public' }, () => loadAllData())
-      .on('postgres_changes', { event: '*', table: 'sub_locations', schema: 'public' }, () => loadAllData())
+      .on('postgres_changes', { event: '*', table: 'inventory', schema: 'public' }, (payload) => {
+        // Only trigger global silent reload if the change didn't come from us
+        if (payload.new && (payload.new as any).user_id !== user.id) {
+          loadAllData(true);
+        } else if (payload.old && payload.eventType === 'DELETE') {
+          // If it was a delete from someone else, we should reload
+          loadAllData(true);
+        }
+      })
+      .on('postgres_changes', { event: '*', table: 'storage_locations', schema: 'public' }, () => loadAllData(true))
+      .on('postgres_changes', { event: '*', table: 'sub_locations', schema: 'public' }, () => loadAllData(true))
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -127,7 +135,6 @@ export const useAppData = () => {
     const updatedAt = new Date().toISOString();
     const updatedItem = { ...target, quantity: newQty, updatedAt };
 
-    // Optimistic Update
     setInventory(prev => {
       if (newQty === 0) return prev.filter(i => i.id !== id);
       return prev.map(i => i.id === id ? updatedItem : i);
@@ -209,7 +216,6 @@ export const useAppData = () => {
       quantity: qty, unit, locationId, updatedAt: new Date().toISOString(), userId: user?.id || ''
     };
 
-    // Optimistic Update
     setInventory(prev => [...prev, newItem]);
 
     if (user) {
@@ -236,6 +242,7 @@ export const useAppData = () => {
         } catch (err) {
             console.error("Bulk sync failed:", err);
             loadAllData();
+            throw err; // Rethrow to let caller know
         }
     }
   };

@@ -14,7 +14,8 @@ interface InventoryViewProps {
   onUpdateItem: (id: string, updates: Partial<InventoryItem>) => void;
   onRemoveItem: (id: string) => void;
   onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
-  onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => void;
+  // Fix: onBulkAdd should return Promise<boolean> to match importBulkInventory and CsvImportModal requirements
+  onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<boolean>;
   onAddToList: (name: string, qty: number, unit: string, productId?: string) => void;
 }
 
@@ -280,7 +281,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Shelf</label>
                   <select className="w-full bg-indigo-50/50 border border-indigo-100 rounded-xl px-4 py-4 text-xs font-bold appearance-none text-indigo-700" value={editingItem.subLocation} onChange={e => setEditingItem({...editingItem, subLocation: e.target.value})}>
                     <option value="">Loose / General</option>
-                    {subLocations.filter(sl => sl.locationId === editingItem.locationId).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+                    {subLocations.filter(sl => {
+                      // Filter by current storage location ID
+                      return sl.locationId === editingItem.locationId;
+                    }).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -400,7 +404,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       {isImporting && (
         <CsvImportModal 
           onClose={() => setIsImporting(false)} 
-          onImport={(items) => { onBulkAdd(items); setIsImporting(false); }} 
+          // Fix: directly pass onBulkAdd which returns Promise<boolean>
+          onImport={onBulkAdd} 
           locations={locations} 
           subLocations={subLocations}
           activeLocationId={activeLocationId} 

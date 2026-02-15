@@ -79,7 +79,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     return subLocations.filter(sl => sl.locationId === activeLocationId);
   }, [subLocations, activeLocationId]);
 
-  // FIX: Added productSuggestions memo to provide autocomplete results in the add stock modal
   const productSuggestions = useMemo(() => {
     if (!newItem.itemName || newItem.itemName.length < 2) return [];
     return products.filter(p => 
@@ -87,8 +86,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     ).slice(0, 5);
   }, [products, newItem.itemName]);
 
-  const handleDragStart = (id: string) => {
+  // Drag and Drop Logic
+  const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedItemId(id);
+    // Ensure the drag is initiated correctly in all browsers
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemId(null);
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
   };
 
   const handleLocationHoverStart = (locId: string) => {
@@ -108,39 +119,42 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     }
   };
 
-  const handleDropOnLocation = (locId: string) => {
+  const handleDropOnLocation = (e: React.DragEvent, locId: string) => {
+    e.preventDefault();
     if (!draggedItemId) return;
     const item = inventory.find(i => i.id === draggedItemId);
     if (item) {
-      // If dropping on "All Stock" tab, move to the first location by default or just ignore?
-      // Moving to first location is safer.
       const newLocId = locId === 'All' ? locations[0]?.id : locId;
       if (newLocId && item.locationId !== newLocId) {
         onUpdateItem(draggedItemId, { locationId: newLocId, subLocation: '' });
       }
     }
-    setDraggedItemId(null);
+    handleDragEnd();
   };
 
-  const handleDropOnShelf = (shelfName: string) => {
+  const handleDropOnShelf = (e: React.DragEvent, shelfName: string) => {
+    e.preventDefault();
     if (!draggedItemId) return;
     const item = inventory.find(i => i.id === draggedItemId);
     if (!item) return;
 
     if (activeLocationId === 'All') {
-      // shelfName is actually a Location Name in the All view
+      // In 'All' view, shelfName represents the Location Name of the group
       const targetLoc = locations.find(l => l.name === shelfName);
       if (targetLoc && item.locationId !== targetLoc.id) {
         onUpdateItem(draggedItemId, { locationId: targetLoc.id, subLocation: '' });
       }
     } else {
-      // In a specific location view, shelfName is actually a shelf/sub-location
+      // In a specific location view, shelfName is the actual sub-location (shelf)
       const newShelf = (shelfName === 'Loose / General' || shelfName === 'All') ? '' : shelfName;
       if (item.subLocation !== newShelf) {
-        onUpdateItem(draggedItemId, { subLocation: newShelf });
+        onUpdateItem(draggedItemId, { 
+          locationId: activeLocationId, 
+          subLocation: newShelf 
+        });
       }
     }
-    setDraggedItemId(null);
+    handleDragEnd();
   };
 
   const handleAdd = (e: React.FormEvent) => {
@@ -196,14 +210,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
 
       <div className="space-y-3">
-        {/* Primary Location Navigation */}
+        {/* Primary Location Navigation Tabs */}
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
           <button 
             onClick={() => { setActiveLocationId('All'); setActiveSubLocation('All'); }}
             onDragOver={(e) => { e.preventDefault(); handleLocationHoverStart('All'); }}
             onDragLeave={handleLocationHoverEnd}
-            onDrop={() => handleDropOnLocation('All')}
-            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'} ${draggedItemId ? 'ring-2 ring-slate-200 ring-offset-2' : ''}`}
+            onDrop={(e) => handleDropOnLocation(e, 'All')}
+            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'} ${draggedItemId ? 'ring-2 ring-slate-300 ring-offset-2 scale-105 z-10' : ''}`}
           >
             All Stock
           </button>
@@ -213,22 +227,22 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               onClick={() => { setActiveLocationId(loc.id); setActiveSubLocation('All'); }}
               onDragOver={(e) => { e.preventDefault(); handleLocationHoverStart(loc.id); }}
               onDragLeave={handleLocationHoverEnd}
-              onDrop={() => handleDropOnLocation(loc.id)}
-              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-200 ring-offset-2' : ''}`}
+              onDrop={(e) => handleDropOnLocation(e, loc.id)}
+              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-300 ring-offset-2 scale-105 z-10' : ''}`}
             >
               {loc.name}
             </button>
           ))}
         </div>
 
-        {/* Sub-Location (Shelf) Navigation */}
+        {/* Sub-Location (Shelf) Navigation Tabs - visible when a specific location is active */}
         {activeLocationId !== 'All' && (
           <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
              <button 
               onClick={() => setActiveSubLocation('All')}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={() => handleDropOnShelf('All')}
-              className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === 'All' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-200 ring-offset-1' : ''}`}
+              onDrop={(e) => handleDropOnShelf(e, 'All')}
+              className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === 'All' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-400 ring-offset-1 scale-105' : ''}`}
             >
               All Shelves
             </button>
@@ -237,8 +251,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 key={sl.id} 
                 onClick={() => setActiveSubLocation(sl.name)}
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={() => handleDropOnShelf(sl.name)}
-                className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === sl.name ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-200 ring-offset-1' : ''}`}
+                onDrop={(e) => handleDropOnShelf(e, sl.name)}
+                className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === sl.name ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-400 ring-offset-1 scale-105' : ''}`}
               >
                 {sl.name}
               </button>
@@ -259,13 +273,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         {Object.keys(groupedInventory).length > 0 ? Object.entries(groupedInventory).map(([shelfName, items]) => (
           <div 
             key={shelfName} 
-            className={`space-y-3 p-2 rounded-[32px] transition-all relative ${draggedItemId ? 'bg-indigo-50/30 border-2 border-dashed border-indigo-100 ring-4 ring-indigo-50/10' : 'bg-transparent border-2 border-transparent'}`}
+            className={`space-y-3 p-2 rounded-[32px] transition-all relative ${draggedItemId ? 'bg-indigo-50/20 border-2 border-dashed border-indigo-200' : 'bg-transparent border-2 border-transparent'}`}
             onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); handleDropOnShelf(shelfName); }}
+            onDrop={(e) => handleDropOnShelf(e, shelfName)}
           >
-            {/* Overlay to ensure drop area works even when empty or nested */}
+            {/* Transparent Drop Capture Overlay when dragging - ensures empty groups can still receive drops */}
             {draggedItemId && (
-              <div className="absolute inset-0 z-10 rounded-[32px]"></div>
+              <div className="absolute inset-0 z-10"></div>
             )}
             
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center justify-between relative z-20">
@@ -280,10 +294,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               {items.map(item => (
                 <div 
                   key={item.id} 
-                  draggable
-                  onDragStart={() => handleDragStart(item.id)}
-                  onDragEnd={() => setDraggedItemId(null)}
-                  className={`bg-white border border-slate-100 p-4 rounded-[28px] shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all cursor-grab active:cursor-grabbing ${draggedItemId === item.id ? 'opacity-40 scale-95 grayscale' : 'opacity-100 scale-100'} ${draggedItemId ? 'pointer-events-none' : 'pointer-events-auto'}`}
+                  draggable={!editingItem && !depletedItem}
+                  onDragStart={(e) => handleDragStart(e, item.id)}
+                  onDragEnd={handleDragEnd}
+                  className={`bg-white border border-slate-100 p-4 rounded-[28px] shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all cursor-grab active:cursor-grabbing ${draggedItemId === item.id ? 'opacity-30 scale-95' : 'opacity-100 scale-100'}`}
                 >
                   <div className="flex-1 min-w-0 pr-4">
                     <div className="flex items-center space-x-2">
@@ -343,6 +357,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         )}
       </div>
 
+      {/* Depletion Confirmation Modal */}
       {depletedItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden p-6 animate-in zoom-in-95 duration-200">
@@ -383,6 +398,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
+      {/* Edit Item Modal */}
       {editingItem && (
         <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-20">
@@ -456,6 +472,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
+      {/* Manual Add Stock Modal */}
       {isAdding && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-20">
@@ -545,6 +562,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
+      {/* Bulk Import Modal */}
       {isImporting && (
         <CsvImportModal 
           onClose={() => setIsImporting(false)} 

@@ -1,8 +1,5 @@
 
-// DO NOT add new files, classes, or namespaces.
-// Fix: Use correct return type for onBulkAdd to match hooks/useAppData.ts and CsvImportModal.tsx
-
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { InventoryItem, StorageLocation, Product, SubLocation } from '../types';
 import CsvImportModal from './CsvImportModal';
 import { UNITS, SUB_CATEGORIES } from '../constants';
@@ -17,8 +14,7 @@ interface InventoryViewProps {
   onUpdateItem: (id: string, updates: Partial<InventoryItem>) => void;
   onRemoveItem: (id: string) => void;
   onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
-  // Fix: onBulkAdd must return Promise<{ success: boolean; count?: number; error?: string }>
-  onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<{ success: boolean; count?: number; error?: string }>;
+  onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<void>;
   onAddToList: (name: string, qty: number, unit: string, productId?: string) => void;
 }
 
@@ -196,10 +192,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         )}
       </div>
 
-      {/* Depletion Prompt Modal */}
       {depletedItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-          <div className="bg-white w-full max-sm rounded-[40px] shadow-2xl overflow-hidden p-6 animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden p-6 animate-in zoom-in-95 duration-200">
             <div className="text-center space-y-4">
               <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,7 +232,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
-      {/* Edit Item Modal */}
       {editingItem && (
         <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-20">
@@ -284,10 +278,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Shelf</label>
                   <select className="w-full bg-indigo-50/50 border border-indigo-100 rounded-xl px-4 py-4 text-xs font-bold appearance-none text-indigo-700" value={editingItem.subLocation} onChange={e => setEditingItem({...editingItem, subLocation: e.target.value})}>
                     <option value="">Loose / General</option>
-                    {subLocations.filter(sl => {
-                      // Filter by current storage location ID
-                      return sl.locationId === editingItem.locationId;
-                    }).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+                    {subLocations.filter(sl => sl.locationId === editingItem.locationId).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -314,7 +305,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
-      {/* Add Stock Modal */}
       {isAdding && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-20">
@@ -407,7 +397,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       {isImporting && (
         <CsvImportModal 
           onClose={() => setIsImporting(false)} 
-          onImport={onBulkAdd} 
+          onImport={async (items) => { 
+            await onBulkAdd(items); 
+            setIsImporting(false); 
+          }} 
           locations={locations} 
           subLocations={subLocations}
           activeLocationId={activeLocationId} 

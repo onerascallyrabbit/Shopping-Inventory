@@ -1,6 +1,6 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
-import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family, ShoppingItem } from '../types';
+import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family, ShoppingItem, CustomCategory, CustomSubCategory } from '../types';
 
 // Environment variables
 // @ts-ignore
@@ -19,6 +19,43 @@ export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_ANON_KEY') return SUPABASE_ANON_KEY;
   if (key === 'API_KEY') return API_KEY;
   return '';
+};
+
+/**
+ * TAXONOMY SYNC
+ */
+export const fetchCustomCategories = async (familyId: string): Promise<CustomCategory[]> => {
+  if (!supabase || !familyId) return [];
+  const { data, error } = await supabase.from('custom_categories').select('*').eq('family_id', familyId);
+  if (error) return [];
+  return data.map(c => ({ id: c.id, name: c.name, familyId: c.family_id }));
+};
+
+export const fetchCustomSubCategories = async (familyId: string): Promise<CustomSubCategory[]> => {
+  if (!supabase || !familyId) return [];
+  const { data, error } = await supabase.from('custom_sub_categories').select('*').eq('family_id', familyId);
+  if (error) return [];
+  return data.map(sc => ({ id: sc.id, categoryId: sc.category_name, name: sc.name, familyId: sc.family_id }));
+};
+
+export const syncCustomCategory = async (cat: Omit<CustomCategory, 'id'>) => {
+  if (!supabase) return;
+  await supabase.from('custom_categories').insert({ family_id: cat.familyId, name: cat.name });
+};
+
+export const deleteCustomCategory = async (id: string) => {
+  if (!supabase) return;
+  await supabase.from('custom_categories').delete().eq('id', id);
+};
+
+export const syncCustomSubCategory = async (sub: Omit<CustomSubCategory, 'id'>) => {
+  if (!supabase) return;
+  await supabase.from('custom_sub_categories').insert({ family_id: sub.familyId, category_name: sub.categoryId, name: sub.name });
+};
+
+export const deleteCustomSubCategory = async (id: string) => {
+  if (!supabase) return;
+  await supabase.from('custom_sub_categories').delete().eq('id', id);
 };
 
 /**
@@ -82,7 +119,7 @@ export const fetchShoppingList = async (): Promise<ShoppingItem[]> => {
     neededQuantity: Number(item.needed_quantity),
     unit: item.unit,
     isCompleted: item.is_completed,
-    manualStore: item.manual_store,
+    manual_store: item.manual_store,
     userId: item.user_id
   }));
 };
@@ -133,6 +170,7 @@ export const syncPriceRecord = async (productId: string, record: PriceRecord, us
 
 export const syncProduct = async (product: Partial<Product>) => {
   if (!supabase) return null;
+  // Fix: Use correct camelCase property names from the Product interface (itemName and subCategory)
   const { data, error } = await supabase.from('products').upsert({
     id: product.id || crypto.randomUUID(),
     category: product.category,
@@ -205,6 +243,15 @@ export const fetchUserData = async () => {
       fetchShoppingList().catch(() => [])
     ]);
 
+    let customCats: CustomCategory[] = [];
+    let customSubs: CustomSubCategory[] = [];
+    if (profile?.familyId) {
+      [customCats, customSubs] = await Promise.all([
+        fetchCustomCategories(profile.familyId),
+        fetchCustomSubCategories(profile.familyId)
+      ]);
+    }
+
     return {
       profile,
       products,
@@ -213,7 +260,9 @@ export const fetchUserData = async () => {
       subLocations: subsRes.data || [],
       stores: storesRes.data || [],
       vehicles: vehiclesRes.data || [],
-      shoppingList: listRes || []
+      shoppingList: listRes || [],
+      customCategories: customCats,
+      customSubCategories: customSubs
     };
   } catch (e) {
     console.error("Error fetching user data:", e);

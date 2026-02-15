@@ -1,6 +1,6 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
-import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family } from '../types';
+import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family, ShoppingItem } from '../types';
 
 // Environment variables
 // @ts-ignore
@@ -66,6 +66,49 @@ export const fetchFamily = async (familyId: string): Promise<Family | null> => {
   } catch (e) {
     return null;
   }
+};
+
+/**
+ * SHOPPING LIST SYNC
+ */
+export const fetchShoppingList = async (): Promise<ShoppingItem[]> => {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('shopping_list').select('*').order('created_at', { ascending: false });
+  if (error) return [];
+  return data.map(item => ({
+    id: item.id,
+    productId: item.product_id,
+    name: item.name,
+    neededQuantity: Number(item.needed_quantity),
+    unit: item.unit,
+    isCompleted: item.is_completed,
+    manualStore: item.manual_store,
+    userId: item.user_id
+  }));
+};
+
+export const syncShoppingItem = async (item: ShoppingItem) => {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  
+  const payload = {
+    id: item.id,
+    product_id: item.productId,
+    name: item.name,
+    needed_quantity: item.neededQuantity,
+    unit: item.unit,
+    is_completed: item.isCompleted,
+    manual_store: item.manualStore,
+    user_id: item.userId || user.id
+  };
+  
+  await supabase.from('shopping_list').upsert(payload);
+};
+
+export const deleteShoppingItem = async (id: string) => {
+  if (!supabase) return;
+  await supabase.from('shopping_list').delete().eq('id', id);
 };
 
 /**
@@ -151,14 +194,15 @@ export const fetchUserData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const [profile, products, inventoryRes, storageRes, subsRes, storesRes, vehiclesRes] = await Promise.all([
+    const [profile, products, inventoryRes, storageRes, subsRes, storesRes, vehiclesRes, listRes] = await Promise.all([
       fetchProfile().catch(() => null),
       fetchPriceData().catch(() => []),
       supabase.from('inventory').select('*'),
       supabase.from('storage_locations').select('*'),
       supabase.from('sub_locations').select('*'),
       supabase.from('stores').select('*'),
-      supabase.from('vehicles').select('*')
+      supabase.from('vehicles').select('*'),
+      fetchShoppingList().catch(() => [])
     ]);
 
     return {
@@ -168,7 +212,8 @@ export const fetchUserData = async () => {
       storageLocations: storageRes.data || [],
       subLocations: subsRes.data || [],
       stores: storesRes.data || [],
-      vehicles: vehiclesRes.data || []
+      vehicles: vehiclesRes.data || [],
+      shoppingList: listRes || []
     };
   } catch (e) {
     console.error("Error fetching user data:", e);

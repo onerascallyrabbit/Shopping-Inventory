@@ -9,7 +9,7 @@ import {
   deleteStorageLocation, syncSubLocation, deleteSubLocation,
   syncProfile, syncVehicle, deleteVehicle, syncStore,
   syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily,
-  deleteInventoryItem
+  deleteInventoryItem, syncShoppingItem, deleteShoppingItem
 } from '../services/supabaseService';
 import { DEFAULT_CATEGORIES, DEFAULT_STORAGE } from '../constants';
 
@@ -50,6 +50,7 @@ export const useAppData = () => {
         }
         
         setProducts(data.products || []);
+        setShoppingList(data.shoppingList || []);
         
         if (data.inventory) {
           setInventory(data.inventory.map(i => ({
@@ -79,11 +80,16 @@ export const useAppData = () => {
     const channel = supabase
       .channel('family-changes')
       .on('postgres_changes', { event: '*', table: 'inventory', schema: 'public' }, (payload) => {
-        // Only trigger global silent reload if the change didn't come from us
         if (payload.new && (payload.new as any).user_id !== user.id) {
           loadAllData(true);
-        } else if (payload.old && payload.eventType === 'DELETE') {
-          // If it was a delete from someone else, we should reload
+        } else if (payload.eventType === 'DELETE') {
+          loadAllData(true);
+        }
+      })
+      .on('postgres_changes', { event: '*', table: 'shopping_list', schema: 'public' }, (payload) => {
+        if (payload.new && (payload.new as any).user_id !== user.id) {
+          loadAllData(true);
+        } else if (payload.eventType === 'DELETE') {
           loadAllData(true);
         }
       })
@@ -203,11 +209,64 @@ export const useAppData = () => {
     });
   };
 
-  const addToList = (name: string, qty: number, unit: string, productId?: string) => {
-    setShoppingList(prev => [...prev, { 
+  const addToList = async (name: string, qty: number, unit: string, productId?: string) => {
+    const newItem: ShoppingItem = { 
       id: crypto.randomUUID(), productId: productId || 'manual', name, 
       neededQuantity: qty, unit, isCompleted: false, userId: user?.id 
-    }]);
+    };
+    
+    setShoppingList(prev => [newItem, ...prev]);
+    
+    if (user) {
+      try {
+        await syncShoppingItem(newItem);
+      } catch (e) {
+        console.error("Failed to sync list item:", e);
+      }
+    }
+  };
+
+  const toggleListItem = async (id: string) => {
+    const item = shoppingList.find(i => i.id === id);
+    if (!item) return;
+    
+    const updated = { ...item, isCompleted: !item.isCompleted };
+    setShoppingList(prev => prev.map(i => i.id === id ? updated : i));
+    
+    if (user) {
+      try {
+        await syncShoppingItem(updated);
+      } catch (e) {
+        console.error("Failed to sync toggle:", e);
+      }
+    }
+  };
+
+  const removeListItem = async (id: string) => {
+    setShoppingList(prev => prev.filter(i => i.id !== id));
+    if (user) {
+      try {
+        await deleteShoppingItem(id);
+      } catch (e) {
+        console.error("Failed to delete list item:", e);
+      }
+    }
+  };
+
+  const overrideStoreForListItem = async (id: string, store: string | undefined) => {
+    const item = shoppingList.find(i => i.id === id);
+    if (!item) return;
+    
+    const updated = { ...item, manualStore: store };
+    setShoppingList(prev => prev.map(i => i.id === id ? updated : i));
+    
+    if (user) {
+      try {
+        await syncShoppingItem(updated);
+      } catch (e) {
+        console.error("Failed to sync store override:", e);
+      }
+    }
   };
 
   const addToInventory = async (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => {
@@ -242,7 +301,7 @@ export const useAppData = () => {
         } catch (err) {
             console.error("Bulk sync failed:", err);
             loadAllData();
-            throw err; // Rethrow to let caller know
+            throw err;
         }
     }
   };
@@ -251,7 +310,8 @@ export const useAppData = () => {
     user, loading, products, shoppingList, setShoppingList, inventory, 
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
-    updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, addPriceRecord, addToList, addToInventory, 
-    importBulkInventory, refresh: loadAllData
+    updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
+    addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem, 
+    addToInventory, importBulkInventory, refresh: loadAllData
   };
 };

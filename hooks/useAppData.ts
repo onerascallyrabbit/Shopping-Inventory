@@ -2,14 +2,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Product, ShoppingItem, InventoryItem, StorageLocation, 
-  SubLocation, StoreLocation, Vehicle, Profile, Family 
+  SubLocation, StoreLocation, Vehicle, Profile, Family, CustomCategory, CustomSubCategory
 } from '../types';
 import { 
   fetchUserData, syncInventoryItem, syncStorageLocation, 
   deleteStorageLocation, syncSubLocation, deleteSubLocation,
   syncProfile, syncVehicle, deleteVehicle, syncStore,
   syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily,
-  deleteInventoryItem, syncShoppingItem, deleteShoppingItem
+  deleteInventoryItem, syncShoppingItem, deleteShoppingItem,
+  syncCustomCategory, deleteCustomCategory, syncCustomSubCategory, deleteCustomSubCategory
 } from '../services/supabaseService';
 import { DEFAULT_CATEGORIES, DEFAULT_STORAGE } from '../constants';
 
@@ -23,6 +24,8 @@ export const useAppData = () => {
   const [subLocations, setSubLocations] = useState<SubLocation[]>([]);
   const [stores, setStores] = useState<StoreLocation[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+  const [customSubCategories, setCustomSubCategories] = useState<CustomSubCategory[]>([]);
   const [activeFamily, setActiveFamily] = useState<Family | null>(null);
   const [profile, setProfile] = useState<Profile>({ 
     id: '', locationLabel: '', zip: '', gasPrice: 3.50, 
@@ -51,6 +54,8 @@ export const useAppData = () => {
         
         setProducts(data.products || []);
         setShoppingList(data.shoppingList || []);
+        setCustomCategories(data.customCategories || []);
+        setCustomSubCategories(data.customSubCategories || []);
         
         if (data.inventory) {
           setInventory(data.inventory.map(i => ({
@@ -73,26 +78,16 @@ export const useAppData = () => {
     }
   }, []);
 
-  // Realtime Subscription for Collaborative Changes
+  // Realtime Subscription
   useEffect(() => {
     if (!supabase || !user) return;
 
     const channel = supabase
       .channel('family-changes')
-      .on('postgres_changes', { event: '*', table: 'inventory', schema: 'public' }, (payload) => {
-        if (payload.new && (payload.new as any).user_id !== user.id) {
-          loadAllData(true);
-        } else if (payload.eventType === 'DELETE') {
-          loadAllData(true);
-        }
-      })
-      .on('postgres_changes', { event: '*', table: 'shopping_list', schema: 'public' }, (payload) => {
-        if (payload.new && (payload.new as any).user_id !== user.id) {
-          loadAllData(true);
-        } else if (payload.eventType === 'DELETE') {
-          loadAllData(true);
-        }
-      })
+      .on('postgres_changes', { event: '*', table: 'inventory', schema: 'public' }, () => loadAllData(true))
+      .on('postgres_changes', { event: '*', table: 'shopping_list', schema: 'public' }, () => loadAllData(true))
+      .on('postgres_changes', { event: '*', table: 'custom_categories', schema: 'public' }, () => loadAllData(true))
+      .on('postgres_changes', { event: '*', table: 'custom_sub_categories', schema: 'public' }, () => loadAllData(true))
       .on('postgres_changes', { event: '*', table: 'storage_locations', schema: 'public' }, () => loadAllData(true))
       .on('postgres_changes', { event: '*', table: 'sub_locations', schema: 'public' }, () => loadAllData(true))
       .subscribe();
@@ -136,180 +131,132 @@ export const useAppData = () => {
   const updateInventoryQty = async (id: string, delta: number) => {
     const target = inventory.find(i => i.id === id);
     if (!target) return;
-
     const newQty = Math.max(0, target.quantity + delta);
-    const updatedAt = new Date().toISOString();
-    const updatedItem = { ...target, quantity: newQty, updatedAt };
-
-    setInventory(prev => {
-      if (newQty === 0) return prev.filter(i => i.id !== id);
-      return prev.map(i => i.id === id ? updatedItem : i);
-    });
-
+    const updatedItem = { ...target, quantity: newQty, updatedAt: new Date().toISOString() };
+    setInventory(prev => newQty === 0 ? prev.filter(i => i.id !== id) : prev.map(i => i.id === id ? updatedItem : i));
     if (user) {
         try {
             if (newQty === 0) await deleteInventoryItem(id);
             else await syncInventoryItem(updatedItem);
-        } catch (err) {
-            console.error("Sync failed, rolling back:", err);
-            loadAllData(); 
-        }
+        } catch (err) { loadAllData(); }
     }
   };
 
   const updateInventoryItem = async (id: string, updates: Partial<InventoryItem>) => {
     const target = inventory.find(i => i.id === id);
     if (!target) return;
-
     const updated = { ...target, ...updates, updatedAt: new Date().toISOString() };
     setInventory(prev => prev.map(item => item.id === id ? updated : item));
-
-    if (user) {
-        try {
-            await syncInventoryItem(updated);
-        } catch (err) {
-            console.error("Sync failed:", err);
-            loadAllData();
-        }
-    }
+    if (user) try { await syncInventoryItem(updated); } catch (err) { loadAllData(); }
   };
 
   const removeInventoryItem = async (id: string) => {
     setInventory(prev => prev.filter(i => i.id !== id));
-    if (user) {
-        try {
-            await deleteInventoryItem(id);
-        } catch (err) {
-            console.error("Delete failed:", err);
-            loadAllData();
-        }
-    }
+    if (user) try { await deleteInventoryItem(id); } catch (err) { loadAllData(); }
   };
 
   const addPriceRecord = async (category: string, itemName: string, variety: string, record: any, brand?: string, barcode?: string, subCategory?: string) => {
     const newRecord = { ...record, id: crypto.randomUUID(), date: new Date().toISOString(), isPublic: profile.sharePrices };
     const existingProduct = products.find(p => (barcode && p.barcode === barcode) || (p.itemName.toLowerCase() === itemName.toLowerCase() && (p.variety || '').toLowerCase() === (variety || '').toLowerCase() && (p.brand || '').toLowerCase() === (brand || '').toLowerCase()));
-    
     let productId = existingProduct?.id;
     if (user) {
       try {
         const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode, subCategory });
         productId = syncedProduct.id;
         await syncPriceRecord(productId, newRecord, user.id);
-      } catch (err) {
-        console.error("Cloud price log failed:", err);
-      }
+      } catch (err) { console.error(err); }
     }
-
     setProducts(prev => {
-      if (existingProduct) {
-        return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history] } : p);
-      }
+      if (existingProduct) return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history] } : p);
       return [...prev, { id: productId || crypto.randomUUID(), category, subCategory, itemName, variety, brand, barcode, history: [newRecord] }];
     });
   };
 
   const addToList = async (name: string, qty: number, unit: string, productId?: string) => {
-    const newItem: ShoppingItem = { 
-      id: crypto.randomUUID(), productId: productId || 'manual', name, 
-      neededQuantity: qty, unit, isCompleted: false, userId: user?.id 
-    };
-    
+    const newItem: ShoppingItem = { id: crypto.randomUUID(), productId: productId || 'manual', name, neededQuantity: qty, unit, isCompleted: false, userId: user?.id };
     setShoppingList(prev => [newItem, ...prev]);
-    
-    if (user) {
-      try {
-        await syncShoppingItem(newItem);
-      } catch (e) {
-        console.error("Failed to sync list item:", e);
-      }
-    }
+    if (user) try { await syncShoppingItem(newItem); } catch (e) { console.error(e); }
   };
 
   const toggleListItem = async (id: string) => {
     const item = shoppingList.find(i => i.id === id);
     if (!item) return;
-    
     const updated = { ...item, isCompleted: !item.isCompleted };
     setShoppingList(prev => prev.map(i => i.id === id ? updated : i));
-    
-    if (user) {
-      try {
-        await syncShoppingItem(updated);
-      } catch (e) {
-        console.error("Failed to sync toggle:", e);
-      }
-    }
+    if (user) try { await syncShoppingItem(updated); } catch (e) { console.error(e); }
   };
 
   const removeListItem = async (id: string) => {
     setShoppingList(prev => prev.filter(i => i.id !== id));
-    if (user) {
-      try {
-        await deleteShoppingItem(id);
-      } catch (e) {
-        console.error("Failed to delete list item:", e);
-      }
-    }
+    if (user) try { await deleteShoppingItem(id); } catch (e) { console.error(e); }
   };
 
   const overrideStoreForListItem = async (id: string, store: string | undefined) => {
     const item = shoppingList.find(i => i.id === id);
     if (!item) return;
-    
     const updated = { ...item, manualStore: store };
     setShoppingList(prev => prev.map(i => i.id === id ? updated : i));
-    
-    if (user) {
-      try {
-        await syncShoppingItem(updated);
-      } catch (e) {
-        console.error("Failed to sync store override:", e);
-      }
-    }
+    if (user) try { await syncShoppingItem(updated); } catch (e) { console.error(e); }
   };
 
   const addToInventory = async (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => {
-    const newItem: InventoryItem = {
-      id: crypto.randomUUID(), productId, itemName, category, subCategory, variety, subLocation, 
-      quantity: qty, unit, locationId, updatedAt: new Date().toISOString(), userId: user?.id || ''
-    };
-
+    const newItem: InventoryItem = { id: crypto.randomUUID(), productId, itemName, category, subCategory, variety, subLocation, quantity: qty, unit, locationId, updatedAt: new Date().toISOString(), userId: user?.id || '' };
     setInventory(prev => [...prev, newItem]);
-
-    if (user) {
-        try {
-            await syncInventoryItem(newItem);
-        } catch (err) {
-            console.error("Cloud inventory add failed, rolling back:", err);
-            loadAllData();
-        }
-    }
+    if (user) try { await syncInventoryItem(newItem); } catch (err) { loadAllData(); }
   };
 
   const importBulkInventory = async (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => {
     const timestamp = new Date().toISOString();
-    const newItems = items.map(i => ({
-      ...i, id: crypto.randomUUID(), updatedAt: timestamp, userId: user?.id || ''
-    })) as InventoryItem[];
-
+    const newItems = items.map(i => ({ ...i, id: crypto.randomUUID(), updatedAt: timestamp, userId: user?.id || '' })) as InventoryItem[];
     setInventory(prev => [...prev, ...newItems]);
+    if (user) try { await bulkSyncInventory(newItems); } catch (err) { loadAllData(); throw err; }
+  };
 
-    if (user) {
-        try {
-            await bulkSyncInventory(newItems);
-        } catch (err) {
-            console.error("Bulk sync failed:", err);
-            loadAllData();
-            throw err;
-        }
+  // Taxonomy Management
+  const addCategory = async (name: string) => {
+    if (!activeFamily) return;
+    await syncCustomCategory({ familyId: activeFamily.id, name });
+    loadAllData(true);
+  };
+
+  const removeCategory = async (id: string) => {
+    const cat = customCategories.find(c => c.id === id);
+    if (!cat) return;
+    // Safety check: is in use?
+    const inUse = inventory.some(i => i.category === cat.name) || products.some(p => p.category === cat.name);
+    if (inUse) {
+        alert("Cannot delete category: It is currently assigned to items in your stock or price history.");
+        return;
     }
+    await deleteCustomCategory(id);
+    loadAllData(true);
+  };
+
+  const addSubCategory = async (categoryName: string, name: string) => {
+    if (!activeFamily) return;
+    await syncCustomSubCategory({ familyId: activeFamily.id, categoryId: categoryName, name });
+    loadAllData(true);
+  };
+
+  const removeSubCategory = async (id: string) => {
+    const sub = customSubCategories.find(s => s.id === id);
+    if (!sub) return;
+    // Safety check: is in use?
+    const inUse = inventory.some(i => i.subCategory === sub.name) || products.some(p => p.subCategory === sub.name);
+    if (inUse) {
+        alert("Cannot delete sub-category: It is currently assigned to items in your stock or price history.");
+        return;
+    }
+    await deleteCustomSubCategory(id);
+    loadAllData(true);
   };
 
   return {
-    user, loading, products, shoppingList, setShoppingList, inventory, 
+    user, loading, products, shoppingList, inventory, 
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
+    customCategories, customSubCategories,
+    addCategory, removeCategory, addSubCategory, removeSubCategory,
     updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
     addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem, 
     addToInventory, importBulkInventory, refresh: loadAllData

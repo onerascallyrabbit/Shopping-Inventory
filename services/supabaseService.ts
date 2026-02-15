@@ -358,13 +358,12 @@ export const deleteInventoryItem = async (id: string) => {
   if (error) throw error;
 };
 
-export const bulkSyncInventory = async (items: InventoryItem[]) => {
+export const bulkSyncInventory = async (items: InventoryItem[]): Promise<number> => {
   if (!supabase) throw new Error("Supabase client not initialized.");
   
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated for bulk import.");
   
-  // CRITICAL: Explicitly set user_id to satisfy RLS policy: (auth.uid() = user_id)
   const payload = items.map(item => ({ 
     id: item.id || crypto.randomUUID(), 
     product_id: item.productId, 
@@ -381,15 +380,24 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
   }));
 
   console.log(`Cloud Sync: Attempting to upload ${payload.length} items to database...`);
+  console.table(payload.slice(0, 5)); // Log sample of payload
 
-  const { error } = await supabase.from('inventory').upsert(payload);
+  const { error, count } = await supabase
+    .from('inventory')
+    .upsert(payload, { count: 'exact' });
   
   if (error) {
     console.error("bulkSyncInventory error details:", error);
-    throw error;
+    // Specifically handle common errors
+    if (error.code === '22P02') {
+        throw new Error("Data conversion error (Invalid UUID or Number). Ensure storage location is valid.");
+    }
+    throw new Error(error.message || "Unknown database error during sync.");
   }
   
-  console.log(`Cloud Sync: Successfully stored ${payload.length} items.`);
+  const finalCount = count ?? payload.length;
+  console.log(`Cloud Sync: Successfully stored ${finalCount} items.`);
+  return finalCount;
 };
 
 export const syncStorageLocation = async (loc: StorageLocation) => {

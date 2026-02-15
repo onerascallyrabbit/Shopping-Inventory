@@ -24,9 +24,9 @@ export const SUB_CATEGORIES: Record<string, string[]> = {
 export const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
 
 export const DEFAULT_STORAGE: StorageLocation[] = [
-  { id: '1', name: 'Pantry - Main' },
-  { id: '2', name: 'Refrigerator #1' },
-  { id: '3', name: 'Freezer #1' }
+  { id: '11111111-1111-1111-1111-111111111111', name: 'Pantry - Main' },
+  { id: '22222222-2222-2222-2222-222222222222', name: 'Refrigerator #1' },
+  { id: '33333333-3333-3333-3333-333333333333', name: 'Freezer #1' }
 ];
 
 export const NATIONAL_STORES = [

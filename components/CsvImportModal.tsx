@@ -5,7 +5,7 @@ import { UNITS, SUB_CATEGORIES } from '../constants';
 
 interface CsvImportModalProps {
   onClose: () => void;
-  onImport: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<boolean>;
+  onImport: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<{ success: boolean; count?: number; error?: string }>;
   locations: StorageLocation[];
   subLocations: SubLocation[];
   activeLocationId: string;
@@ -24,6 +24,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
   const [targetSubLocation, setTargetSubLocation] = useState('');
   
   const [reviewItems, setReviewItems] = useState<Omit<InventoryItem, 'id' | 'updatedAt'>[]>([]);
+  const [importResult, setImportResult] = useState<{ count?: number; error?: string }>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -100,8 +101,9 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
 
   const handleFinalImport = async () => {
     setStep('processing');
-    const success = await onImport(reviewItems);
-    if (success) {
+    const result = await onImport(reviewItems);
+    setImportResult({ count: result.count, error: result.error });
+    if (result.success) {
       setStep('success');
     } else {
       setStep('error');
@@ -273,7 +275,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
                </div>
                <div className="text-center">
                   <h4 className="text-xl font-black text-slate-900 uppercase">Import Successful</h4>
-                  <p className="text-sm text-slate-500 mt-2 font-medium">Your stock has been uploaded. Other family members will see the update instantly.</p>
+                  <p className="text-sm text-slate-500 mt-2 font-medium">Successfully stored {importResult.count || reviewItems.length} items in your cloud database.</p>
                </div>
                <button onClick={onClose} className="bg-slate-900 text-white px-12 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">Done</button>
             </div>
@@ -286,10 +288,12 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({ onClose, onImport, loca
                </div>
                <div className="text-center px-6">
                   <h4 className="text-xl font-black text-slate-900 uppercase">Sync Failed</h4>
-                  <p className="text-sm text-slate-500 mt-2 font-medium">We couldn't reach the database. Check your connection or RLS permissions and try again.</p>
+                  <p className="text-xs text-red-500 mt-2 font-bold bg-red-50 p-3 rounded-xl border border-red-100">{importResult.error || "The database rejected the upload."}</p>
+                  <p className="text-[10px] text-slate-400 mt-4 uppercase font-black tracking-widest">Helpful Tip</p>
+                  <p className="text-[11px] text-slate-500 mt-1">If using default locations, try creating a real storage location in Settings first to ensure the ID is valid.</p>
                </div>
-               <div className="flex space-x-3 w-full px-12">
-                  <button onClick={() => setStep('review')} className="flex-1 border border-slate-200 text-slate-600 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest">Back</button>
+               <div className="flex space-x-3 w-full px-12 pt-4">
+                  <button onClick={() => setStep('review')} className="flex-1 border border-slate-200 text-slate-600 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest">Edit Data</button>
                   <button onClick={handleFinalImport} className="flex-[2] bg-indigo-600 text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95">Retry Sync</button>
                </div>
             </div>

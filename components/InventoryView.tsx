@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { InventoryItem, StorageLocation, Product, SubLocation } from '../types';
 import CsvImportModal from './CsvImportModal';
 import { UNITS, SUB_CATEGORIES } from '../constants';
@@ -22,17 +22,23 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   inventory, locations, subLocations, products, categoryOrder, 
   onUpdateQty, onUpdateItem, onRemoveItem, onAddToInventory, onBulkAdd, onAddToList
 }) => {
-  const [activeLocationId, setActiveLocationId] = useState<string>(locations[0]?.id || '');
+  const [activeLocationId, setActiveLocationId] = useState<string>('All');
+  const [activeSubLocation, setActiveSubLocation] = useState<string>('All');
   const [activeCategory, setActiveCategory] = useState<string>('All');
+  
   const [isAdding, setIsAdding] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [depletedItem, setDepletedItem] = useState<InventoryItem | null>(null);
   const [search, setSearch] = useState('');
   
+  // Drag and Drop State
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const hoverTimerRef = useRef<number | null>(null);
+
   const [newItem, setNewItem] = useState({
     productId: '', itemName: '', category: 'Pantry', subCategory: '', variety: '', subLocation: '',
-    quantity: '1', unit: 'pc', locationId: activeLocationId || (locations[0]?.id || '')
+    quantity: '1', unit: 'pc', locationId: locations[0]?.id || ''
   });
 
   const filteredInventory = useMemo(() => {
@@ -41,26 +47,43 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                            (item.variety && item.variety.toLowerCase().includes(search.toLowerCase())) ||
                            (item.subLocation && item.subLocation.toLowerCase().includes(search.toLowerCase())) ||
                            (item.subCategory && item.subCategory.toLowerCase().includes(search.toLowerCase()));
-      const matchesLocation = (search || activeCategory !== 'All') ? true : item.locationId === activeLocationId;
+      
+      const matchesLocation = activeLocationId === 'All' ? true : item.locationId === activeLocationId;
+      const matchesSubLocation = activeSubLocation === 'All' ? true : item.subLocation === activeSubLocation;
       const matchesCategory = activeCategory === 'All' ? true : item.category === activeCategory;
-      return matchesSearch && matchesLocation && matchesCategory;
+      
+      return matchesSearch && matchesLocation && matchesSubLocation && matchesCategory;
     });
-  }, [inventory, activeLocationId, search, activeCategory]);
+  }, [inventory, activeLocationId, activeSubLocation, search, activeCategory]);
 
   const groupedInventory = useMemo(() => {
     const groups: Record<string, InventoryItem[]> = {};
+    
     filteredInventory.forEach(item => {
-      const shelf = item.subLocation || 'Loose / General';
-      if (!groups[shelf]) groups[shelf] = [];
-      groups[shelf].push(item);
+      let groupName = 'General';
+      
+      if (activeLocationId === 'All') {
+        const locName = locations.find(l => l.id === item.locationId)?.name || 'Unknown Location';
+        groupName = locName;
+      } else {
+        groupName = item.subLocation || 'Loose / General';
+      }
+
+      if (!groups[groupName]) groups[groupName] = [];
+      groups[groupName].push(item);
     });
     return groups;
-  }, [filteredInventory]);
+  }, [filteredInventory, activeLocationId, locations]);
 
   const productSuggestions = useMemo(() => {
     if (newItem.itemName.length < 2) return [];
     return products.filter(p => p.itemName.toLowerCase().includes(newItem.itemName.toLowerCase())).slice(0, 5);
   }, [newItem.itemName, products]);
+
+  const currentSubLocations = useMemo(() => {
+    if (activeLocationId === 'All') return [];
+    return subLocations.filter(sl => sl.locationId === activeLocationId);
+  }, [subLocations, activeLocationId]);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,6 +122,47 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setDepletedItem(null);
   };
 
+  // Drag and Drop Logic
+  const handleDragStart = (id: string) => {
+    setDraggedItemId(id);
+  };
+
+  const handleLocationHoverStart = (locId: string) => {
+    if (!draggedItemId) return;
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    
+    hoverTimerRef.current = window.setTimeout(() => {
+      setActiveLocationId(locId);
+      setActiveSubLocation('All');
+    }, 600);
+  };
+
+  const handleLocationHoverEnd = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+
+  const handleDropOnLocation = (locId: string) => {
+    if (!draggedItemId) return;
+    const item = inventory.find(i => i.id === draggedItemId);
+    if (item && item.locationId !== locId) {
+      onUpdateItem(draggedItemId, { locationId: locId, subLocation: '' });
+    }
+    setDraggedItemId(null);
+  };
+
+  const handleDropOnShelf = (shelfName: string) => {
+    if (!draggedItemId || activeLocationId === 'All') return;
+    const item = inventory.find(i => i.id === draggedItemId);
+    if (item) {
+      const newShelf = shelfName === 'Loose / General' ? '' : shelfName;
+      onUpdateItem(draggedItemId, { subLocation: newShelf });
+    }
+    setDraggedItemId(null);
+  };
+
   return (
     <div className="space-y-6 pb-24">
       <div className="flex items-center justify-between px-1">
@@ -114,42 +178,99 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         <svg className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
+        {/* Primary Location Navigation */}
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+          <button 
+            onClick={() => { setActiveLocationId('All'); setActiveSubLocation('All'); }}
+            onDragOver={(e) => { e.preventDefault(); handleLocationHoverStart('All'); }}
+            onDragLeave={handleLocationHoverEnd}
+            onDrop={() => handleDropOnLocation('All')}
+            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}
+          >
+            All Stock
+          </button>
           {locations.map(loc => (
-            <button key={loc.id} onClick={() => setActiveLocationId(loc.id)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}>
+            <button 
+              key={loc.id} 
+              onClick={() => { setActiveLocationId(loc.id); setActiveSubLocation('All'); }}
+              onDragOver={(e) => { e.preventDefault(); handleLocationHoverStart(loc.id); }}
+              onDragLeave={handleLocationHoverEnd}
+              onDrop={() => handleDropOnLocation(loc.id)}
+              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-200 ring-offset-2' : ''}`}
+            >
               {loc.name}
             </button>
           ))}
         </div>
+
+        {/* Sub-Location (Shelf) Navigation */}
+        {activeLocationId !== 'All' && (
+          <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+             <button 
+              onClick={() => setActiveSubLocation('All')}
+              className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === 'All' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'}`}
+            >
+              All Shelves
+            </button>
+            {currentSubLocations.map(sl => (
+              <button 
+                key={sl.id} 
+                onClick={() => setActiveSubLocation(sl.name)}
+                className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === sl.name ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'}`}
+              >
+                {sl.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Category Quick Filter */}
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
           <button onClick={() => setActiveCategory('All')} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${activeCategory === 'All' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-transparent'}`}>All Categories</button>
           {categoryOrder.map(cat => (
-            <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${activeCategory === cat ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-400 border-transparent'}`}>{cat}</button>
+            <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${activeCategory === cat ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-400 border-transparent'}`}>{cat}</button>
           ))}
         </div>
       </div>
 
-      <div className="space-y-8">
-        {Object.keys(groupedInventory).length > 0 ? Object.entries(groupedInventory).map(([shelf, items]) => (
-          <div key={shelf} className="space-y-3">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>
-              {shelf}
+      <div className="space-y-10">
+        {Object.keys(groupedInventory).length > 0 ? Object.entries(groupedInventory).map(([shelfName, items]) => (
+          <div 
+            key={shelfName} 
+            className={`space-y-3 p-2 rounded-[32px] transition-all ${draggedItemId ? 'bg-indigo-50/30 border-2 border-dashed border-indigo-100' : 'bg-transparent border-2 border-transparent'}`}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => handleDropOnShelf(shelfName)}
+          >
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center justify-between">
+              <div className="flex items-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>
+                {shelfName}
+              </div>
+              <span className="text-slate-300">{items.length} items</span>
             </h3>
             <div className="space-y-2">
               {items.map(item => (
-                <div key={item.id} className="bg-white border border-slate-100 p-4 rounded-[28px] shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-colors">
+                <div 
+                  key={item.id} 
+                  draggable
+                  onDragStart={() => handleDragStart(item.id)}
+                  onDragEnd={() => setDraggedItemId(null)}
+                  className={`bg-white border border-slate-100 p-4 rounded-[28px] shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all cursor-grab active:cursor-grabbing ${draggedItemId === item.id ? 'opacity-40 scale-95 grayscale' : 'opacity-100 scale-100'}`}
+                >
                   <div className="flex-1 min-w-0 pr-4">
                     <div className="flex items-center space-x-2">
                        <h4 className="font-black text-slate-800 text-xs truncate uppercase tracking-tight leading-tight">{item.itemName}</h4>
                        {item.variety && <span className="text-[9px] font-bold text-slate-400">({item.variety})</span>}
                     </div>
-                    {(item.subCategory || item.category) && (
-                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-0.5">
-                        {item.category} {item.subCategory && <span className="text-slate-300">{" > "} {item.subCategory}</span>}
+                    <div className="flex items-center space-x-2 mt-0.5">
+                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">
+                        {item.category}
                       </p>
-                    )}
+                      {activeLocationId === 'All' && (
+                        <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">• {item.subLocation || 'Loose'}</span>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="flex items-center bg-slate-50 rounded-2xl p-0.5 border border-slate-100/50 shrink-0">
@@ -187,11 +308,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
              <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mb-4 text-slate-300">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
              </div>
-             <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">No items in inventory</p>
+             <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">No items found with current filters</p>
+             {(activeLocationId !== 'All' || activeCategory !== 'All' || search) && (
+               <button onClick={() => { setActiveLocationId('All'); setActiveCategory('All'); setSearch(''); }} className="mt-4 text-indigo-600 text-[10px] font-black uppercase underline">Clear All Filters</button>
+             )}
           </div>
         )}
       </div>
 
+      {/* Depletion Modal (Same as before) */}
       {depletedItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden p-6 animate-in zoom-in-95 duration-200">
@@ -232,6 +357,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
+      {/* Edit Modal (Same as before) */}
       {editingItem && (
         <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-20">
@@ -305,6 +431,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
+      {/* Add Manual Modal (Same as before) */}
       {isAdding && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-20">
@@ -403,7 +530,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           }} 
           locations={locations} 
           subLocations={subLocations}
-          activeLocationId={activeLocationId} 
+          activeLocationId={activeLocationId === 'All' ? locations[0]?.id : activeLocationId} 
           categoryOrder={categoryOrder} 
         />
       )}

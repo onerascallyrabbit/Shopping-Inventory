@@ -33,6 +33,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   
   // Drag and Drop State
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [hoveringLocId, setHoveringLocId] = useState<string | null>(null);
   const hoverTimerRef = useRef<number | null>(null);
 
   const [newItem, setNewItem] = useState({
@@ -89,13 +90,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   // Drag and Drop Logic
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedItemId(id);
-    // Ensure the drag is initiated correctly in all browsers
     e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragEnd = () => {
     setDraggedItemId(null);
+    setHoveringLocId(null);
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
@@ -103,16 +104,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const handleLocationHoverStart = (locId: string) => {
-    if (!draggedItemId) return;
+    if (!draggedItemId || activeLocationId === locId) return;
+    setHoveringLocId(locId);
+    
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     
     hoverTimerRef.current = window.setTimeout(() => {
       setActiveLocationId(locId);
       setActiveSubLocation('All');
-    }, 600);
+      setHoveringLocId(null);
+    }, 500); // Fast enough to feel responsive, slow enough to be intentional
   };
 
   const handleLocationHoverEnd = () => {
+    setHoveringLocId(null);
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
@@ -138,22 +143,17 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     const item = inventory.find(i => i.id === draggedItemId);
     if (!item) return;
 
-    if (activeLocationId === 'All') {
-      // In 'All' view, shelfName represents the Location Name of the group
-      const targetLoc = locations.find(l => l.name === shelfName);
-      if (targetLoc && item.locationId !== targetLoc.id) {
-        onUpdateItem(draggedItemId, { locationId: targetLoc.id, subLocation: '' });
-      }
-    } else {
-      // In a specific location view, shelfName is the actual sub-location (shelf)
-      const newShelf = (shelfName === 'Loose / General' || shelfName === 'All') ? '' : shelfName;
-      if (item.subLocation !== newShelf) {
-        onUpdateItem(draggedItemId, { 
-          locationId: activeLocationId, 
-          subLocation: newShelf 
-        });
-      }
-    }
+    // Determine target location: use current active view if specific, otherwise keep item's own location
+    const targetLocId = activeLocationId === 'All' ? item.locationId : activeLocationId;
+    
+    // If shelfName is 'All' or general, reset subLocation
+    const newShelf = (shelfName === 'Loose / General' || shelfName === 'All' || shelfName === 'General') ? '' : shelfName;
+    
+    onUpdateItem(draggedItemId, { 
+      locationId: targetLocId, 
+      subLocation: newShelf 
+    });
+    
     handleDragEnd();
   };
 
@@ -210,14 +210,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
 
       <div className="space-y-3">
-        {/* Primary Location Navigation Tabs */}
+        {/* Primary Location Tabs */}
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
           <button 
             onClick={() => { setActiveLocationId('All'); setActiveSubLocation('All'); }}
-            onDragOver={(e) => { e.preventDefault(); handleLocationHoverStart('All'); }}
+            onDragEnter={() => handleLocationHoverStart('All')}
+            onDragOver={(e) => e.preventDefault()}
             onDragLeave={handleLocationHoverEnd}
             onDrop={(e) => handleDropOnLocation(e, 'All')}
-            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'} ${draggedItemId ? 'ring-2 ring-slate-300 ring-offset-2 scale-105 z-10' : ''}`}
+            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-100'} ${hoveringLocId === 'All' ? 'animate-pulse ring-2 ring-indigo-400' : ''}`}
           >
             All Stock
           </button>
@@ -225,24 +226,25 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             <button 
               key={loc.id} 
               onClick={() => { setActiveLocationId(loc.id); setActiveSubLocation('All'); }}
-              onDragOver={(e) => { e.preventDefault(); handleLocationHoverStart(loc.id); }}
+              onDragEnter={() => handleLocationHoverStart(loc.id)}
+              onDragOver={(e) => e.preventDefault()}
               onDragLeave={handleLocationHoverEnd}
               onDrop={(e) => handleDropOnLocation(e, loc.id)}
-              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-300 ring-offset-2 scale-105 z-10' : ''}`}
+              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100'} ${hoveringLocId === loc.id ? 'animate-pulse ring-2 ring-white border-white' : ''} ${draggedItemId && activeLocationId !== loc.id ? 'ring-2 ring-indigo-100 ring-offset-1' : ''}`}
             >
               {loc.name}
             </button>
           ))}
         </div>
 
-        {/* Sub-Location (Shelf) Navigation Tabs - visible when a specific location is active */}
+        {/* Sub-Location Chips (Shelves) */}
         {activeLocationId !== 'All' && (
           <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
              <button 
               onClick={() => setActiveSubLocation('All')}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => handleDropOnShelf(e, 'All')}
-              className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === 'All' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-400 ring-offset-1 scale-105' : ''}`}
+              className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === 'All' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'} ${draggedItemId ? 'border-dashed border-indigo-400 bg-indigo-50/30' : ''}`}
             >
               All Shelves
             </button>
@@ -252,7 +254,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 onClick={() => setActiveSubLocation(sl.name)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => handleDropOnShelf(e, sl.name)}
-                className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === sl.name ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'} ${draggedItemId ? 'ring-2 ring-indigo-400 ring-offset-1 scale-105' : ''}`}
+                className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${activeSubLocation === sl.name ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-300 border-slate-50'} ${draggedItemId ? 'border-dashed border-indigo-400 bg-indigo-50/30 shadow-inner' : ''}`}
               >
                 {sl.name}
               </button>
@@ -273,16 +275,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         {Object.keys(groupedInventory).length > 0 ? Object.entries(groupedInventory).map(([shelfName, items]) => (
           <div 
             key={shelfName} 
-            className={`space-y-3 p-2 rounded-[32px] transition-all relative ${draggedItemId ? 'bg-indigo-50/20 border-2 border-dashed border-indigo-200' : 'bg-transparent border-2 border-transparent'}`}
+            className={`space-y-3 p-2 rounded-[32px] transition-all relative ${draggedItemId ? 'bg-indigo-50/20 border-2 border-dashed border-indigo-200 ring-4 ring-indigo-50/5' : 'bg-transparent border-2 border-transparent'}`}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleDropOnShelf(e, shelfName)}
           >
-            {/* Transparent Drop Capture Overlay when dragging - ensures empty groups can still receive drops */}
-            {draggedItemId && (
-              <div className="absolute inset-0 z-10"></div>
-            )}
+            {/* Capture overlay to handle empty lists */}
+            {draggedItemId && <div className="absolute inset-0 z-0 rounded-[32px]" />}
             
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center justify-between relative z-20">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center justify-between relative z-10">
               <div className="flex items-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>
                 {shelfName}
@@ -290,7 +290,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <span className="text-slate-300">{items.length} items</span>
             </h3>
             
-            <div className="space-y-2 relative z-20">
+            <div className="space-y-2 relative z-10">
               {items.map(item => (
                 <div 
                   key={item.id} 
@@ -357,7 +357,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         )}
       </div>
 
-      {/* Depletion Confirmation Modal */}
+      {/* Modals remain same as previous state for functional consistency */}
       {depletedItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden p-6 animate-in zoom-in-95 duration-200">
@@ -369,36 +369,18 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
               <div>
                 <h3 className="text-lg font-black text-slate-900 uppercase">Out of Stock?</h3>
-                <p className="text-sm text-slate-500 mt-2 font-medium">
-                  "{depletedItem.itemName}" is now depleted. Add it to your shopping list?
-                </p>
+                <p className="text-sm text-slate-500 mt-2 font-medium">"{depletedItem.itemName}" is now depleted. Add it to your shopping list?</p>
               </div>
               <div className="space-y-2 pt-4">
-                <button 
-                  onClick={() => handleDepletionConfirm(true)}
-                  className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs shadow-lg shadow-indigo-100 active:scale-[0.98] transition-all"
-                >
-                  Yes, Add to List
-                </button>
-                <button 
-                  onClick={() => handleDepletionConfirm(false)}
-                  className="w-full py-4 bg-slate-50 text-slate-400 font-black rounded-2xl uppercase tracking-widest text-[10px] active:scale-[0.98] transition-all"
-                >
-                  Just Remove
-                </button>
-                <button 
-                  onClick={() => setDepletedItem(null)}
-                  className="w-full py-2 text-slate-300 font-black uppercase tracking-widest text-[9px]"
-                >
-                  Cancel
-                </button>
+                <button onClick={() => handleDepletionConfirm(true)} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs shadow-lg shadow-indigo-100 active:scale-[0.98] transition-all">Yes, Add to List</button>
+                <button onClick={() => handleDepletionConfirm(false)} className="w-full py-4 bg-slate-50 text-slate-400 font-black rounded-2xl uppercase tracking-widest text-[10px] active:scale-[0.98] transition-all">Just Remove</button>
+                <button onClick={() => setDepletedItem(null)} className="w-full py-2 text-slate-300 font-black uppercase tracking-widest text-[9px]">Cancel</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Item Modal */}
       {editingItem && (
         <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-20">
@@ -472,7 +454,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
-      {/* Manual Add Stock Modal */}
       {isAdding && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-20">
@@ -519,23 +500,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Target Storage (Req)</label>
-                    <select 
-                      required
-                      className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-xs font-bold appearance-none text-indigo-700"
-                      value={newItem.locationId}
-                      onChange={e => setNewItem({...newItem, locationId: e.target.value, subLocation: ''})}
-                    >
+                    <select required className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-xs font-bold appearance-none text-indigo-700" value={newItem.locationId} onChange={e => setNewItem({...newItem, locationId: e.target.value, subLocation: ''})}>
                       <option value="">Select Location...</option>
                       {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest ml-1">Specific Shelf</label>
-                    <select 
-                      className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-xs font-bold appearance-none text-indigo-700"
-                      value={newItem.subLocation}
-                      onChange={e => setNewItem({...newItem, subLocation: e.target.value})}
-                    >
+                    <select className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-3 text-xs font-bold appearance-none text-indigo-700" value={newItem.subLocation} onChange={e => setNewItem({...newItem, subLocation: e.target.value})}>
                       <option value="">No Shelf / General</option>
                       {subLocations.filter(sl => sl.locationId === newItem.locationId).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
                     </select>
@@ -555,14 +527,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   </select>
                 </div>
               </div>
-              
               <button type="submit" className="w-full bg-indigo-600 text-white font-black py-5 rounded-[24px] uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all">Add to Inventory</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Bulk Import Modal */}
       {isImporting && (
         <CsvImportModal 
           onClose={() => setIsImporting(false)} 

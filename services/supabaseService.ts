@@ -359,12 +359,14 @@ export const deleteInventoryItem = async (id: string) => {
 };
 
 export const bulkSyncInventory = async (items: InventoryItem[]) => {
-  if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!supabase) throw new Error("Supabase client not initialized.");
   
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated for bulk import.");
+  
+  // CRITICAL: Explicitly set user_id to satisfy RLS policy: (auth.uid() = user_id)
   const payload = items.map(item => ({ 
-    id: item.id, 
+    id: item.id || crypto.randomUUID(), 
     product_id: item.productId, 
     item_name: item.itemName, 
     category: item.category, 
@@ -374,15 +376,20 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
     quantity: item.quantity, 
     unit: item.unit, 
     location_id: item.locationId, 
-    updated_at: item.updatedAt, 
-    user_id: item.userId || user.id 
+    updated_at: item.updatedAt || new Date().toISOString(), 
+    user_id: user.id 
   }));
 
+  console.log(`Cloud Sync: Attempting to upload ${payload.length} items to database...`);
+
   const { error } = await supabase.from('inventory').upsert(payload);
+  
   if (error) {
     console.error("bulkSyncInventory error details:", error);
     throw error;
   }
+  
+  console.log(`Cloud Sync: Successfully stored ${payload.length} items.`);
 };
 
 export const syncStorageLocation = async (loc: StorageLocation) => {

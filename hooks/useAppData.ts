@@ -10,7 +10,8 @@ import {
   syncProfile, syncVehicle, deleteVehicle, syncStore,
   syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily,
   deleteInventoryItem, syncShoppingItem, deleteShoppingItem,
-  syncCustomCategory, deleteCustomCategory, syncCustomSubCategory, deleteCustomSubCategory
+  syncCustomCategory, deleteCustomCategory, syncCustomSubCategory, deleteCustomSubCategory,
+  bulkSyncStorageLocations
 } from '../services/supabaseService';
 import { DEFAULT_CATEGORIES, DEFAULT_STORAGE } from '../constants';
 
@@ -20,7 +21,7 @@ export const useAppData = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [storageLocations, setStorageLocations] = useState<StorageLocation[]>(DEFAULT_STORAGE);
+  const [storageLocations, setStorageLocations] = useState<StorageLocation[]>(DEFAULT_STORAGE.map((s, i) => ({ ...s, sortOrder: i })));
   const [subLocations, setSubLocations] = useState<SubLocation[]>([]);
   const [stores, setStores] = useState<StoreLocation[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -66,7 +67,13 @@ export const useAppData = () => {
           })));
         }
 
-        if (data.storageLocations) setStorageLocations(data.storageLocations.map(s => ({ id: s.id, name: s.name })));
+        if (data.storageLocations) {
+            setStorageLocations(data.storageLocations.map(s => ({ 
+                id: s.id, 
+                name: s.name, 
+                sortOrder: s.sort_order ?? 0 
+            })));
+        }
         if (data.subLocations) setSubLocations(data.subLocations.map(s => ({ id: s.id, locationId: s.location_id, name: s.name })));
         if (data.stores) setStores(data.stores.map(s => ({ id: s.id, name: s.name, address: s.address, lat: Number(s.lat), lng: Number(s.lng), phone: s.phone, hours: s.hours, zip: s.zip })));
         if (data.vehicles) setVehicles(data.vehicles.map(v => ({ id: v.id, name: v.name, mpg: Number(v.mpg) })));
@@ -212,6 +219,19 @@ export const useAppData = () => {
     if (user) try { await bulkSyncInventory(newItems); } catch (err) { loadAllData(); throw err; }
   };
 
+  const reorderStorageLocations = async (newOrder: StorageLocation[]) => {
+    const ordered = newOrder.map((l, i) => ({ ...l, sortOrder: i }));
+    setStorageLocations(ordered);
+    if (user) {
+        try {
+            await bulkSyncStorageLocations(ordered);
+        } catch (e) {
+            console.error("Reorder sync failed:", e);
+            loadAllData(true);
+        }
+    }
+  };
+
   // Taxonomy Management
   const addCategory = async (name: string) => {
     if (!activeFamily) return;
@@ -259,6 +279,6 @@ export const useAppData = () => {
     addCategory, removeCategory, addSubCategory, removeSubCategory,
     updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
     addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem, 
-    addToInventory, importBulkInventory, refresh: loadAllData
+    addToInventory, importBulkInventory, reorderStorageLocations, refresh: loadAllData
   };
 };

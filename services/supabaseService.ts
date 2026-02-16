@@ -1,6 +1,6 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
-import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family, ShoppingItem, CustomCategory, CustomSubCategory } from '../types';
+import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family, ShoppingItem, CustomCategory, CustomSubCategory, MealIdea } from '../types';
 
 // Environment variables
 // @ts-ignore
@@ -19,6 +19,67 @@ export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_ANON_KEY') return SUPABASE_ANON_KEY;
   if (key === 'API_KEY') return API_KEY;
   return '';
+};
+
+/**
+ * MEAL PLANNING SYNC
+ */
+export const fetchMealIdeas = async (familyId: string): Promise<MealIdea[]> => {
+  if (!supabase || !familyId) return [];
+  const { data, error } = await supabase.from('meal_ideas').select('*').eq('family_id', familyId).order('generated_at', { ascending: false });
+  if (error) return [];
+  return data.map(m => ({
+    id: m.id,
+    title: m.title,
+    description: m.description,
+    difficulty: m.difficulty as any,
+    cookTime: m.cook_time,
+    matchPercentage: m.match_percentage,
+    ingredients: m.ingredients,
+    instructions: m.instructions,
+    generatedAt: m.generated_at,
+    cookCount: m.cook_count,
+    lastCooked: m.last_cooked,
+    rating: m.rating
+  }));
+};
+
+export const bulkSyncMealIdeas = async (familyId: string, meals: MealIdea[]) => {
+  if (!supabase) return;
+  // Clear old ones first to prevent cluttering or just append? 
+  // Requirement says "Store the AI-generated meal ideas in the database for future browsing"
+  const payload = meals.map(m => ({
+    family_id: familyId,
+    title: m.title,
+    description: m.description,
+    difficulty: m.difficulty,
+    cook_time: m.cookTime,
+    match_percentage: m.matchPercentage,
+    ingredients: m.ingredients,
+    instructions: m.instructions,
+    generated_at: m.generatedAt,
+    cook_count: 0
+  }));
+  await supabase.from('meal_ideas').insert(payload);
+};
+
+export const updateMealStats = async (mealId: string, updates: { cook_count?: number, last_cooked?: string, rating?: number }) => {
+  if (!supabase) return;
+  await supabase.from('meal_ideas').update(updates).eq('id', mealId);
+};
+
+export const saveMealRating = async (mealId: string, rating: number) => {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('meal_ratings').upsert({ meal_id: mealId, user_id: user.id, rating });
+  
+  // Calculate average rating
+  const { data } = await supabase.from('meal_ratings').select('rating').eq('meal_id', mealId);
+  if (data && data.length > 0) {
+    const avg = data.reduce((acc, curr) => acc + curr.rating, 0) / data.length;
+    await updateMealStats(mealId, { rating: avg });
+  }
 };
 
 /**
@@ -170,7 +231,6 @@ export const syncPriceRecord = async (productId: string, record: PriceRecord, us
 
 export const syncProduct = async (product: Partial<Product>) => {
   if (!supabase) return null;
-  // Fix: Use correct camelCase property names from the Product interface (itemName and subCategory)
   const { data, error } = await supabase.from('products').upsert({
     id: product.id || crypto.randomUUID(),
     category: product.category,
@@ -245,10 +305,12 @@ export const fetchUserData = async () => {
 
     let customCats: CustomCategory[] = [];
     let customSubs: CustomSubCategory[] = [];
+    let mealIdeas: MealIdea[] = [];
     if (profile?.familyId) {
-      [customCats, customSubs] = await Promise.all([
+      [customCats, customSubs, mealIdeas] = await Promise.all([
         fetchCustomCategories(profile.familyId),
-        fetchCustomSubCategories(profile.familyId)
+        fetchCustomSubCategories(profile.familyId),
+        fetchMealIdeas(profile.familyId)
       ]);
     }
 
@@ -262,7 +324,8 @@ export const fetchUserData = async () => {
       vehicles: vehiclesRes.data || [],
       shoppingList: listRes || [],
       customCategories: customCats,
-      customSubCategories: customSubs
+      customSubCategories: customSubs,
+      mealIdeas
     };
   } catch (e) {
     console.error("Error fetching user data:", e);
@@ -385,15 +448,11 @@ export const deleteStore = async (id: string) => {
   await supabase.from('stores').delete().eq('id', id);
 };
 
-/**
- * INVENTORY SYNC (Fixed Column Handling)
- */
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
-  // Stripping undefined values to prevent PostgREST column mapping errors
   const payload: any = {
     id: item.id,
     product_id: item.productId,

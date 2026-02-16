@@ -236,7 +236,7 @@ export const fetchUserData = async () => {
       fetchProfile().catch(() => null),
       fetchPriceData().catch(() => []),
       supabase.from('inventory').select('*'),
-      supabase.from('storage_locations').select('*'),
+      supabase.from('storage_locations').select('*').order('sort_order', { ascending: true }),
       supabase.from('sub_locations').select('*'),
       supabase.from('stores').select('*'),
       supabase.from('vehicles').select('*'),
@@ -448,7 +448,15 @@ export const syncStorageLocation = async (loc: StorageLocation) => {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('storage_locations').upsert({ id: loc.id, name: loc.name, user_id: user.id });
+  await supabase.from('storage_locations').upsert({ id: loc.id, name: loc.name, user_id: user.id, sort_order: loc.sortOrder });
+};
+
+export const bulkSyncStorageLocations = async (locs: StorageLocation[]) => {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  const payload = locs.map(l => ({ id: l.id, name: l.name, user_id: user.id, sort_order: l.sortOrder }));
+  await supabase.from('storage_locations').upsert(payload);
 };
 
 export const deleteStorageLocation = async (id: string) => {

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Product, ShoppingItem, InventoryItem, StorageLocation, 
   SubLocation, StoreLocation, Vehicle, Profile, Family, CustomCategory, CustomSubCategory
@@ -33,12 +33,21 @@ export const useAppData = () => {
     categoryOrder: DEFAULT_CATEGORIES, sharePrices: false 
   });
 
+  // Sync Locks to prevent "Reset" flicker on reordering
+  const isSyncingReorder = useRef(false);
+
   const loadAllData = useCallback(async (silent = false) => {
     if (!supabase) {
       setLoading(false);
       return;
     }
     
+    // If we are currently writing a reorder, don't let a "Realtime" event trigger a fetch
+    // which might pull old data from the DB before our write has finished.
+    if (silent && isSyncingReorder.current) {
+      return;
+    }
+
     if (!silent) setLoading(true);
     try {
       const data = await fetchUserData();
@@ -95,7 +104,10 @@ export const useAppData = () => {
       .on('postgres_changes', { event: '*', table: 'shopping_list', schema: 'public' }, () => loadAllData(true))
       .on('postgres_changes', { event: '*', table: 'custom_categories', schema: 'public' }, () => loadAllData(true))
       .on('postgres_changes', { event: '*', table: 'custom_sub_categories', schema: 'public' }, () => loadAllData(true))
-      .on('postgres_changes', { event: '*', table: 'storage_locations', schema: 'public' }, () => loadAllData(true))
+      .on('postgres_changes', { event: '*', table: 'storage_locations', schema: 'public' }, () => {
+         // Debounced reload if storage locations change elsewhere
+         loadAllData(true);
+      })
       .on('postgres_changes', { event: '*', table: 'sub_locations', schema: 'public' }, () => loadAllData(true))
       .subscribe();
 
@@ -221,12 +233,21 @@ export const useAppData = () => {
 
   const reorderStorageLocations = async (newOrder: StorageLocation[]) => {
     const ordered = newOrder.map((l, i) => ({ ...l, sortOrder: i }));
+    
+    // OPTIMISTIC UPDATE: Update state immediately
     setStorageLocations(ordered);
+
     if (user) {
+        isSyncingReorder.current = true;
         try {
             await bulkSyncStorageLocations(ordered);
+            // Wait a tiny bit for DB propagation before unlocking syncs
+            setTimeout(() => {
+                isSyncingReorder.current = false;
+            }, 1500);
         } catch (e) {
             console.error("Reorder sync failed:", e);
+            isSyncingReorder.current = false;
             loadAllData(true);
         }
     }

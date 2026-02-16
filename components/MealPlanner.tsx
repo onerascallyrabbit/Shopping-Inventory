@@ -40,7 +40,7 @@ const MealPlanner: React.FC<MealPlannerProps> = ({
         <button 
           onClick={onRefresh} 
           disabled={loading}
-          className={`bg-indigo-600 text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center space-x-2 ${loading ? 'opacity-50' : ''}`}
+          className={`bg-indigo-600 text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center space-x-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {loading ? (
             <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -65,11 +65,15 @@ const MealPlanner: React.FC<MealPlannerProps> = ({
 
       {mealIdeas.length === 0 && !loading ? (
         <div className="text-center py-20 flex flex-col items-center">
-           <div className="bg-indigo-50 p-6 rounded-[32px] mb-4">
-             <img src="cart_logo.png" className="w-12 h-12 grayscale opacity-40" alt="Robot" />
+           <div className="bg-indigo-50 p-8 rounded-[40px] mb-6 text-indigo-400">
+             <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+             </svg>
            </div>
-           <p className="text-slate-900 font-black text-sm uppercase tracking-widest">No Meal Plans</p>
-           <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-tight">Tap 'New Ideas' to let the AI analyze your stock!</p>
+           <p className="text-slate-900 font-black text-sm uppercase tracking-widest">No Meal Ideas Yet</p>
+           <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-tight max-w-[200px] leading-relaxed">
+             {!activeFamily ? "Join a Family Hub in Settings to enable shared meal planning." : "Tap 'New Ideas' and let the AI chef analyze your pantry stock!"}
+           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">

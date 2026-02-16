@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Product } from '../types';
 
@@ -34,47 +35,50 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       {/* Action Center */}
-      <section className="bg-indigo-600 rounded-[32px] p-6 shadow-xl shadow-indigo-100 text-white">
-        <h2 className="text-xl font-black mb-4">Track a Price</h2>
-        <div className="grid grid-cols-3 gap-3">
-          <button 
-            onClick={() => document.dispatchEvent(new CustomEvent('openAddModal', { detail: { mode: 'type' } }))}
-            className="flex flex-col items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl p-3 aspect-square active:scale-95 transition-transform"
-          >
-            <div className="bg-white/20 p-2 rounded-xl mb-2">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-widest">Type</span>
-          </button>
+      <section className="bg-indigo-600 rounded-[32px] p-6 shadow-xl shadow-indigo-100 text-white relative overflow-hidden">
+        <div className="relative z-10">
+          <h2 className="text-xl font-black mb-4">Track a Price</h2>
+          <div className="grid grid-cols-3 gap-3">
+            <button 
+              onClick={() => document.dispatchEvent(new CustomEvent('openAddModal', { detail: { mode: 'type' } }))}
+              className="flex flex-col items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl p-3 aspect-square active:scale-95 transition-transform"
+            >
+              <div className="bg-white/20 p-2 rounded-xl mb-2">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest">Type</span>
+            </button>
 
-          <button 
-            onClick={() => document.dispatchEvent(new CustomEvent('openAddModal', { detail: { mode: 'product' } }))}
-            className="flex flex-col items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl p-3 aspect-square active:scale-95 transition-transform"
-          >
-            <div className="bg-white/20 p-2 rounded-xl mb-2">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-widest">Photo</span>
-          </button>
+            <button 
+              onClick={() => document.dispatchEvent(new CustomEvent('openAddModal', { detail: { mode: 'product' } }))}
+              className="flex flex-col items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl p-3 aspect-square active:scale-95 transition-transform"
+            >
+              <div className="bg-white/20 p-2 rounded-xl mb-2">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                </svg>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest">Photo</span>
+            </button>
 
-          <button 
-            onClick={() => document.dispatchEvent(new CustomEvent('openAddModal', { detail: { mode: 'barcode' } }))}
-            className="flex flex-col items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl p-3 aspect-square active:scale-95 transition-transform"
-          >
-            <div className="bg-white/20 p-2 rounded-xl mb-2">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-widest">UPC</span>
-          </button>
+            <button 
+              onClick={() => document.dispatchEvent(new CustomEvent('openAddModal', { detail: { mode: 'barcode' } }))}
+              className="flex flex-col items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl p-3 aspect-square active:scale-95 transition-transform"
+            >
+              <div className="bg-white/20 p-2 rounded-xl mb-2">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest">UPC</span>
+            </button>
+          </div>
         </div>
+        <img src="cart_logo.png" className="absolute -right-6 -bottom-6 w-32 h-32 opacity-10 rotate-12" alt="" />
       </section>
 
       <section>
@@ -146,8 +150,9 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
               </div>
             </div>
           )) : (
-            <div className="w-full py-12 text-center bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200 text-slate-400">
-               <p className="text-sm font-medium">No deals logged yet.</p>
+            <div className="w-full py-12 flex flex-col items-center justify-center bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200 text-slate-400">
+               <img src="cart_logo.png" className="w-12 h-12 grayscale opacity-30 mb-4" alt="Empty" />
+               <p className="text-sm font-black uppercase tracking-widest">No deals logged yet.</p>
             </div>
           )}
         </div>
@@ -170,7 +175,7 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-slate-900 text-sm leading-tight truncate">{getFullName(record.product)}</h3>
+                    <h3 className="font-bold text-slate-900 text-sm leading-tight truncate uppercase tracking-tight">{getFullName(record.product)}</h3>
                     {record.product.subCategory && (
                       <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-0.5">
                         {record.product.category} {" > "} {record.product.subCategory}
@@ -229,7 +234,13 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
               </div>
             </div>
           )) : (
-            <p className="text-center text-slate-300 py-8 italic text-sm">Tap a button above to start logging prices!</p>
+            <div className="text-center py-12 flex flex-col items-center">
+               <div className="bg-indigo-50 p-6 rounded-[32px] mb-4">
+                 <img src="cart_logo.png" className="w-12 h-12 grayscale opacity-40" alt="Start" />
+               </div>
+               <p className="text-slate-900 font-black text-sm uppercase tracking-widest">No Activity Yet</p>
+               <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-tight">Tap the buttons above to record your first price!</p>
+            </div>
           )}
         </div>
       </section>

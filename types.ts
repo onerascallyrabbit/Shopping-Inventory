@@ -116,4 +116,26 @@ export interface CustomSubCategory {
   familyId: string;
 }
 
-export type AppTab = 'dashboard' | 'items' | 'inventory' | 'list' | 'shop' | 'settings';
+export interface MealIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+  isMissing: boolean;
+}
+
+export interface MealIdea {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  cookTime: number;
+  ingredients: MealIngredient[];
+  instructions: string[];
+  matchPercentage: number;
+  rating?: number;
+  cookCount: number;
+  lastCooked?: string;
+  generatedAt: string;
+}
+
+export type AppTab = 'dashboard' | 'items' | 'inventory' | 'list' | 'shop' | 'meals' | 'settings';

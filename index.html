@@ -42,19 +42,32 @@
         }
         .system-status.hidden {
             display: none;
+            pointer-events: none;
         }
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #6366f1;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #6366f1;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 1rem;
         }
+        .boot-logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            animation: pulse-soft 2s ease-in-out infinite;
+        }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse-soft {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
         }
     </style>
 <script type="importmap">
@@ -72,11 +85,12 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
     <div id="boot-status" class="system-status">
+        <img src="cart_logo.png" class="boot-logo" alt="Logo">
         <div class="spinner"></div>
         <h1 style="font-weight: 800; font-size: 1.25rem; color: #1e293b; margin-bottom: 0.5rem;">Aisle Be Back</h1>
-        <p id="boot-message" style="font-size: 0.875rem; color: #64748b;">Initializing application...</p>
+        <p id="boot-message" style="font-size: 0.875rem; color: #64748b;">Initializing secure environment...</p>
         <div id="error-console" style="margin-top: 2rem; display: none; text-align: left; width: 100%; max-width: 500px;">
-            <p style="font-[10px] font-black uppercase text-red-500 mb-2">Critical Failure Detected:</p>
+            <p style="font-size: 10px; font-weight: 900; text-transform: uppercase; color: #ef4444; margin-bottom: 0.5rem;">Critical Failure Detected:</p>
             <pre id="error-text" style="background: #fef2f2; border: 1px solid #fee2e2; color: #ef4444; padding: 1rem; border-radius: 12px; font-size: 12px; white-space: pre-wrap; word-break: break-all; font-family: monospace;"></pre>
             <button onclick="window.location.reload()" style="margin-top: 1rem; width: 100%; padding: 0.75rem; background: #6366f1; color: white; border-radius: 8px; font-weight: 700; border: none; cursor: pointer;">RETRY BOOT</button>
         </div>
@@ -87,46 +101,23 @@
     <script type="module" src="./index.tsx"></script>
     
     <script>
-        // Store the deferred prompt event for installation
         window.deferredPrompt = null;
 
         window.addEventListener('beforeinstallprompt', (e) => {
-          // Prevent the mini-infobar from appearing on mobile
           e.preventDefault();
-          // Stash the event so it can be triggered later.
           window.deferredPrompt = e;
-          console.log('Install prompt captured');
-          // Optional: Dispatch a custom event to notify React that installation is possible
           window.dispatchEvent(new CustomEvent('app-installable'));
         });
 
-        window.addEventListener('appinstalled', (evt) => {
-          console.log('App successfully installed');
-          window.deferredPrompt = null;
-        });
-
-        // Service Worker Registration for PWA
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js').then(reg => {
-              console.log('SW Registered:', reg);
+              console.log('SW Registered');
             }).catch(err => {
-              console.warn('SW Registration Failed:', err);
+              console.warn('SW Failed');
             });
           });
         }
-
-        setTimeout(() => {
-            const root = document.getElementById('root');
-            if (root && root.innerHTML === '' && !window.__APP_BOOTSTRAPPED__) {
-                const msg = document.getElementById('boot-message');
-                const console = document.getElementById('error-console');
-                const errorText = document.getElementById('error-text');
-                if (msg) msg.innerText = "Application failed to start.";
-                if (console) console.style.display = 'block';
-                if (errorText) errorText.innerText = "Module resolution timeout or version conflict.";
-            }
-        }, 10000);
     </script>
 </body>
 </html>

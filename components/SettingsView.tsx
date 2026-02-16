@@ -24,6 +24,7 @@ interface SettingsViewProps {
   onRemoveCategory: (id: string) => void;
   onAddSubCategory: (catName: string, name: string) => void;
   onRemoveSubCategory: (id: string) => void;
+  onReorderStorageLocations?: (locs: StorageLocation[]) => void;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ 
@@ -32,7 +33,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   storageLocations, onStorageLocationsChange,
   subLocations, onSubLocationsChange,
   customCategories, customSubCategories,
-  onAddCategory, onRemoveCategory, onAddSubCategory, onRemoveSubCategory
+  onAddCategory, onRemoveCategory, onAddSubCategory, onRemoveSubCategory,
+  onReorderStorageLocations
 }) => {
   const [newStore, setNewStore] = useState({ name: '', lat: '', lng: '', address: '', hours: '', phone: '', isPublic: false });
   const [newVehicle, setNewVehicle] = useState({ name: '', mpg: '' });
@@ -46,12 +48,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [communityStores, setCommunityStores] = useState<StoreLocation[]>([]);
   const [mapResult, setMapResult] = useState<StoreLocation | null>(null);
   
   const [familyInviteCode, setFamilyInviteCode] = useState('');
   const [familyName, setFamilyName] = useState('');
-  const [familyLoading, setFamilyLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -71,18 +71,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleCreateFamily = async () => {
     if (!familyName) return;
-    setFamilyLoading(true);
     try { await createFamily(familyName); alert('Family Hub created!'); window.location.reload(); }
     catch (e: any) { alert(`Creation failed: ${e.message}`); }
-    setFamilyLoading(false);
   };
 
   const handleJoinFamily = async () => {
     if (!familyInviteCode) return;
-    setFamilyLoading(true);
     try { await joinFamily(familyInviteCode); alert('Successfully joined family!'); window.location.reload(); }
     catch (e: any) { alert(`Join failed: ${e.message}`); }
-    setFamilyLoading(false);
   };
 
   const shareInviteLink = () => {
@@ -93,30 +89,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleStoreSearch = async () => {
-    if (!searchQuery) return;
-    setSearchLoading(true);
-    const result = await searchStoreDetails(searchQuery, profile.zip || profile.locationLabel);
-    if (result) {
-      const text = result.text;
-      const latLngMatch = text.match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/);
-      const phoneMatch = text.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
-      setMapResult({
-        id: 'map-result', name: searchQuery,
-        lat: latLngMatch ? parseFloat(latLngMatch[1]) : undefined,
-        lng: latLngMatch ? parseFloat(latLngMatch[2]) : undefined,
-        phone: phoneMatch ? phoneMatch[0] : '',
-        address: text.split('\n')[1] || ''
-      });
-    }
-    setSearchLoading(false);
-  };
-
-  const addStore = async (s: Omit<StoreLocation, 'id'>, isPublic: boolean = false) => {
-    const storeObj = { ...s, id: crypto.randomUUID() };
-    onStoresChange([...stores, storeObj]);
-    if (user) await syncStore(storeObj, isPublic);
-    setSearchQuery(''); setMapResult(null);
+  const moveLocation = (index: number, direction: 'up' | 'down') => {
+    if (!onReorderStorageLocations) return;
+    const newLocs = [...storageLocations];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newLocs.length) return;
+    
+    [newLocs[index], newLocs[targetIndex]] = [newLocs[targetIndex], newLocs[index]];
+    onReorderStorageLocations(newLocs);
   };
 
   return (
@@ -133,18 +113,70 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">Active Hub</p>
                 <p className="text-lg font-black text-slate-800">{activeFamily.name}</p>
               </div>
-              <button onClick={shareInviteLink} className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-widest ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}>
+              <button onClick={shareInviteLink} className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}>
                 {copied ? 'Copied Link' : 'Invite Family'}
               </button>
             </div>
           ) : (
             <div className="space-y-4">
               <input className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold" placeholder="Invite Code..." value={familyInviteCode} onChange={e => setFamilyInviteCode(e.target.value)} />
-              <button onClick={handleJoinFamily} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black uppercase text-[10px]">Join Family</button>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={handleJoinFamily} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black uppercase text-[10px]">Join Family</button>
+                <button onClick={() => { const name = prompt('Family Name?'); if(name) { setFamilyName(name); handleCreateFamily(); } }} className="w-full bg-slate-100 text-slate-600 py-3 rounded-xl font-black uppercase text-[10px]">Create Hub</button>
+              </div>
             </div>
           )}
         </section>
       )}
+
+      {/* Stock Locations Section */}
+      <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Stock Locations</h3>
+          <span className="text-[8px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full uppercase">Order for Family</span>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="flex space-x-2">
+            <input className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold" placeholder="New Location (e.g. Garage)..." value={newStorageName} onChange={e => setNewStorageName(e.target.value)} />
+            <button onClick={() => { if(newStorageName) { const loc={id:crypto.randomUUID(), name:newStorageName, sortOrder: storageLocations.length}; onStorageLocationsChange([...storageLocations, loc]); if(user) syncStorageLocation(loc); setNewStorageName(''); } }} className="px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase shadow-sm active:scale-95">Add</button>
+          </div>
+          
+          <div className="space-y-2">
+            {storageLocations.length > 0 ? storageLocations.map((loc, idx) => (
+              <div key={loc.id} className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-all">
+                <div className="flex items-center space-x-3">
+                  <div className="flex flex-col space-y-0.5 bg-slate-50 rounded-lg p-1">
+                    <button 
+                      onClick={() => moveLocation(idx, 'up')}
+                      disabled={idx === 0}
+                      className={`p-1.5 rounded-md hover:bg-white transition-all ${idx === 0 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-indigo-600 active:scale-90'}`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 15l7-7 7 7"/></svg>
+                    </button>
+                    <button 
+                      onClick={() => moveLocation(idx, 'down')}
+                      disabled={idx === storageLocations.length - 1}
+                      className={`p-1.5 rounded-md hover:bg-white transition-all ${idx === storageLocations.length - 1 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-indigo-600 active:scale-90'}`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{loc.name}</span>
+                    <span className="text-[8px] font-bold text-slate-300 uppercase">Position {idx + 1}</span>
+                  </div>
+                </div>
+                <button onClick={async () => { if(confirm(`Delete ${loc.name}?`)) { onStorageLocationsChange(storageLocations.filter(l => l.id !== loc.id)); if (user) await deleteStorageLocation(loc.id); } }} className="text-slate-300 hover:text-red-500 p-2 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+              </div>
+            )) : (
+              <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No custom locations</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Household Taxonomy Section */}
       {activeFamily && (
@@ -190,25 +222,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </section>
       )}
-
-      {/* Stock Locations Section */}
-      <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
-        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Stock Locations</h3>
-        <div className="space-y-4">
-          <div className="flex space-x-2">
-            <input className="flex-1 bg-slate-50 border rounded-xl px-4 py-3 text-xs font-bold" placeholder="New Location..." value={newStorageName} onChange={e => setNewStorageName(e.target.value)} />
-            <button onClick={() => { if(newStorageName) { const loc={id:crypto.randomUUID(), name:newStorageName}; onStorageLocationsChange([...storageLocations, loc]); if(user) syncStorageLocation(loc); setNewStorageName(''); } }} className="px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase">Add</button>
-          </div>
-          <div className="space-y-2">
-            {storageLocations.map(loc => (
-              <div key={loc.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border">
-                <span className="text-xs font-bold text-slate-700 uppercase">{loc.name}</span>
-                <button onClick={async () => { onStorageLocationsChange(storageLocations.filter(l => l.id !== loc.id)); if (user) await deleteStorageLocation(loc.id); }} className="text-slate-300 hover:text-red-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Fuel Settings */}
       <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">

@@ -16,3 +16,4 @@ Update: category management
 Update: location order management*
 New: install as app with logo***
 Update: settings page cleanup
+Update: home page cleanup

@@ -22,7 +22,7 @@ const App: React.FC = () => {
     customCategories, customSubCategories, addCategory, removeCategory, addSubCategory, removeSubCategory,
     updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
     addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem,
-    addToInventory, importBulkInventory, refresh 
+    addToInventory, importBulkInventory, reorderStorageLocations, refresh 
   } = useAppData();
 
   const [isGuest, setIsGuest] = useState(() => localStorage.getItem('pricewise_is_guest') === 'true');
@@ -77,6 +77,7 @@ const App: React.FC = () => {
             storageLocations={storageLocations} onStorageLocationsChange={setStorageLocations} subLocations={subLocations} onSubLocationsChange={setSubLocations}
             customCategories={customCategories} customSubCategories={customSubCategories}
             onAddCategory={addCategory} onRemoveCategory={removeCategory} onAddSubCategory={addSubCategory} onRemoveSubCategory={removeSubCategory}
+            onReorderStorageLocations={reorderStorageLocations}
           />
         )}
       </main>

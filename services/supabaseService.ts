@@ -2,13 +2,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family, ShoppingItem, CustomCategory, CustomSubCategory, MealIdea } from '../types';
 
-// Environment variables
+// Environment variables detection
 // @ts-ignore
-export const SUPABASE_URL = (import.meta.env?.VITE_SUPABASE_URL) || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : '') || '';
+const envApiKey = (typeof process !== 'undefined' ? process.env.API_KEY : '') || (typeof process !== 'undefined' ? process.env.VITE_API_KEY : '') || (import.meta as any).env?.VITE_API_KEY || '';
 // @ts-ignore
-export const SUPABASE_ANON_KEY = (import.meta.env?.VITE_SUPABASE_ANON_KEY) || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : '') || '';
+export const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : '') || '';
 // @ts-ignore
-export const API_KEY = (import.meta.env?.VITE_API_KEY) || (typeof process !== 'undefined' ? process.env.VITE_API_KEY : '') || '';
+export const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : '') || '';
+export const API_KEY = envApiKey;
 
 export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
@@ -46,8 +47,6 @@ export const fetchMealIdeas = async (familyId: string): Promise<MealIdea[]> => {
 
 export const bulkSyncMealIdeas = async (familyId: string, meals: MealIdea[]) => {
   if (!supabase) return;
-  // Clear old ones first to prevent cluttering or just append? 
-  // Requirement says "Store the AI-generated meal ideas in the database for future browsing"
   const payload = meals.map(m => ({
     family_id: familyId,
     title: m.title,
@@ -74,7 +73,6 @@ export const saveMealRating = async (mealId: string, rating: number) => {
   if (!user) return;
   await supabase.from('meal_ratings').upsert({ meal_id: mealId, user_id: user.id, rating });
   
-  // Calculate average rating
   const { data } = await supabase.from('meal_ratings').select('rating').eq('meal_id', mealId);
   if (data && data.length > 0) {
     const avg = data.reduce((acc, curr) => acc + curr.rating, 0) / data.length;

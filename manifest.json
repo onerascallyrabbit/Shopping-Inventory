@@ -2,9 +2,11 @@
 {
   "name": "Aisle Be Back",
   "short_name": "AisleBack",
-  "description": "Smart grocery price history and inventory tracker.",
-  "start_url": "./",
+  "description": "Smart grocery price history and household inventory tracker.",
+  "start_url": "/",
+  "id": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
   "icons": [
@@ -12,12 +14,19 @@
       "src": "cart_logo.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "cart_logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "cart_logo.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

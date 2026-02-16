@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { StoreLocation, Vehicle, StorageLocation, SubLocation, Profile, Family, CustomCategory, CustomSubCategory } from '../types';
 import { supabase, createFamily, joinFamily, fetchGlobalStores, syncStore, deleteStore, syncStorageLocation, deleteStorageLocation, syncSubLocation, deleteSubLocation } from '../services/supabaseService';
 import { searchStoreDetails } from '../services/geminiService';
@@ -36,23 +36,92 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   onAddCategory, onRemoveCategory, onAddSubCategory, onRemoveSubCategory,
   onReorderStorageLocations
 }) => {
-  const [newStore, setNewStore] = useState({ name: '', lat: '', lng: '', address: '', hours: '', phone: '', isPublic: false });
-  const [newVehicle, setNewVehicle] = useState({ name: '', mpg: '' });
   const [newStorageName, setNewStorageName] = useState('');
-  const [newSubName, setNewSubName] = useState('');
   const [selectedParentId, setSelectedParentId] = useState('');
   
   const [newCatName, setNewCatName] = useState('');
   const [newSubCatName, setNewSubCatName] = useState('');
   const [selectedTaxonomyCat, setSelectedTaxonomyCat] = useState('');
 
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [mapResult, setMapResult] = useState<StoreLocation | null>(null);
-  
   const [familyInviteCode, setFamilyInviteCode] = useState('');
   const [familyName, setFamilyName] = useState('');
   const [copied, setCopied] = useState(false);
+
+  // Install State
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  // --- REORDERING LOGIC ---
+  // We use local state for "Stock Locations" so the UI moves instantly.
+  const [localLocations, setLocalLocations] = useState<StorageLocation[]>(storageLocations);
+  const saveTimeoutRef = useRef<number | null>(null);
+
+  // Sync local state when external props change (but not while we are dragging/moving)
+  useEffect(() => {
+    if (!saveTimeoutRef.current) {
+      setLocalLocations(storageLocations);
+    }
+  }, [storageLocations]);
+
+  const moveLocation = (index: number, direction: 'up' | 'down') => {
+    const newLocs = [...localLocations];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newLocs.length) return;
+    
+    // Immediate Swap
+    [newLocs[index], newLocs[targetIndex]] = [newLocs[targetIndex], newLocs[index]];
+    
+    // Update Local UI instantly
+    setLocalLocations(newLocs);
+
+    // Debounce the save to Parent/Supabase
+    if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = window.setTimeout(() => {
+      if (onReorderStorageLocations) {
+        onReorderStorageLocations(newLocs);
+      }
+      saveTimeoutRef.current = null;
+    }, 800); // 800ms debounce
+  };
+
+  const handleAddLocation = () => {
+    if (!newStorageName) return;
+    const newLoc = { id: crypto.randomUUID(), name: newStorageName, sortOrder: localLocations.length };
+    const updated = [...localLocations, newLoc];
+    setLocalLocations(updated);
+    onStorageLocationsChange(updated);
+    if (user) syncStorageLocation(newLoc);
+    setNewStorageName('');
+  };
+
+  const handleDeleteLocation = async (loc: StorageLocation) => {
+    if (!confirm(`Delete ${loc.name}? This will affect items stored here.`)) return;
+    const updated = localLocations.filter(l => l.id !== loc.id);
+    setLocalLocations(updated);
+    onStorageLocationsChange(updated);
+    if (user) await deleteStorageLocation(loc.id);
+  };
+  // ------------------------
+
+  useEffect(() => {
+    const checkInstallable = () => {
+      // @ts-ignore
+      setIsInstallable(!!window.deferredPrompt);
+    };
+    window.addEventListener('app-installable', checkInstallable);
+    checkInstallable();
+    return () => window.removeEventListener('app-installable', checkInstallable);
+  }, []);
+
+  const handleInstall = async () => {
+    // @ts-ignore
+    const promptEvent = window.deferredPrompt;
+    if (!promptEvent) return;
+    promptEvent.prompt();
+    const { outcome } = await promptEvent.userChoice;
+    // @ts-ignore
+    window.deferredPrompt = null;
+    setIsInstallable(false);
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -89,19 +158,30 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const moveLocation = (index: number, direction: 'up' | 'down') => {
-    if (!onReorderStorageLocations) return;
-    const newLocs = [...storageLocations];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newLocs.length) return;
-    
-    [newLocs[index], newLocs[targetIndex]] = [newLocs[targetIndex], newLocs[index]];
-    onReorderStorageLocations(newLocs);
-  };
-
   return (
     <div className="space-y-6 pb-20 animate-in fade-in">
       <h2 className="text-2xl font-black text-slate-900 px-1">Settings</h2>
+
+      {/* Installation Prompt */}
+      {isInstallable && (
+        <section className="bg-indigo-600 p-6 rounded-[32px] shadow-lg shadow-indigo-100 text-white animate-bounce-subtle">
+          <div className="flex items-center space-x-4">
+            <div className="bg-white/20 p-3 rounded-2xl">
+              <img src="cart_logo.png" className="w-8 h-8 object-contain" alt="App Logo" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-black uppercase tracking-tight">Add to Home Screen</h3>
+              <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest mt-0.5">Install for quick access & offline use</p>
+            </div>
+            <button 
+              onClick={handleInstall}
+              className="bg-white text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm active:scale-95 transition-transform"
+            >
+              Install
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Family Hub */}
       {user && (
@@ -133,44 +213,44 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Stock Locations</h3>
-          <span className="text-[8px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full uppercase">Order for Family</span>
+          <span className="text-[8px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full uppercase italic">Drag or Tap to order</span>
         </div>
         
         <div className="space-y-4">
           <div className="flex space-x-2">
             <input className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold" placeholder="New Location (e.g. Garage)..." value={newStorageName} onChange={e => setNewStorageName(e.target.value)} />
-            <button onClick={() => { if(newStorageName) { const loc={id:crypto.randomUUID(), name:newStorageName, sortOrder: storageLocations.length}; onStorageLocationsChange([...storageLocations, loc]); if(user) syncStorageLocation(loc); setNewStorageName(''); } }} className="px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase shadow-sm active:scale-95">Add</button>
+            <button onClick={handleAddLocation} className="px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase shadow-sm active:scale-95">Add</button>
           </div>
           
           <div className="space-y-2">
-            {storageLocations.length > 0 ? storageLocations.map((loc, idx) => (
-              <div key={loc.id} className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-all">
+            {localLocations.length > 0 ? localLocations.map((loc, idx) => (
+              <div key={loc.id} className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-all shadow-sm">
                 <div className="flex items-center space-x-3">
                   <div className="flex flex-col space-y-0.5 bg-slate-50 rounded-lg p-1">
                     <button 
                       onClick={() => moveLocation(idx, 'up')}
                       disabled={idx === 0}
-                      className={`p-1.5 rounded-md hover:bg-white transition-all ${idx === 0 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-indigo-600 active:scale-90'}`}
+                      className={`p-2 rounded-md transition-all ${idx === 0 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-indigo-600 hover:bg-white active:scale-90'}`}
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 15l7-7 7 7"/></svg>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 15l7-7 7 7"/></svg>
                     </button>
                     <button 
                       onClick={() => moveLocation(idx, 'down')}
-                      disabled={idx === storageLocations.length - 1}
-                      className={`p-1.5 rounded-md hover:bg-white transition-all ${idx === storageLocations.length - 1 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-indigo-600 active:scale-90'}`}
+                      disabled={idx === localLocations.length - 1}
+                      className={`p-2 rounded-md transition-all ${idx === localLocations.length - 1 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-indigo-600 hover:bg-white active:scale-90'}`}
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M19 9l-7 7-7-7"/></svg>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{loc.name}</span>
-                    <span className="text-[8px] font-bold text-slate-300 uppercase">Position {idx + 1}</span>
+                    <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Aisle #{idx + 1}</span>
                   </div>
                 </div>
-                <button onClick={async () => { if(confirm(`Delete ${loc.name}?`)) { onStorageLocationsChange(storageLocations.filter(l => l.id !== loc.id)); if (user) await deleteStorageLocation(loc.id); } }} className="text-slate-300 hover:text-red-500 p-2 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                <button onClick={() => handleDeleteLocation(loc)} className="text-slate-300 hover:text-red-500 p-2 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg></button>
               </div>
             )) : (
-              <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed">
+              <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No custom locations</p>
               </div>
             )}

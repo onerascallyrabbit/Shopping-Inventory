@@ -1,7 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { InventoryItem, MealIdea } from "../types";
-import { getEnv } from "./supabaseService";
 
 export interface AnalyzedPrice {
   category: string;
@@ -16,8 +15,10 @@ export interface AnalyzedPrice {
 }
 
 const getAIClient = () => {
-  const apiKey = getEnv('API_KEY');
-  if (!apiKey) throw new Error("Missing Gemini API Key. Please configure process.env.API_KEY.");
+  const apiKey = (typeof process !== 'undefined' ? process.env.API_KEY : '');
+  if (!apiKey) {
+    throw new Error("Gemini API Key missing. Please ensure 'API_KEY' is set in your environment variables.");
+  }
   return new GoogleGenAI({ apiKey });
 };
 

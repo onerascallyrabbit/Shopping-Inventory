@@ -17,4 +17,4 @@ Update: location order management*
 New: install as app with logo***
 Update: settings page cleanup
 Update: home page cleanup
-New: AI meal assistant**
+New: AI meal assistant***

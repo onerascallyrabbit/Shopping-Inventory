@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { StoreLocation, Vehicle, StorageLocation, SubLocation, Profile, Family, CustomCategory, CustomSubCategory } from '../types';
-import { createFamily, joinFamily } from '../services/supabaseService';
+import { createFamily, joinFamily, testDatabaseConnection, getEnv } from '../services/supabaseService';
 import StorageLocationsModal from './StorageLocationsModal';
 import TaxonomyModal from './TaxonomyModal';
 
@@ -37,6 +37,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [familyInviteCode, setFamilyInviteCode] = useState('');
   const [familyName, setFamilyName] = useState('');
   const [copied, setCopied] = useState(false);
+  const [dbStatus, setDbStatus] = useState<'testing' | 'ok' | 'fail'>('testing');
+  const [aiStatus, setAiStatus] = useState<'ok' | 'fail'>('fail');
 
   // Modal Visibility States
   const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
@@ -50,6 +52,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     };
     window.addEventListener('app-installable', checkInstallable);
     checkInstallable();
+    
+    // Test Health
+    testDatabaseConnection().then(res => setDbStatus(res.success ? 'ok' : 'fail'));
+    setAiStatus(getEnv('API_KEY') ? 'ok' : 'fail');
+
     return () => window.removeEventListener('app-installable', checkInstallable);
   }, []);
 
@@ -93,6 +100,32 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   return (
     <div className="space-y-6 pb-20 animate-in fade-in">
       <h2 className="text-2xl font-black text-slate-900 px-1">Settings</h2>
+
+      {/* System Health Section */}
+      <section className="bg-slate-900 rounded-[32px] p-6 text-white shadow-xl">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">System Health</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] font-black uppercase text-slate-400">Database</span>
+              <div className={`w-2 h-2 rounded-full ${dbStatus === 'ok' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : dbStatus === 'testing' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`}></div>
+            </div>
+            <p className="text-xs font-bold">{dbStatus === 'ok' ? 'Connected' : dbStatus === 'testing' ? 'Syncing...' : 'Disconnected'}</p>
+          </div>
+          <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] font-black uppercase text-slate-400">Gemini AI</span>
+              <div className={`w-2 h-2 rounded-full ${aiStatus === 'ok' ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-red-500'}`}></div>
+            </div>
+            <p className="text-xs font-bold">{aiStatus === 'ok' ? 'Ready' : 'No API Key'}</p>
+          </div>
+        </div>
+        {!activeFamily && user && (
+          <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+            <p className="text-[10px] font-bold text-amber-400 leading-tight">⚠️ AI Meal Planning requires an active Family Hub. Join or create one below to enable storage for shared meal ideas.</p>
+          </div>
+        )}
+      </section>
 
       {/* Installation Prompt */}
       {isInstallable && (

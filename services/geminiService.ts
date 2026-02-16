@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { InventoryItem, MealIdea } from "../types";
+import { getEnv } from "./supabaseService";
 
 export interface AnalyzedPrice {
   category: string;
@@ -14,9 +15,15 @@ export interface AnalyzedPrice {
   unit: string;
 }
 
+const getAIClient = () => {
+  const apiKey = getEnv('API_KEY');
+  if (!apiKey) throw new Error("Missing Gemini API Key. Please configure process.env.API_KEY.");
+  return new GoogleGenAI({ apiKey });
+};
+
 export const searchStoreDetails = async (storeQuery: string, locationContext: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
+    const ai = getAIClient();
     const prompt = `Find the most relevant store matching "${storeQuery}" near "${locationContext}". 
     Extract and return the following as a structured list: 
     - Full Name
@@ -44,8 +51,8 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
 };
 
 export const lookupMarketDetails = async (itemName: string, variety?: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
+    const ai = getAIClient();
     const query = `Current average grocery price and standard units for ${itemName} ${variety || ''} in the US.`;
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
@@ -66,14 +73,14 @@ export const lookupMarketDetails = async (itemName: string, variety?: string) =>
 };
 
 export const identifyProductFromImage = async (base64Image: string, mode: 'barcode' | 'product' | 'tag' = 'tag'): Promise<AnalyzedPrice | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompts = {
-    barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category, Item Name, and Variety.",
-    product: "This is a photo of a product. Identify the hierarchy: Category, Item Name, and Variety. Also find the brand.",
-    tag: "This is a photo of a price tag. Extract hierarchy: Category, Item Name, and Variety. Also extract total price, quantity, unit, and store name."
-  };
-
   try {
+    const ai = getAIClient();
+    const prompts = {
+      barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category, Item Name, and Variety.",
+      product: "This is a photo of a product. Identify the hierarchy: Category, Item Name, and Variety. Also find the brand.",
+      tag: "This is a photo of a price tag. Extract hierarchy: Category, Item Name, and Variety. Also extract total price, quantity, unit, and store name."
+    };
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
@@ -117,7 +124,7 @@ export const identifyProductFromImage = async (base64Image: string, mode: 'barco
 };
 
 export const generateMealIdeas = async (inventory: InventoryItem[]): Promise<MealIdea[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   const inventoryText = inventory.map(i => `${i.quantity} ${i.unit} of ${i.itemName}${i.variety ? ` (${i.variety})` : ''}`).join(', ');
   
   const prompt = `Based on the following pantry/fridge inventory: [${inventoryText}].
@@ -125,58 +132,53 @@ export const generateMealIdeas = async (inventory: InventoryItem[]): Promise<Mea
   - Some should be 100% matches (using ONLY available ingredients).
   - Some should be close (missing 1-3 common items).
   - Provide varied cuisines.
-  Return the response in a structured JSON format following the provided schema.`;
+  Return the response in a structured JSON format.`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              description: { type: Type.STRING },
-              difficulty: { type: Type.STRING, enum: ['Easy', 'Medium', 'Hard'] },
-              cookTime: { type: Type.NUMBER, description: 'Time in minutes' },
-              matchPercentage: { type: Type.NUMBER, description: 'Percentage of ingredients currently in stock' },
-              ingredients: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    quantity: { type: Type.NUMBER },
-                    unit: { type: Type.STRING },
-                    isMissing: { type: Type.BOOLEAN, description: 'True if not in inventory' }
-                  },
-                  required: ["name", "quantity", "unit", "isMissing"]
-                }
-              },
-              instructions: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            description: { type: Type.STRING },
+            difficulty: { type: Type.STRING, enum: ['Easy', 'Medium', 'Hard'] },
+            cookTime: { type: Type.NUMBER, description: 'Time in minutes' },
+            matchPercentage: { type: Type.NUMBER, description: 'Percentage of ingredients currently in stock' },
+            ingredients: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  quantity: { type: Type.NUMBER },
+                  unit: { type: Type.STRING },
+                  isMissing: { type: Type.BOOLEAN, description: 'True if not in inventory' }
+                },
+                required: ["name", "quantity", "unit", "isMissing"]
               }
             },
-            required: ["title", "description", "difficulty", "cookTime", "ingredients", "instructions", "matchPercentage"]
-          }
+            instructions: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            }
+          },
+          required: ["title", "description", "difficulty", "cookTime", "ingredients", "instructions", "matchPercentage"]
         }
       }
-    });
+    }
+  });
 
-    const parsed = JSON.parse(response.text || '[]');
-    const now = new Date().toISOString();
-    return parsed.map((m: any) => ({
-      ...m,
-      id: crypto.randomUUID(),
-      generatedAt: now,
-      cookCount: 0
-    }));
-  } catch (error) {
-    console.error("Gemini Meal Generation Error:", error);
-    return [];
-  }
+  const parsed = JSON.parse(response.text || '[]');
+  const now = new Date().toISOString();
+  return parsed.map((m: any) => ({
+    ...m,
+    id: crypto.randomUUID(),
+    generatedAt: now,
+    cookCount: 0
+  }));
 };

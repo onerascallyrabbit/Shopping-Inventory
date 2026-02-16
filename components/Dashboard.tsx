@@ -72,7 +72,9 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
             </button>
           </div>
         </div>
-        <img src="cart_logo.png" className="absolute -right-4 -bottom-4 w-24 h-24 opacity-10 rotate-12" alt="" />
+        <svg className="absolute -right-4 -bottom-4 w-32 h-32 opacity-10 rotate-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
       </section>
 
       {/* Best Values List */}
@@ -142,7 +144,9 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
             </div>
           )) : (
             <div className="w-full py-8 flex flex-col items-center justify-center bg-slate-50 rounded-[24px] border border-dashed border-slate-200 text-slate-400">
-               <img src="cart_logo.png" className="w-8 h-8 grayscale opacity-30 mb-2" alt="Empty" />
+               <svg className="w-8 h-8 opacity-20 mb-2" fill="currentColor" viewBox="0 0 24 24">
+                 <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+               </svg>
                <p className="text-[9px] font-black uppercase tracking-widest">No deals logged yet.</p>
             </div>
           )}
@@ -221,8 +225,10 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
             </div>
           )) : (
             <div className="text-center py-12 flex flex-col items-center">
-               <div className="bg-indigo-50 p-4 rounded-full mb-3">
-                 <img src="cart_logo.png" className="w-8 h-8 grayscale opacity-40" alt="Start" />
+               <div className="bg-indigo-50 p-4 rounded-full mb-3 text-indigo-200">
+                 <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                   <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                 </svg>
                </div>
                <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest">No Activity Yet</p>
             </div>

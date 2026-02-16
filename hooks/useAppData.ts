@@ -11,7 +11,7 @@ import {
   syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily,
   deleteInventoryItem, syncShoppingItem, deleteShoppingItem,
   syncCustomCategory, deleteCustomCategory, syncCustomSubCategory, deleteCustomSubCategory,
-  bulkSyncStorageLocations, bulkSyncMealIdeas, updateMealStats, saveMealRating, getEnv
+  bulkSyncStorageLocations, bulkSyncMealIdeas, updateMealStats, saveMealRating
 } from '../services/supabaseService';
 import { generateMealIdeas } from '../services/geminiService';
 import { DEFAULT_CATEGORIES, DEFAULT_STORAGE } from '../constants';
@@ -140,10 +140,6 @@ export const useAppData = () => {
     }
     if (inventory.length === 0) {
       alert("Your stock is empty! Add items to your inventory so the AI can suggest recipes.");
-      return;
-    }
-    if (!getEnv('API_KEY')) {
-      alert("System Error: No Gemini API key detected. Please configure your environment.");
       return;
     }
 

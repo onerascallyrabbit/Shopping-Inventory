@@ -54,6 +54,7 @@ export interface SubLocation {
 export interface StorageLocation {
   id: string;
   name: string;
+  sortOrder: number;
 }
 
 export interface InventoryItem {

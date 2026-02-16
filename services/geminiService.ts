@@ -1,4 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
+import { InventoryItem, MealIdea } from "../types";
 
 export interface AnalyzedPrice {
   category: string;
@@ -12,11 +14,7 @@ export interface AnalyzedPrice {
   unit: string;
 }
 
-// Guideline: Always use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-// Guideline: Create a new GoogleGenAI instance right before making an API call.
-
 export const searchStoreDetails = async (storeQuery: string, locationContext: string) => {
-  // Use process.env.API_KEY directly as per SDK requirements
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const prompt = `Find the most relevant store matching "${storeQuery}" near "${locationContext}". 
@@ -46,7 +44,6 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
 };
 
 export const lookupMarketDetails = async (itemName: string, variety?: string) => {
-  // Use process.env.API_KEY directly as per SDK requirements
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const query = `Current average grocery price and standard units for ${itemName} ${variety || ''} in the US.`;
@@ -69,7 +66,6 @@ export const lookupMarketDetails = async (itemName: string, variety?: string) =>
 };
 
 export const identifyProductFromImage = async (base64Image: string, mode: 'barcode' | 'product' | 'tag' = 'tag'): Promise<AnalyzedPrice | null> => {
-  // Use process.env.API_KEY directly as per SDK requirements
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompts = {
     barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category, Item Name, and Variety.",
@@ -117,5 +113,70 @@ export const identifyProductFromImage = async (base64Image: string, mode: 'barco
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
     return null;
+  }
+};
+
+export const generateMealIdeas = async (inventory: InventoryItem[]): Promise<MealIdea[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const inventoryText = inventory.map(i => `${i.quantity} ${i.unit} of ${i.itemName}${i.variety ? ` (${i.variety})` : ''}`).join(', ');
+  
+  const prompt = `Based on the following pantry/fridge inventory: [${inventoryText}].
+  Suggest exactly 6 meal ideas.
+  - Some should be 100% matches (using ONLY available ingredients).
+  - Some should be close (missing 1-3 common items).
+  - Provide varied cuisines.
+  Return the response in a structured JSON format following the provided schema.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              difficulty: { type: Type.STRING, enum: ['Easy', 'Medium', 'Hard'] },
+              cookTime: { type: Type.NUMBER, description: 'Time in minutes' },
+              matchPercentage: { type: Type.NUMBER, description: 'Percentage of ingredients currently in stock' },
+              ingredients: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    quantity: { type: Type.NUMBER },
+                    unit: { type: Type.STRING },
+                    isMissing: { type: Type.BOOLEAN, description: 'True if not in inventory' }
+                  },
+                  required: ["name", "quantity", "unit", "isMissing"]
+                }
+              },
+              instructions: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              }
+            },
+            required: ["title", "description", "difficulty", "cookTime", "ingredients", "instructions", "matchPercentage"]
+          }
+        }
+      }
+    });
+
+    const parsed = JSON.parse(response.text || '[]');
+    const now = new Date().toISOString();
+    return parsed.map((m: any) => ({
+      ...m,
+      id: crypto.randomUUID(),
+      generatedAt: now,
+      cookCount: 0
+    }));
+  } catch (error) {
+    console.error("Gemini Meal Generation Error:", error);
+    return [];
   }
 };

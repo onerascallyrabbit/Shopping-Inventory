@@ -66,13 +66,15 @@ const MealPlanner: React.FC<MealPlannerProps> = ({
       {mealIdeas.length === 0 && !loading ? (
         <div className="text-center py-20 flex flex-col items-center">
            <div className="bg-indigo-50 p-8 rounded-[40px] mb-6 text-indigo-400">
-             <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+             <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+               <circle cx="10" cy="12" r="1" fill="currentColor"/>
+               <circle cx="14" cy="12" r="1" fill="currentColor"/>
              </svg>
            </div>
-           <p className="text-slate-900 font-black text-sm uppercase tracking-widest">No Meal Ideas Yet</p>
+           <p className="text-slate-900 font-black text-sm uppercase tracking-widest">Aisle Be Cookin'</p>
            <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-tight max-w-[200px] leading-relaxed">
-             {!activeFamily ? "Join a Family Hub in Settings to enable shared meal planning." : "Tap 'New Ideas' and let the AI chef analyze your pantry stock!"}
+             {!activeFamily ? "Join a Family Hub in Settings to enable shared meal planning." : "Tap 'New Ideas' and let my AI core analyze your pantry stock!"}
            </p>
         </div>
       ) : (

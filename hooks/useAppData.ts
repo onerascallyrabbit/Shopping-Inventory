@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Product, ShoppingItem, InventoryItem, StorageLocation, 
-  SubLocation, StoreLocation, Vehicle, Profile, Family, CustomCategory, CustomSubCategory
+  SubLocation, StoreLocation, Vehicle, Profile, Family, CustomCategory, CustomSubCategory, MealIdea
 } from '../types';
 import { 
   fetchUserData, syncInventoryItem, syncStorageLocation, 
@@ -11,8 +11,9 @@ import {
   syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily,
   deleteInventoryItem, syncShoppingItem, deleteShoppingItem,
   syncCustomCategory, deleteCustomCategory, syncCustomSubCategory, deleteCustomSubCategory,
-  bulkSyncStorageLocations
+  bulkSyncStorageLocations, bulkSyncMealIdeas, updateMealStats, saveMealRating
 } from '../services/supabaseService';
+import { generateMealIdeas } from '../services/geminiService';
 import { DEFAULT_CATEGORIES, DEFAULT_STORAGE } from '../constants';
 
 export const useAppData = () => {
@@ -21,6 +22,7 @@ export const useAppData = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [mealIdeas, setMealIdeas] = useState<MealIdea[]>([]);
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>(DEFAULT_STORAGE.map((s, i) => ({ ...s, sortOrder: i })));
   const [subLocations, setSubLocations] = useState<SubLocation[]>([]);
   const [stores, setStores] = useState<StoreLocation[]>([]);
@@ -33,7 +35,6 @@ export const useAppData = () => {
     categoryOrder: DEFAULT_CATEGORIES, sharePrices: false 
   });
 
-  // Sync Locks to prevent "Reset" flicker on reordering
   const isSyncingReorder = useRef(false);
 
   const loadAllData = useCallback(async (silent = false) => {
@@ -42,8 +43,6 @@ export const useAppData = () => {
       return;
     }
     
-    // If we are currently writing a reorder, don't let a "Realtime" event trigger a fetch
-    // which might pull old data from the DB before our write has finished.
     if (silent && isSyncingReorder.current) {
       return;
     }
@@ -66,6 +65,7 @@ export const useAppData = () => {
         setShoppingList(data.shoppingList || []);
         setCustomCategories(data.customCategories || []);
         setCustomSubCategories(data.customSubCategories || []);
+        setMealIdeas(data.mealIdeas || []);
         
         if (data.inventory) {
           setInventory(data.inventory.map(i => ({
@@ -94,7 +94,6 @@ export const useAppData = () => {
     }
   }, []);
 
-  // Realtime Subscription
   useEffect(() => {
     if (!supabase || !user) return;
 
@@ -104,11 +103,8 @@ export const useAppData = () => {
       .on('postgres_changes', { event: '*', table: 'shopping_list', schema: 'public' }, () => loadAllData(true))
       .on('postgres_changes', { event: '*', table: 'custom_categories', schema: 'public' }, () => loadAllData(true))
       .on('postgres_changes', { event: '*', table: 'custom_sub_categories', schema: 'public' }, () => loadAllData(true))
-      .on('postgres_changes', { event: '*', table: 'storage_locations', schema: 'public' }, () => {
-         // Debounced reload if storage locations change elsewhere
-         loadAllData(true);
-      })
-      .on('postgres_changes', { event: '*', table: 'sub_locations', schema: 'public' }, () => loadAllData(true))
+      .on('postgres_changes', { event: '*', table: 'meal_ideas', schema: 'public' }, () => loadAllData(true))
+      .on('postgres_changes', { event: '*', table: 'storage_locations', schema: 'public' }, () => loadAllData(true))
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -136,6 +132,36 @@ export const useAppData = () => {
     
     return () => subscription.unsubscribe();
   }, [loadAllData]);
+
+  const refreshMeals = async () => {
+    if (!activeFamily) return;
+    setLoading(true);
+    try {
+      const newMeals = await generateMealIdeas(inventory);
+      if (newMeals.length > 0) {
+        await bulkSyncMealIdeas(activeFamily.id, newMeals);
+        await loadAllData(true);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cookMeal = async (mealId: string) => {
+    const meal = mealIdeas.find(m => m.id === mealId);
+    if (!meal) return;
+    const updates = { 
+      cook_count: (meal.cookCount || 0) + 1, 
+      last_cooked: new Date().toISOString() 
+    };
+    await updateMealStats(mealId, updates);
+    loadAllData(true);
+  };
+
+  const rateMeal = async (mealId: string, rating: number) => {
+    await saveMealRating(mealId, rating);
+    loadAllData(true);
+  };
 
   const updateProfile = async (updates: Partial<Profile>) => {
     try {
@@ -233,18 +259,12 @@ export const useAppData = () => {
 
   const reorderStorageLocations = async (newOrder: StorageLocation[]) => {
     const ordered = newOrder.map((l, i) => ({ ...l, sortOrder: i }));
-    
-    // OPTIMISTIC UPDATE: Update state immediately
     setStorageLocations(ordered);
-
     if (user) {
         isSyncingReorder.current = true;
         try {
             await bulkSyncStorageLocations(ordered);
-            // Wait a tiny bit for DB propagation before unlocking syncs
-            setTimeout(() => {
-                isSyncingReorder.current = false;
-            }, 1500);
+            setTimeout(() => { isSyncingReorder.current = false; }, 1500);
         } catch (e) {
             console.error("Reorder sync failed:", e);
             isSyncingReorder.current = false;
@@ -253,7 +273,6 @@ export const useAppData = () => {
     }
   };
 
-  // Taxonomy Management
   const addCategory = async (name: string) => {
     if (!activeFamily) return;
     await syncCustomCategory({ familyId: activeFamily.id, name });
@@ -263,7 +282,6 @@ export const useAppData = () => {
   const removeCategory = async (id: string) => {
     const cat = customCategories.find(c => c.id === id);
     if (!cat) return;
-    // Safety check: is in use?
     const inUse = inventory.some(i => i.category === cat.name) || products.some(p => p.category === cat.name);
     if (inUse) {
         alert("Cannot delete category: It is currently assigned to items in your stock or price history.");
@@ -282,7 +300,6 @@ export const useAppData = () => {
   const removeSubCategory = async (id: string) => {
     const sub = customSubCategories.find(s => s.id === id);
     if (!sub) return;
-    // Safety check: is in use?
     const inUse = inventory.some(i => i.subCategory === sub.name) || products.some(p => p.subCategory === sub.name);
     if (inUse) {
         alert("Cannot delete sub-category: It is currently assigned to items in your stock or price history.");
@@ -293,13 +310,14 @@ export const useAppData = () => {
   };
 
   return {
-    user, loading, products, shoppingList, inventory, 
+    user, loading, products, shoppingList, inventory, mealIdeas,
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
     customCategories, customSubCategories,
     addCategory, removeCategory, addSubCategory, removeSubCategory,
     updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
     addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem, 
-    addToInventory, importBulkInventory, reorderStorageLocations, refresh: loadAllData
+    addToInventory, importBulkInventory, reorderStorageLocations, refresh: loadAllData,
+    refreshMeals, cookMeal, rateMeal
   };
 };

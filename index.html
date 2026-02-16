@@ -5,9 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Aisle Be Back">
     <title>Aisle Be Back</title>
-    <link rel="manifest" href="./manifest.json">
+    <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="cart_logo.png">
+    <link rel="icon" type="image/png" href="cart_logo.png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -82,10 +87,28 @@
     <script type="module" src="./index.tsx"></script>
     
     <script>
-        // Service Worker Registration for PWA Installability
+        // Store the deferred prompt event for installation
+        window.deferredPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+          // Prevent the mini-infobar from appearing on mobile
+          e.preventDefault();
+          // Stash the event so it can be triggered later.
+          window.deferredPrompt = e;
+          console.log('Install prompt captured');
+          // Optional: Dispatch a custom event to notify React that installation is possible
+          window.dispatchEvent(new CustomEvent('app-installable'));
+        });
+
+        window.addEventListener('appinstalled', (evt) => {
+          console.log('App successfully installed');
+          window.deferredPrompt = null;
+        });
+
+        // Service Worker Registration for PWA
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').then(reg => {
+            navigator.serviceWorker.register('sw.js').then(reg => {
               console.log('SW Registered:', reg);
             }).catch(err => {
               console.warn('SW Registration Failed:', err);
@@ -101,7 +124,7 @@
                 const errorText = document.getElementById('error-text');
                 if (msg) msg.innerText = "Application failed to start.";
                 if (console) console.style.display = 'block';
-                if (errorText) errorText.innerText = "Module resolution timeout or version conflict. Ensure only one React version is requested.";
+                if (errorText) errorText.innerText = "Module resolution timeout or version conflict.";
             }
         }, 10000);
     </script>

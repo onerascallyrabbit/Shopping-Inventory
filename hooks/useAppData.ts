@@ -11,7 +11,7 @@ import {
   syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily,
   deleteInventoryItem, syncShoppingItem, deleteShoppingItem,
   syncCustomCategory, deleteCustomCategory, syncCustomSubCategory, deleteCustomSubCategory,
-  bulkSyncStorageLocations, bulkSyncMealIdeas, updateMealStats, saveMealRating
+  bulkSyncStorageLocations, bulkSyncMealIdeas, updateMealStats, saveMealRating, getEnv
 } from '../services/supabaseService';
 import { generateMealIdeas } from '../services/geminiService';
 import { DEFAULT_CATEGORIES, DEFAULT_STORAGE } from '../constants';
@@ -134,14 +134,31 @@ export const useAppData = () => {
   }, [loadAllData]);
 
   const refreshMeals = async () => {
-    if (!activeFamily) return;
+    if (!activeFamily) {
+      alert("No active Family Hub. Please join or create a Hub in Settings to enable shared meal planning.");
+      return;
+    }
+    if (inventory.length === 0) {
+      alert("Your stock is empty! Add items to your inventory so the AI can suggest recipes.");
+      return;
+    }
+    if (!getEnv('API_KEY')) {
+      alert("System Error: No Gemini API key detected. Please configure your environment.");
+      return;
+    }
+
     setLoading(true);
     try {
       const newMeals = await generateMealIdeas(inventory);
-      if (newMeals.length > 0) {
+      if (newMeals && newMeals.length > 0) {
         await bulkSyncMealIdeas(activeFamily.id, newMeals);
         await loadAllData(true);
+      } else {
+        alert("The AI was unable to suggest meals. Check your inventory items or API limits.");
       }
+    } catch (err: any) {
+      console.error("Meal Generation Failure:", err);
+      alert(`AI Error: ${err.message || 'Failed to generate meals. Try again.'}`);
     } finally {
       setLoading(false);
     }

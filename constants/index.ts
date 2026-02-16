@@ -23,10 +23,11 @@ export const SUB_CATEGORIES: Record<string, string[]> = {
 
 export const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
 
+// Fix: Added missing sortOrder property to satisfy StorageLocation interface
 export const DEFAULT_STORAGE: StorageLocation[] = [
-  { id: '11111111-1111-1111-1111-111111111111', name: 'Pantry - Main' },
-  { id: '22222222-2222-2222-2222-222222222222', name: 'Refrigerator #1' },
-  { id: '33333333-3333-3333-3333-333333333333', name: 'Freezer #1' }
+  { id: '1', name: 'Pantry - Main', sortOrder: 0 },
+  { id: '2', name: 'Refrigerator #1', sortOrder: 1 },
+  { id: '3', name: 'Freezer #1', sortOrder: 2 }
 ];
 
 export const NATIONAL_STORES = [

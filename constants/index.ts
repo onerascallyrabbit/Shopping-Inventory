@@ -4,7 +4,7 @@ import { StorageLocation } from '../types';
 export const DEFAULT_CATEGORIES = [
   "Produce", "Dairy", "Meat", "Seafood", "Deli", "Bakery", 
   "Frozen", "Pantry", "Beverages", "Household", "Personal Care", 
-  "Baby", "Pets", "Other"
+  "Pets", "Other"
 ];
 
 export const SUB_CATEGORIES: Record<string, string[]> = {
@@ -32,5 +32,5 @@ export const DEFAULT_STORAGE: StorageLocation[] = [
 
 export const NATIONAL_STORES = [
   "Walmart", "Target", "Costco", "Whole Foods", 
-  "Trader Joe's", "Aldi", "Kroger", "Safeway", "Publix"
+  "Trader Joe's", "Fred Meyer", "Safeway"
 ];

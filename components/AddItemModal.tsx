@@ -18,17 +18,22 @@ interface AddItemModalProps {
 }
 
 const AddItemModal: React.FC<AddItemModalProps> = ({ 
-  onClose, onSubmit, products, initialMode = 'tag', location = '', savedStores, lastUsedStore,
+  onClose, onSubmit, products, initialMode = 'type', location = '', savedStores, lastUsedStore,
   customCategories, customSubCategories
 }) => {
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag'>(initialMode);
   const [formData, setFormData] = useState({
-    category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'lb'
+    category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc'
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync mode if initialMode changes
+  useEffect(() => {
+    setInputMode(initialMode);
+  }, [initialMode]);
 
   const allCategories = useMemo(() => {
     return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories.map(c => c.name)])).sort();
@@ -40,6 +45,13 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
     return Array.from(new Set([...globals, ...customs])).sort();
   }, [formData.category, customSubCategories]);
 
+  const storeSuggestions = useMemo(() => {
+    const historical = products.flatMap(p => p.history.map(h => h.store));
+    const saved = savedStores.map(s => s.name);
+    const combined = Array.from(new Set([...historical, ...saved, ...NATIONAL_STORES])).filter(Boolean).sort();
+    return combined;
+  }, [products, savedStores]);
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -48,20 +60,25 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
         const base64 = reader.result as string;
         setImage(base64);
         setLoading(true);
-        const analyzed = await identifyProductFromImage(base64, inputMode === 'type' ? 'tag' : inputMode);
-        if (analyzed) {
-          setFormData(prev => ({
-            ...prev,
-            category: allCategories.find(c => c.toLowerCase() === (analyzed.category || '').toLowerCase()) || prev.category,
-            itemName: analyzed.itemName || prev.itemName,
-            variety: analyzed.variety || prev.variety || '',
-            brand: analyzed.brand || prev.brand,
-            barcode: analyzed.barcode || prev.barcode,
-            price: analyzed.price?.toString() || prev.price,
-            store: analyzed.store || prev.store,
-            quantity: analyzed.quantity?.toString() || prev.quantity,
-            unit: analyzed.unit || prev.unit,
-          }));
+        try {
+          const modeToUse = inputMode === 'type' ? 'tag' : inputMode;
+          const analyzed = await identifyProductFromImage(base64, modeToUse);
+          if (analyzed) {
+            setFormData(prev => ({
+              ...prev,
+              category: allCategories.find(c => c.toLowerCase() === (analyzed.category || '').toLowerCase()) || prev.category,
+              itemName: analyzed.itemName || prev.itemName,
+              variety: analyzed.variety || prev.variety || '',
+              brand: analyzed.brand || prev.brand,
+              barcode: analyzed.barcode || prev.barcode,
+              price: analyzed.price?.toString() || prev.price,
+              store: analyzed.store || prev.store,
+              quantity: analyzed.quantity?.toString() || prev.quantity,
+              unit: analyzed.unit || prev.unit,
+            }));
+          }
+        } catch (err) {
+          console.error("AI Analysis failed", err);
         }
         setLoading(false);
       };
@@ -79,13 +96,22 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md">
-      <div className="bg-white w-full max-w-lg h-[95vh] sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] rounded-t-[40px] shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 animate-in fade-in">
+      <div className="bg-white w-full max-w-lg h-[95vh] sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] rounded-t-[40px] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-10">
         <div className="px-6 py-4 flex justify-between items-center shrink-0 border-b">
-          <button onClick={onClose} className="p-2 text-slate-300"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
-          <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button onClick={onClose} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+          <div className="flex bg-slate-100 p-1 rounded-2xl">
               {(['type', 'product', 'barcode'] as const).map(mode => (
-                <button key={mode} onClick={() => setInputMode(mode)} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-lg ${inputMode === mode ? 'bg-white text-indigo-600' : 'text-slate-400'}`}>{mode === 'type' ? 'Type' : mode === 'product' ? 'Photo' : 'UPC'}</button>
+                <button 
+                  key={mode} 
+                  type="button"
+                  onClick={() => setInputMode(mode)} 
+                  className={`px-4 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${inputMode === mode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  {mode === 'type' ? 'Manual' : mode === 'product' ? 'Photo' : 'UPC'}
+                </button>
               ))}
           </div>
           <div className="w-8"></div>
@@ -93,34 +119,101 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {inputMode !== 'type' && (
-            <div onClick={() => fileInputRef.current?.click()} className={`h-48 rounded-[32px] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer ${image ? 'bg-slate-900 overflow-hidden' : 'bg-slate-50'}`}>
-              {image ? <img src={image} className="w-full h-full object-contain" /> : <p className="text-[11px] font-black uppercase text-slate-400">Snap {inputMode}</p>}
+            <div 
+              onClick={() => fileInputRef.current?.click()} 
+              className={`h-48 rounded-[32px] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative group transition-all ${image ? 'bg-slate-900 border-none overflow-hidden' : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-indigo-200'}`}
+            >
+              {image ? (
+                <img src={image} className="w-full h-full object-contain" alt="Preview" />
+              ) : (
+                <div className="text-center space-y-2">
+                  <div className="bg-indigo-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-indigo-500 group-hover:scale-110 transition-transform">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
+                  </div>
+                  <p className="text-[11px] font-black uppercase text-slate-400 tracking-widest">Snap {inputMode === 'barcode' ? 'Barcode' : 'Product'}</p>
+                </div>
+              )}
+              {loading && (
+                <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center backdrop-blur-md animate-in fade-in">
+                  <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+                  <p className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] animate-pulse">Analyzing with AI...</p>
+                </div>
+              )}
               <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" capture="environment" />
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
-              <input required className="w-full bg-slate-50 rounded-2xl px-4 py-4 text-sm font-bold" placeholder="Store Name" value={formData.store} onChange={(e) => setFormData({...formData, store: e.target.value})} />
-              <div className="grid grid-cols-2 gap-4">
-                <select className="w-full bg-slate-50 rounded-2xl px-4 py-4 text-sm font-bold" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value, subCategory: ''})}>
-                  {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
-                <select className="w-full bg-slate-50 rounded-2xl px-4 py-4 text-sm font-bold" value={formData.subCategory} onChange={(e) => setFormData({...formData, subCategory: e.target.value})}>
-                  <option value="">General</option>
-                  {subCatsForSelected.map(sc => <option key={sc} value={sc}>{sc}</option>)}
-                </select>
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Store Selection</label>
+                <div className="relative">
+                  <input 
+                    required 
+                    list="store-suggestions"
+                    className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold placeholder:font-normal focus:ring-2 focus:ring-indigo-500/10 focus:bg-white transition-all" 
+                    placeholder="Enter Store Name..." 
+                    value={formData.store} 
+                    onChange={(e) => setFormData({...formData, store: e.target.value})} 
+                  />
+                  <datalist id="store-suggestions">
+                    {storeSuggestions.map(s => <option key={s} value={s} />)}
+                  </datalist>
+                </div>
               </div>
-              <input required className="w-full bg-slate-50 rounded-2xl px-4 py-4 text-sm font-bold" placeholder="Item Name" value={formData.itemName} onChange={(e) => setFormData({...formData, itemName: e.target.value})} />
-              <div className="bg-indigo-50/50 p-4 rounded-3xl flex space-x-2">
-                <input required type="number" step="0.01" className="flex-1 bg-white rounded-xl px-4 py-3 text-xs font-black" placeholder="Price" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} />
-                <input required type="number" step="0.01" className="w-20 bg-white rounded-xl px-2 py-3 text-xs font-bold" placeholder="Qty" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} />
-                <select className="flex-1 bg-white rounded-xl px-2 py-3 text-xs font-bold" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})}>
-                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
+                   <select className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold appearance-none focus:bg-white transition-all" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value, subCategory: ''})}>
+                     {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                   </select>
+                </div>
+                <div className="space-y-1.5">
+                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sub-Category</label>
+                   <select className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold appearance-none focus:bg-white transition-all" value={formData.subCategory} onChange={(e) => setFormData({...formData, subCategory: e.target.value})}>
+                     <option value="">General</option>
+                     {subCatsForSelected.map(sc => <option key={sc} value={sc}>{sc}</option>)}
+                   </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Description</label>
+                 <input required className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold focus:bg-white transition-all" placeholder="e.g. Organic Honeycrisp Apples" value={formData.itemName} onChange={(e) => setFormData({...formData, itemName: e.target.value})} />
+              </div>
+
+              <div className="bg-indigo-50/40 p-5 rounded-[32px] border border-indigo-100/50 space-y-4">
+                <div className="flex items-center justify-between px-1">
+                   <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Pricing & Quantity</span>
+                </div>
+                <div className="flex space-x-2">
+                  <div className="flex-[2] space-y-1">
+                    <label className="text-[8px] font-black text-indigo-300 uppercase ml-1">Total Price</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-3 text-xs font-black text-indigo-300">$</span>
+                      <input required type="number" step="0.01" className="w-full bg-white border-none rounded-xl pl-7 pr-3 py-3 text-xs font-black" placeholder="0.00" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[8px] font-black text-indigo-300 uppercase ml-1">Qty</label>
+                    <input required type="number" step="0.01" className="w-full bg-white border-none rounded-xl px-2 py-3 text-xs font-bold text-center" placeholder="1" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[8px] font-black text-indigo-300 uppercase ml-1">Unit</label>
+                    <select className="w-full bg-white border-none rounded-xl px-2 py-3 text-xs font-bold text-indigo-600 appearance-none text-center" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})}>
+                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
-            <button type="submit" className="w-full bg-indigo-600 text-white font-black py-5 rounded-[24px] uppercase tracking-widest shadow-lg">Save Price History</button>
+            <button 
+              type="submit" 
+              className="w-full bg-indigo-600 text-white font-black py-5 rounded-[24px] uppercase tracking-[0.2em] text-xs shadow-xl shadow-indigo-100 active:scale-95 hover:bg-indigo-700 transition-all mt-4"
+            >
+              Log Price Entry
+            </button>
           </form>
         </div>
       </div>

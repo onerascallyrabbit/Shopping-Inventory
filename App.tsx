@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppTab } from './types';
 import Dashboard from './components/Dashboard';
 import ItemBrowser from './components/ItemBrowser';
@@ -30,13 +30,30 @@ const App: React.FC = () => {
   const [isGuest, setIsGuest] = useState(() => localStorage.getItem('pricewise_is_guest') === 'true');
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addModalMode, setAddModalMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('type');
   const [lastUsedStore, setLastUsedStore] = useState<string>('');
+
+  useEffect(() => {
+    const handleOpenAddModal = (e: any) => {
+      if (e.detail?.mode) {
+        setAddModalMode(e.detail.mode);
+      } else {
+        setAddModalMode('type');
+      }
+      setIsAddModalOpen(true);
+    };
+
+    document.addEventListener('openAddModal', handleOpenAddModal);
+    return () => document.removeEventListener('openAddModal', handleOpenAddModal);
+  }, []);
 
   if (!user && !isGuest) {
     return (
       <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center overflow-y-auto">
         <div className="bg-indigo-600 p-6 rounded-[40px] shadow-2xl mb-8 flex items-center justify-center">
-          <img src="cart_logo.png" className="w-16 h-16 object-contain" alt="Aisle Be Back Logo" />
+          <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
         </div>
         <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Aisle Be Back</h1>
         <p className="text-slate-400 font-medium mb-12 max-w-[280px] leading-relaxed text-sm">Sign in to sync your prices and household inventory with your family.</p>
@@ -90,11 +107,11 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} onAddClick={() => setIsAddModalOpen(true)} />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} onAddClick={() => { setAddModalMode('type'); setIsAddModalOpen(true); }} />
       
       <div className="fixed bottom-24 right-4 z-40">
         <button 
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => { setAddModalMode('type'); setIsAddModalOpen(true); }}
           className="bg-indigo-600 text-white rounded-full p-4 shadow-xl active:scale-95 transition-transform border-4 border-white"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
@@ -106,6 +123,7 @@ const App: React.FC = () => {
           onClose={() => setIsAddModalOpen(false)} 
           onSubmit={(cat, item, variety, rec, brand, bar) => { addPriceRecord(cat, item, variety, rec, brand, bar); setLastUsedStore(rec.store); setIsAddModalOpen(false); }} 
           onSaveToList={addToList} 
+          initialMode={addModalMode}
           products={products} location={profile.locationLabel} savedStores={stores} lastUsedStore={lastUsedStore}
           customCategories={customCategories} customSubCategories={customSubCategories}
         />

@@ -15,7 +15,9 @@ export interface AnalyzedPrice {
 }
 
 const getAIClient = () => {
-  const apiKey = (typeof process !== 'undefined' ? process.env.API_KEY : '');
+  // Use the API_KEY from the environment as required
+  const apiKey = process.env.API_KEY;
+  
   if (!apiKey) {
     throw new Error("Gemini API Key missing. Please ensure 'API_KEY' is set in your environment variables.");
   }

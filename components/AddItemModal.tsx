@@ -30,9 +30,13 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync mode if initialMode changes
+  // Default to 'type' if no specific initialMode provided or if it's 'tag' (which isn't a main tab)
   useEffect(() => {
-    setInputMode(initialMode);
+    if (initialMode === 'tag' || !initialMode) {
+      setInputMode('type');
+    } else {
+      setInputMode(initialMode);
+    }
   }, [initialMode]);
 
   const allCategories = useMemo(() => {
@@ -150,14 +154,14 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                 <div className="relative">
                   <input 
                     required 
-                    list="store-suggestions"
+                    list="store-suggestions-datalist"
                     className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold placeholder:font-normal focus:ring-2 focus:ring-indigo-500/10 focus:bg-white transition-all" 
                     placeholder="Enter Store Name..." 
                     value={formData.store} 
                     onChange={(e) => setFormData({...formData, store: e.target.value})} 
                   />
-                  <datalist id="store-suggestions">
-                    {storeSuggestions.map(s => <option key={s} value={s} />)}
+                  <datalist id="store-suggestions-datalist">
+                    {storeSuggestions.map((s, idx) => <option key={`${s}-${idx}`} value={s} />)}
                   </datalist>
                 </div>
               </div>

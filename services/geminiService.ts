@@ -15,11 +15,11 @@ export interface AnalyzedPrice {
 }
 
 const getAIClient = () => {
-  // Use the API_KEY from the environment as required
+  // Always use process.env.API_KEY as the source
   const apiKey = process.env.API_KEY;
   
   if (!apiKey) {
-    throw new Error("Gemini API Key missing. Please ensure 'API_KEY' is set in your environment variables.");
+    throw new Error("Gemini API Key missing. Please ensure 'API_KEY' is set in your environment variables (e.g. in your .env file or hosting dashboard).");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -36,7 +36,7 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
     - Hours of Operation`;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', 
+      model: 'gemini-2.5-flash-lite-latest', 
       contents: prompt,
       config: {
         tools: [{ googleMaps: {} }],

@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { InventoryItem, MealIdea } from "../types";
 
@@ -14,21 +13,17 @@ export interface AnalyzedPrice {
   unit: string;
 }
 
-const getApiKey = () => {
-  try {
-    // Exclusively using process.env.API_KEY as required
-    return typeof process !== 'undefined' ? process.env.API_KEY : undefined;
-  } catch {
-    return undefined;
-  }
-};
+// Ensure the GoogleGenAI instance is created directly with process.env.API_KEY where needed.
+// This is compliant with the requirement to use the API key directly.
 
+/**
+ * Searches for store details using Google Maps grounding.
+ * Uses gemini-2.5-flash as it is supported for maps grounding.
+ */
 export const searchStoreDetails = async (storeQuery: string, locationContext: string) => {
   try {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API_KEY not found in environment.");
-    
-    const ai = new GoogleGenAI({ apiKey });
+    // Correct initialization as per instructions
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Find the most relevant store matching "${storeQuery}" near "${locationContext}". 
     Extract and return the following as a structured list: 
     - Full Name
@@ -38,7 +33,7 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
     - Hours of Operation`;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest', 
+      model: 'gemini-2.5-flash', 
       contents: prompt,
       config: {
         tools: [{ googleMaps: {} }],
@@ -55,12 +50,12 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
   }
 };
 
+/**
+ * Look up market details using Google Search grounding.
+ */
 export const lookupMarketDetails = async (itemName: string, variety?: string) => {
   try {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API_KEY not found in environment.");
-
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const query = `Current average grocery price and standard units for ${itemName} ${variety || ''} in the US.`;
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
@@ -80,12 +75,12 @@ export const lookupMarketDetails = async (itemName: string, variety?: string) =>
   }
 };
 
+/**
+ * Identifies a product or extracts data from an image using AI vision.
+ */
 export const identifyProductFromImage = async (base64Image: string, mode: 'barcode' | 'product' | 'tag' = 'tag'): Promise<AnalyzedPrice | null> => {
   try {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API_KEY not found in environment.");
-
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompts = {
       barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category, Item Name, and Variety.",
       product: "This is a photo of a product. Identify the hierarchy: Category, Item Name, and Variety. Also find the brand.",
@@ -134,11 +129,11 @@ export const identifyProductFromImage = async (base64Image: string, mode: 'barco
   }
 };
 
+/**
+ * Generates meal ideas based on available inventory.
+ */
 export const generateMealIdeas = async (inventory: InventoryItem[]): Promise<MealIdea[]> => {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API_KEY not found in environment.");
-
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const inventoryText = inventory.map(i => `${i.quantity} ${i.unit} of ${i.itemName}${i.variety ? ` (${i.variety})` : ''}`).join(', ');
   
   const prompt = `Based on the following pantry/fridge inventory: [${inventoryText}].

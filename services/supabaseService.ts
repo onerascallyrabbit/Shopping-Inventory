@@ -3,14 +3,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
 import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family, ShoppingItem, CustomCategory, CustomSubCategory, MealIdea } from '../types';
 
 // Environment variables detection
-// We prioritize process.env.API_KEY as per instructions
-const envApiKey = (typeof process !== 'undefined' ? process.env.API_KEY : '') || (typeof process !== 'undefined' ? process.env.VITE_API_KEY : '') || '';
-
 // @ts-ignore
 export const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : '') || '';
 // @ts-ignore
 export const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : '') || '';
-export const API_KEY = envApiKey;
 
 export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
@@ -19,7 +15,7 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
 export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_URL') return SUPABASE_URL;
   if (key === 'SUPABASE_ANON_KEY') return SUPABASE_ANON_KEY;
-  if (key === 'API_KEY') return (typeof process !== 'undefined' ? process.env.API_KEY : '') || API_KEY;
+  if (key === 'API_KEY') return process.env.API_KEY || '';
   return '';
 };
 

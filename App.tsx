@@ -47,6 +47,11 @@ const App: React.FC = () => {
     return () => document.removeEventListener('openAddModal', handleOpenAddModal);
   }, []);
 
+  const openAddModal = (mode: 'type' | 'barcode' | 'product' | 'tag' = 'type') => {
+    setAddModalMode(mode);
+    setIsAddModalOpen(true);
+  };
+
   if (!user && !isGuest) {
     return (
       <div className="flex flex-col h-screen bg-white items-center justify-center p-8 text-center overflow-y-auto">
@@ -107,11 +112,11 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} onAddClick={() => { setAddModalMode('type'); setIsAddModalOpen(true); }} />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} onAddClick={() => openAddModal('type')} />
       
       <div className="fixed bottom-24 right-4 z-40">
         <button 
-          onClick={() => { setAddModalMode('type'); setIsAddModalOpen(true); }}
+          onClick={() => openAddModal('type')}
           className="bg-indigo-600 text-white rounded-full p-4 shadow-xl active:scale-95 transition-transform border-4 border-white"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>

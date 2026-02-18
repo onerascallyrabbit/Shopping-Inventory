@@ -14,19 +14,9 @@ export interface AnalyzedPrice {
   unit: string;
 }
 
-const getAIClient = () => {
-  // Always use process.env.API_KEY as the source
-  const apiKey = process.env.API_KEY;
-  
-  if (!apiKey) {
-    throw new Error("Gemini API Key missing. Please ensure 'API_KEY' is set in your environment variables (e.g. in your .env file or hosting dashboard).");
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
 export const searchStoreDetails = async (storeQuery: string, locationContext: string) => {
   try {
-    const ai = getAIClient();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Find the most relevant store matching "${storeQuery}" near "${locationContext}". 
     Extract and return the following as a structured list: 
     - Full Name
@@ -55,7 +45,7 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
 
 export const lookupMarketDetails = async (itemName: string, variety?: string) => {
   try {
-    const ai = getAIClient();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const query = `Current average grocery price and standard units for ${itemName} ${variety || ''} in the US.`;
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
@@ -77,7 +67,7 @@ export const lookupMarketDetails = async (itemName: string, variety?: string) =>
 
 export const identifyProductFromImage = async (base64Image: string, mode: 'barcode' | 'product' | 'tag' = 'tag'): Promise<AnalyzedPrice | null> => {
   try {
-    const ai = getAIClient();
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompts = {
       barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category, Item Name, and Variety.",
       product: "This is a photo of a product. Identify the hierarchy: Category, Item Name, and Variety. Also find the brand.",
@@ -127,7 +117,7 @@ export const identifyProductFromImage = async (base64Image: string, mode: 'barco
 };
 
 export const generateMealIdeas = async (inventory: InventoryItem[]): Promise<MealIdea[]> => {
-  const ai = getAIClient();
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const inventoryText = inventory.map(i => `${i.quantity} ${i.unit} of ${i.itemName}${i.variety ? ` (${i.variety})` : ''}`).join(', ');
   
   const prompt = `Based on the following pantry/fridge inventory: [${inventoryText}].

@@ -181,7 +181,7 @@ export const fetchShoppingList = async (): Promise<ShoppingItem[]> => {
     neededQuantity: Number(item.needed_quantity),
     unit: item.unit,
     isCompleted: item.is_completed,
-    manual_store: item.manual_store,
+    manualStore: item.manual_store,
     userId: item.user_id
   }));
 };
@@ -191,14 +191,15 @@ export const syncShoppingItem = async (item: ShoppingItem) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
   
+  // Fix: use item.neededQuantity and item.manualStore to match type definition
   const payload = {
     id: item.id,
     product_id: item.productId,
     name: item.name,
-    needed_quantity: item.needed_quantity,
+    needed_quantity: item.neededQuantity,
     unit: item.unit,
     is_completed: item.isCompleted,
-    manual_store: item.manual_store,
+    manual_store: item.manualStore,
     user_id: item.userId || user.id
   };
   
@@ -455,6 +456,7 @@ export const syncInventoryItem = async (item: InventoryItem) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
 
+  // Fix: use item.locationId instead of item.location_id
   const payload: any = {
     id: item.id,
     product_id: item.productId,
@@ -462,7 +464,7 @@ export const syncInventoryItem = async (item: InventoryItem) => {
     category: item.category,
     quantity: item.quantity,
     unit: item.unit,
-    location_id: item.location_id,
+    location_id: item.locationId,
     updated_at: item.updatedAt,
     user_id: item.userId || user.id
   };
@@ -490,11 +492,12 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
   
+  // Fix: use item.locationId instead of item.location_id
   const payload = items.map(item => {
     const row: any = { 
       id: item.id, product_id: item.productId, item_name: item.itemName, 
       category: item.category, quantity: item.quantity, unit: item.unit, 
-      location_id: item.location_id, updated_at: item.updatedAt, user_id: item.userId || user.id 
+      location_id: item.locationId, updated_at: item.updatedAt, user_id: item.userId || user.id 
     };
     if (item.subCategory) row.sub_category = item.subCategory;
     if (item.variety) row.variety = item.variety;

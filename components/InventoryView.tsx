@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import { InventoryItem, StorageLocation, Product, SubLocation, CustomCategory, CustomSubCategory } from '../types';
 import CsvImportModal from './CsvImportModal';
@@ -34,6 +33,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [depletedItem, setDepletedItem] = useState<InventoryItem | null>(null);
   const [search, setSearch] = useState('');
   const [recentlyAddedToList, setRecentlyAddedToList] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   const allAvailableCategories = useMemo(() => {
     return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories.map(c => c.name)])).sort();
@@ -68,13 +68,47 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     return groups;
   }, [filteredInventory, activeLocationId, locations]);
 
+  const handleCopyNames = () => {
+    if (filteredInventory.length === 0) return;
+    
+    // Deduplicate names to provide a clean CSV list
+    const names = Array.from(new Set(filteredInventory.map(item => item.itemName))).sort();
+    const csvList = names.join(', ');
+    
+    navigator.clipboard.writeText(csvList).then(() => {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+  };
+
   return (
     <div className="space-y-6 pb-24">
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-2xl font-black text-slate-900">Stock</h2>
-        <div className="flex space-x-2">
-          <button onClick={() => setIsImporting(true)} className="bg-white text-indigo-600 border border-indigo-100 text-[10px] font-black uppercase px-4 py-2 rounded-xl active:scale-95 shadow-sm">Bulk Import</button>
-          <button onClick={() => setIsAdding(true)} className="bg-indigo-600 text-white text-[10px] font-black uppercase px-4 py-2 rounded-xl active:scale-95 shadow-lg">+ Add Stock</button>
+      <div className="flex flex-col space-y-4 px-1">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-900">Stock</h2>
+          <div className="flex space-x-2">
+            <button onClick={() => setIsImporting(true)} className="bg-white text-indigo-600 border border-indigo-100 text-[10px] font-black uppercase px-4 py-2 rounded-xl active:scale-95 shadow-sm">Bulk Import</button>
+            <button onClick={() => setIsAdding(true)} className="bg-indigo-600 text-white text-[10px] font-black uppercase px-4 py-2 rounded-xl active:scale-95 shadow-lg">+ Add Stock</button>
+          </div>
+        </div>
+        <div className="flex justify-end">
+           <button 
+             onClick={handleCopyNames}
+             disabled={filteredInventory.length === 0}
+             className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${isCopied ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 active:scale-95 shadow-sm'} ${filteredInventory.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+           >
+             {isCopied ? (
+               <>
+                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                 <span>Copied!</span>
+               </>
+             ) : (
+               <>
+                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                 <span>Copy Names</span>
+               </>
+             )}
+           </button>
         </div>
       </div>
 

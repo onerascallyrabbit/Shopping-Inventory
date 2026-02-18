@@ -18,4 +18,4 @@ New: install as app with logo***
 Update: settings page cleanup
 Update: home page cleanup
 New: AI meal assistant***
-Fix: trying to get AI agent connected******
+Fix: trying to get AI agent connected*******

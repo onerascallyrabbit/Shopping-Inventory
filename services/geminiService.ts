@@ -29,7 +29,8 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
     - Hours of Operation`;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', 
+      // Fix: Maps grounding is only supported in Gemini 2.5 series models.
+      model: 'gemini-2.5-flash-lite-latest', 
       contents: prompt,
       config: {
         tools: [{ googleMaps: {} }],

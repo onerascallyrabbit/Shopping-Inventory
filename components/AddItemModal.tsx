@@ -23,14 +23,14 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState<string | null>(null);
-  const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag'>(initialMode);
+  const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag'>(initialMode === 'tag' ? 'type' : initialMode);
   const [formData, setFormData] = useState({
     category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc'
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Force default to 'type' if initialMode is empty or internal 'tag'
+  // Default to 'type' whenever the modal mounts unless a specific valid mode is provided
   useEffect(() => {
     if (!initialMode || initialMode === 'tag') {
       setInputMode('type');

@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { InventoryItem, MealIdea } from "../types";
 
@@ -13,16 +14,11 @@ export interface AnalyzedPrice {
   unit: string;
 }
 
-// Ensure the GoogleGenAI instance is created directly with process.env.API_KEY where needed.
-// This is compliant with the requirement to use the API key directly.
-
 /**
  * Searches for store details using Google Maps grounding.
- * Uses gemini-2.5-flash as it is supported for maps grounding.
  */
 export const searchStoreDetails = async (storeQuery: string, locationContext: string) => {
   try {
-    // Correct initialization as per instructions
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Find the most relevant store matching "${storeQuery}" near "${locationContext}". 
     Extract and return the following as a structured list: 
@@ -33,7 +29,7 @@ export const searchStoreDetails = async (storeQuery: string, locationContext: st
     - Hours of Operation`;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', 
+      model: 'gemini-3-flash-preview', 
       contents: prompt,
       config: {
         tools: [{ googleMaps: {} }],
@@ -58,7 +54,7 @@ export const lookupMarketDetails = async (itemName: string, variety?: string) =>
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const query = `Current average grocery price and standard units for ${itemName} ${variety || ''} in the US.`;
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: query,
       config: {
         tools: [{ googleSearch: {} }],

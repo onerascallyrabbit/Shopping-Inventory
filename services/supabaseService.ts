@@ -15,7 +15,13 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
 export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_URL') return SUPABASE_URL;
   if (key === 'SUPABASE_ANON_KEY') return SUPABASE_ANON_KEY;
-  if (key === 'API_KEY') return process.env.API_KEY || '';
+  if (key === 'API_KEY') {
+    try {
+      return (typeof process !== 'undefined' ? process.env.API_KEY : '') || '';
+    } catch {
+      return '';
+    }
+  }
   return '';
 };
 
@@ -486,7 +492,7 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
     const row: any = { 
       id: item.id, product_id: item.productId, item_name: item.itemName, 
       category: item.category, quantity: item.quantity, unit: item.unit, 
-      location_id: item.locationId, updated_at: item.updatedAt, user_id: item.userId || user.id 
+      location_id: item.location_id, updated_at: item.updated_at, user_id: item.userId || user.id 
     };
     if (item.subCategory) row.sub_category = item.subCategory;
     if (item.variety) row.variety = item.variety;

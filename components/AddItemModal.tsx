@@ -30,7 +30,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Default to 'type' mode on open unless a specific mode is requested
+  // Default to manual entry
   useEffect(() => {
     if (initialMode && initialMode !== 'tag') {
       setInputMode(initialMode);
@@ -49,34 +49,35 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
     return Array.from(new Set([...globals, ...customs])).sort();
   }, [formData.category, customSubCategories]);
 
+  // Real-time Best Price Lookup
+  const priceMemory = useMemo(() => {
+    if (!formData.itemName || formData.itemName.length < 2) return null;
+    
+    const term = formData.itemName.toLowerCase();
+    const matches = products.filter(p => p.itemName.toLowerCase().includes(term));
+    
+    if (matches.length === 0) return null;
+
+    const allHistory = matches.flatMap(p => p.history.map(h => ({ ...h, itemName: p.itemName })));
+    const sorted = allHistory.sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity));
+    
+    const best = sorted[0];
+    const currentUnitPrice = parseFloat(formData.price) / (parseFloat(formData.quantity) || 1);
+    const bestUnitPrice = best.price / best.quantity;
+
+    return {
+      best,
+      isBetter: currentUnitPrice < bestUnitPrice,
+      diff: ((currentUnitPrice / bestUnitPrice) - 1) * 100
+    };
+  }, [formData.itemName, formData.price, formData.quantity, products]);
+
   const storeSuggestions = useMemo(() => {
     const historical = products.flatMap(p => p.history.map(h => h.store));
     const saved = savedStores.map(s => s.name);
     const combined = Array.from(new Set([...historical, ...saved, ...NATIONAL_STORES])).filter(Boolean).sort();
     return combined;
   }, [products, savedStores]);
-
-  // Real-time lookup for the "Best Price Found at other stores" feature
-  const bestHistoricalRecord = useMemo(() => {
-    if (!formData.itemName || formData.itemName.length < 2) return null;
-    
-    const searchName = formData.itemName.toLowerCase();
-    const matches = products.filter(p => p.itemName.toLowerCase().includes(searchName));
-    
-    if (matches.length === 0) return null;
-    
-    const allRecords = matches.flatMap(p => p.history.map(h => ({ ...h, itemName: p.itemName })));
-    const sorted = allRecords.sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity));
-    
-    return sorted[0];
-  }, [formData.itemName, products]);
-
-  const unitPrice = useMemo(() => {
-    const p = parseFloat(formData.price);
-    const q = parseFloat(formData.quantity);
-    if (isNaN(p) || isNaN(q) || q <= 0) return null;
-    return p / q;
-  }, [formData.price, formData.quantity]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,8 +88,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
         setImage(base64);
         setLoading(true);
         try {
-          const modeToUse = inputMode === 'type' ? 'tag' : inputMode;
-          const analyzed = await identifyProductFromImage(base64, modeToUse);
+          const analyzed = await identifyProductFromImage(base64, inputMode === 'type' ? 'tag' : inputMode);
           if (analyzed) {
             setFormData(prev => ({
               ...prev,
@@ -121,6 +121,8 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
     );
   };
 
+  const currentVal = parseFloat(formData.price) / (parseFloat(formData.quantity) || 1);
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 animate-in fade-in">
       <div className="bg-white w-full max-w-lg h-[95vh] sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] rounded-t-[40px] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-10">
@@ -144,6 +146,29 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {priceMemory && (
+            <div className={`p-4 rounded-[28px] border animate-in slide-in-from-top-4 ${priceMemory.isBetter ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Market Insight</span>
+                {formData.price && !isNaN(currentVal) && (
+                   <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${priceMemory.isBetter ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                     {priceMemory.isBetter ? 'Beat the record!' : `${Math.abs(priceMemory.diff).toFixed(0)}% more expensive`}
+                   </span>
+                )}
+              </div>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Best price recorded:</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">{priceMemory.best.store} • {new Date(priceMemory.best.date).toLocaleDateString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-black text-indigo-600 leading-none">${priceMemory.best.price.toFixed(2)}</p>
+                  <p className="text-[9px] font-black text-indigo-300 uppercase mt-1">/{priceMemory.best.quantity}{priceMemory.best.unit}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {inputMode !== 'type' && (
             <div 
               onClick={() => fileInputRef.current?.click()} 
@@ -160,9 +185,9 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                 </div>
               )}
               {loading && (
-                <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center backdrop-blur-md animate-in fade-in">
-                  <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-                  <p className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] animate-pulse">Analyzing with AI...</p>
+                <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center backdrop-blur-md">
+                  <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-[10px] font-black uppercase text-indigo-600 mt-3 animate-pulse">AI is analyzing...</p>
                 </div>
               )}
               <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" capture="environment" />
@@ -172,32 +197,23 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Store Selection</label>
-                <div className="relative">
-                  <input 
-                    required 
-                    list="store-suggestions-datalist"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold placeholder:font-normal focus:ring-2 focus:ring-indigo-500/10 focus:bg-white transition-all" 
-                    placeholder="Enter Store Name..." 
-                    value={formData.store} 
-                    onChange={(e) => setFormData({...formData, store: e.target.value})} 
-                  />
-                  <datalist id="store-suggestions-datalist">
-                    {storeSuggestions.map((s, idx) => <option key={`${s}-${idx}`} value={s} />)}
-                  </datalist>
-                </div>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Store</label>
+                <input 
+                  required 
+                  list="store-suggestions-datalist"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold placeholder:font-normal focus:ring-2 focus:ring-indigo-500/10 focus:bg-white transition-all" 
+                  placeholder="Where are you shopping?" 
+                  value={formData.store} 
+                  onChange={(e) => setFormData({...formData, store: e.target.value})} 
+                />
+                <datalist id="store-suggestions-datalist">
+                  {storeSuggestions.map((s, idx) => <option key={`${s}-${idx}`} value={s} />)}
+                </datalist>
               </div>
 
               <div className="space-y-1.5">
-                 <div className="flex items-center justify-between">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Description</label>
-                    {bestHistoricalRecord && (
-                      <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                        Best: ${bestHistoricalRecord.price.toFixed(2)} at {bestHistoricalRecord.store}
-                      </span>
-                    )}
-                 </div>
-                 <input required className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold focus:bg-white transition-all" placeholder="e.g. Organic Honeycrisp Apples" value={formData.itemName} onChange={(e) => setFormData({...formData, itemName: e.target.value})} />
+                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Name</label>
+                 <input required className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold focus:bg-white transition-all" placeholder="e.g. Avocado" value={formData.itemName} onChange={(e) => setFormData({...formData, itemName: e.target.value})} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -218,10 +234,10 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
 
               <div className="bg-indigo-50/40 p-5 rounded-[32px] border border-indigo-100/50 space-y-4">
                 <div className="flex items-center justify-between px-1">
-                   <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Pricing & Quantity</span>
-                   {unitPrice !== null && (
-                     <span className="text-[8px] font-black text-indigo-500 uppercase">
-                       Value: ${unitPrice.toFixed(3)} / {formData.unit}
+                   <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Price & Value</span>
+                   {formData.price && !isNaN(currentVal) && (
+                     <span className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter">
+                       ${currentVal.toFixed(3)} / {formData.unit}
                      </span>
                    )}
                 </div>
@@ -229,7 +245,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                   <div className="flex-[2] space-y-1">
                     <label className="text-[8px] font-black text-indigo-300 uppercase ml-1">Total Price</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-3 text-xs font-black text-indigo-300">$</span>
+                      <span className="absolute left-3 top-3.5 text-xs font-black text-indigo-300">$</span>
                       <input required type="number" step="0.01" className="w-full bg-white border-none rounded-xl pl-7 pr-3 py-3 text-xs font-black" placeholder="0.00" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} />
                     </div>
                   </div>
@@ -239,7 +255,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                   </div>
                   <div className="flex-1 space-y-1">
                     <label className="text-[8px] font-black text-indigo-300 uppercase ml-1">Unit</label>
-                    <select className="w-full bg-white border-none rounded-xl px-2 py-3 text-xs font-bold text-indigo-600 appearance-none text-center" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})}>
+                    <select className="w-full bg-white border-none rounded-xl px-2 py-3 text-[10px] font-black text-indigo-600 appearance-none text-center uppercase" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})}>
                       {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </div>

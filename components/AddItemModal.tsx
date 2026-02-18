@@ -23,19 +23,19 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState<string | null>(null);
-  const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag'>(initialMode === 'tag' ? 'type' : initialMode);
+  const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('type');
   const [formData, setFormData] = useState({
     category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc'
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Default to 'type' whenever the modal mounts unless a specific valid mode is provided
+  // Default to 'type' mode on open unless a specific mode is requested
   useEffect(() => {
-    if (!initialMode || initialMode === 'tag') {
-      setInputMode('type');
-    } else {
+    if (initialMode && initialMode !== 'tag') {
       setInputMode(initialMode);
+    } else {
+      setInputMode('type');
     }
   }, [initialMode]);
 
@@ -55,6 +55,28 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
     const combined = Array.from(new Set([...historical, ...saved, ...NATIONAL_STORES])).filter(Boolean).sort();
     return combined;
   }, [products, savedStores]);
+
+  // Real-time lookup for the "Best Price Found at other stores" feature
+  const bestHistoricalRecord = useMemo(() => {
+    if (!formData.itemName || formData.itemName.length < 2) return null;
+    
+    const searchName = formData.itemName.toLowerCase();
+    const matches = products.filter(p => p.itemName.toLowerCase().includes(searchName));
+    
+    if (matches.length === 0) return null;
+    
+    const allRecords = matches.flatMap(p => p.history.map(h => ({ ...h, itemName: p.itemName })));
+    const sorted = allRecords.sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity));
+    
+    return sorted[0];
+  }, [formData.itemName, products]);
+
+  const unitPrice = useMemo(() => {
+    const p = parseFloat(formData.price);
+    const q = parseFloat(formData.quantity);
+    if (isNaN(p) || isNaN(q) || q <= 0) return null;
+    return p / q;
+  }, [formData.price, formData.quantity]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -166,6 +188,18 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                 </div>
               </div>
 
+              <div className="space-y-1.5">
+                 <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Description</label>
+                    {bestHistoricalRecord && (
+                      <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                        Best: ${bestHistoricalRecord.price.toFixed(2)} at {bestHistoricalRecord.store}
+                      </span>
+                    )}
+                 </div>
+                 <input required className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold focus:bg-white transition-all" placeholder="e.g. Organic Honeycrisp Apples" value={formData.itemName} onChange={(e) => setFormData({...formData, itemName: e.target.value})} />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
@@ -182,14 +216,14 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Description</label>
-                 <input required className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold focus:bg-white transition-all" placeholder="e.g. Organic Honeycrisp Apples" value={formData.itemName} onChange={(e) => setFormData({...formData, itemName: e.target.value})} />
-              </div>
-
               <div className="bg-indigo-50/40 p-5 rounded-[32px] border border-indigo-100/50 space-y-4">
                 <div className="flex items-center justify-between px-1">
                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Pricing & Quantity</span>
+                   {unitPrice !== null && (
+                     <span className="text-[8px] font-black text-indigo-500 uppercase">
+                       Value: ${unitPrice.toFixed(3)} / {formData.unit}
+                     </span>
+                   )}
                 </div>
                 <div className="flex space-x-2">
                   <div className="flex-[2] space-y-1">

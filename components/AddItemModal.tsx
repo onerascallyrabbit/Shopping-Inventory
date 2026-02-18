@@ -30,9 +30,9 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Default to 'type' if no specific initialMode provided or if it's 'tag' (which isn't a main tab)
+  // Force default to 'type' if initialMode is empty or internal 'tag'
   useEffect(() => {
-    if (initialMode === 'tag' || !initialMode) {
+    if (!initialMode || initialMode === 'tag') {
       setInputMode('type');
     } else {
       setInputMode(initialMode);

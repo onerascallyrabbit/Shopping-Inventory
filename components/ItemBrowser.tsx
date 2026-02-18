@@ -14,7 +14,7 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(categoryOrder[0] || 'Produce');
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
-  const [marketInfo, setMarketInfo] = useState<Record<string, { text: string; loading: boolean }>>({});
+  const [marketInfo, setMarketInfo] = useState<Record<string, { text: string; sources: any[]; loading: boolean }>>({});
   
   const [listQty, setListQty] = useState('1');
   const [listUnit, setListUnit] = useState('pc');
@@ -30,13 +30,18 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
     });
   }, [products, activeCategory, search]);
 
+  // Handle market lookup and store grounding sources for compliance
   const handleMarketLookup = async (product: Product) => {
     if (marketInfo[product.id]) return;
-    setMarketInfo(prev => ({ ...prev, [product.id]: { text: '', loading: true } }));
+    setMarketInfo(prev => ({ ...prev, [product.id]: { text: '', sources: [], loading: true } }));
     const result = await lookupMarketDetails(product.itemName, product.variety);
     setMarketInfo(prev => ({ 
       ...prev, 
-      [product.id]: { text: result?.text || 'No market data found currently.', loading: false } 
+      [product.id]: { 
+        text: result?.text || 'No market data found currently.', 
+        sources: result?.sources || [],
+        loading: false 
+      } 
     }));
   };
 
@@ -77,6 +82,7 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
           const best = [...product.history].sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity))[0];
           const genericImg = `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=120&h=120&grocery,${product.itemName}`;
           const uniqueStoresCount = new Set(product.history.map(h => h.store)).size;
+          const marketData = marketInfo[product.id];
 
           return (
             <div key={product.id} className={`bg-white rounded-[24px] border transition-all duration-200 ${isExpanded ? 'border-indigo-200 shadow-xl' : 'border-slate-100 shadow-sm active:scale-[0.98]'}`}>
@@ -151,10 +157,50 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
                   <div className="grid grid-cols-1 gap-2">
                     <button 
                       onClick={() => handleMarketLookup(product)}
-                      className="bg-white text-indigo-400 border border-indigo-50 font-black text-[9px] uppercase py-2.5 rounded-xl tracking-widest active:scale-95"
+                      disabled={marketData?.loading}
+                      className="bg-white text-indigo-400 border border-indigo-50 font-black text-[9px] uppercase py-2.5 rounded-xl tracking-widest active:scale-95 flex items-center justify-center space-x-2"
                     >
-                      Compare Web Prices
+                      {marketData?.loading ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                          <span>Searching...</span>
+                        </>
+                      ) : (
+                        <span>Compare Web Prices</span>
+                      )}
                     </button>
+
+                    {/* Display grounded search results with sources as required */}
+                    {marketData && !marketData.loading && (
+                      <div className="bg-indigo-50 p-4 rounded-3xl space-y-3 animate-in fade-in">
+                        <div className="flex items-center space-x-2 text-indigo-600">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          <span className="text-[10px] font-black uppercase tracking-widest">Market Analysis</span>
+                        </div>
+                        <p className="text-[11px] font-medium leading-relaxed text-slate-600">{marketData.text}</p>
+                        
+                        {marketData.sources.length > 0 && (
+                          <div className="space-y-1.5 pt-2 border-t border-indigo-100">
+                            <p className="text-[8px] font-black text-indigo-300 uppercase tracking-widest">Web Sources</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {marketData.sources.map((chunk, i) => (
+                                chunk.web && (
+                                  <a 
+                                    key={i} 
+                                    href={chunk.web.uri} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="bg-white border border-indigo-100 px-2 py-1 rounded-lg text-[8px] font-bold text-indigo-500 hover:bg-indigo-600 hover:text-white transition-colors truncate max-w-[120px]"
+                                  >
+                                    {chunk.web.title || 'Source'}
+                                  </a>
+                                )
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">

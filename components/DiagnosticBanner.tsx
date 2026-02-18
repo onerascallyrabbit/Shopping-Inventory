@@ -1,5 +1,5 @@
+
 import React from 'react';
-import { getEnv } from '../services/supabaseService';
 
 interface DiagnosticBannerProps {
   user?: any;
@@ -8,7 +8,6 @@ interface DiagnosticBannerProps {
 }
 
 const DiagnosticBanner: React.FC<DiagnosticBannerProps> = ({ user, isGuest, onExitGuest }) => {
-  const hasApiKey = !!getEnv('API_KEY');
   if (!isGuest && user) return null;
 
   return (
@@ -18,8 +17,8 @@ const DiagnosticBanner: React.FC<DiagnosticBannerProps> = ({ user, isGuest, onEx
         <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Diagnostic Console</span>
       </div>
       <div className="flex flex-wrap justify-center gap-1.5">
-        {!hasApiKey && <span className="bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-red-400 tracking-wider uppercase">AI Offline</span>}
-        {isGuest && <button onClick={onExitGuest} className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 tracking-wider">Exit Guest Mode</button>}
+        {isGuest && <button onClick={onExitGuest} className="bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-amber-400 tracking-wider uppercase">Exit Guest Mode</button>}
+        <span className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-bold text-indigo-400 tracking-wider uppercase">Local Session</span>
       </div>
     </div>
   );

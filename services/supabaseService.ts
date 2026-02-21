@@ -136,6 +136,7 @@ export const fetchCellarItems = async (familyId?: string): Promise<CellarItem[]>
   if (error) return [];
   return data.map(item => ({
     id: item.id,
+    producer: item.producer,
     name: item.name,
     category: item.category,
     subCategory: item.sub_category,
@@ -162,6 +163,7 @@ export const syncCellarItem = async (item: CellarItem) => {
 
   const payload = {
     id: item.id,
+    producer: item.producer,
     name: item.name,
     category: item.category,
     sub_category: item.subCategory,

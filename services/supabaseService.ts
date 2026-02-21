@@ -484,7 +484,8 @@ export const fetchProfile = async (): Promise<Profile | null> => {
       categoryOrder: data.category_order || [], 
       activeVehicleId: data.active_vehicle_id, 
       sharePrices: data.share_prices, 
-      familyId: data.family_id 
+      familyId: data.family_id,
+      defaultTab: data.default_tab
     };
   } catch (e) {
     return null;
@@ -503,6 +504,7 @@ export const syncProfile = async (profile: Partial<Profile>) => {
   if (profile.activeVehicleId !== undefined) payload.active_vehicle_id = profile.activeVehicleId;
   if (profile.sharePrices !== undefined) payload.share_prices = profile.sharePrices;
   if (profile.familyId !== undefined) payload.family_id = profile.familyId;
+  if (profile.defaultTab !== undefined) payload.default_tab = profile.defaultTab;
   
   const { data, error } = await supabase.from('profiles').upsert({ id: user.id, ...payload }).select().single();
   if (error) throw error;

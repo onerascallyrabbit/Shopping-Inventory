@@ -1,19 +1,20 @@
 
 import React, { useState } from 'react';
-import { MealIdea, Family } from '../types';
+import { MealIdea, Family, CellarItem } from '../types';
 
 interface MealPlannerProps {
   mealIdeas: MealIdea[];
+  cellarItems: CellarItem[];
   loading: boolean;
   onRefresh: () => void;
   onCook: (id: string) => void;
   onRate: (id: string, rating: number) => void;
-  onAddToList: (name: string, qty: number, unit: string) => void;
+  onAddToList: (name: string, qty: number, unit: string, productId?: string, category?: string) => void;
   activeFamily: Family | null;
 }
 
 const MealPlanner: React.FC<MealPlannerProps> = ({ 
-  mealIdeas, loading, onRefresh, onCook, onRate, onAddToList, activeFamily 
+  mealIdeas, cellarItems, loading, onRefresh, onCook, onRate, onAddToList, activeFamily 
 }) => {
   const [filter, setFilter] = useState<'all' | 'ready' | 'close'>('all');
   const [selectedMeal, setSelectedMeal] = useState<MealIdea | null>(null);
@@ -197,6 +198,39 @@ const MealPlanner: React.FC<MealPlannerProps> = ({
                         <p className="text-[11px] font-medium text-slate-600 leading-relaxed pt-0.5">{step}</p>
                       </div>
                     ))}
+                 </div>
+              </section>
+
+              {/* Cellar Pairings */}
+              <section className="space-y-4">
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Cellar Pairings</p>
+                 <div className="bg-slate-900 rounded-[32px] p-6 space-y-4">
+                    <div className="flex items-center space-x-2">
+                       <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                       <span className="text-[9px] font-black text-white uppercase tracking-widest">Suggested Pairings</span>
+                    </div>
+                    <div className="space-y-3">
+                       {cellarItems.length === 0 ? (
+                         <p className="text-[10px] text-slate-500 font-medium">Add items to your Cellar to see pairings!</p>
+                       ) : (
+                         cellarItems.slice(0, 2).map(item => (
+                           <div key={item.id} className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/10">
+                             <div>
+                               <p className="text-[11px] font-bold text-white">{item.name}</p>
+                               <p className="text-[9px] font-black text-indigo-400 uppercase">{item.type} • {item.quantity} in stock</p>
+                             </div>
+                             {item.quantity <= 0 && (
+                               <button 
+                                 onClick={() => onAddToList(item.name, 1, item.unit, undefined, 'Cellar Restock')}
+                                 className="text-[8px] font-black text-indigo-400 uppercase tracking-widest border border-indigo-400/30 px-2 py-1 rounded-lg"
+                               >
+                                 Restock
+                               </button>
+                             )}
+                           </div>
+                         ))
+                       )}
+                    </div>
                  </div>
               </section>
 

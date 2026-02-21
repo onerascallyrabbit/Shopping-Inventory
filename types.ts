@@ -143,6 +143,7 @@ export interface CellarItem {
   id: string;
   name: string;
   category: 'Wine' | 'Beer' | 'Spirits';
+  subCategory?: string; // Red, White, Rosé, etc.
   type: string; // Pinot Noir, IPA, Whiskey, etc.
   quantity: number;
   unit: string; // bottles, cans, etc.

@@ -26,8 +26,20 @@ const WINE_VARIETALS: Record<string, string[]> = {
   'Fortified': ['Port', 'Sherry', 'Madeira', 'Vermouth']
 };
 
-const BEER_STYLES = ['IPA', 'Lager', 'Pilsner', 'Stout', 'Porter', 'Sour', 'Wheat', 'Pale Ale', 'Amber', 'Belgian', 'Cider', 'Other'];
-const SPIRIT_TYPES = ['Whiskey', 'Bourbon', 'Scotch', 'Gin', 'Vodka', 'Rum', 'Tequila', 'Mezcal', 'Brandy', 'Cognac', 'Liqueur', 'Other'];
+const BEER_STYLES = ['IPA', 'Double IPA', 'Lager', 'Pilsner', 'Stout', 'Imperial Stout', 'Porter', 'Sour', 'Gose', 'Wheat', 'Pale Ale', 'Amber', 'Belgian Tripel/Quad', 'Cider', 'Other'];
+
+const SPIRIT_CLASSES = ['Whiskey', 'Gin', 'Rum', 'Tequila/Mezcal', 'Brandy/Cognac', 'Vodka', 'Liqueur', 'Other'] as const;
+
+const SPIRIT_STYLES: Record<string, string[]> = {
+  'Whiskey': ['Bourbon', 'Rye', 'Scotch Single Malt', 'Scotch Blend', 'Irish Whiskey', 'Japanese Whiskey', 'Tennessee Whiskey', 'Canadian Whiskey'],
+  'Gin': ['London Dry', 'Old Tom', 'Plymouth', 'Genever', 'Sloe Gin', 'New Western'],
+  'Rum': ['White Rum', 'Gold Rum', 'Dark Rum', 'Spiced Rum', 'Rhum Agricole', 'Overproof'],
+  'Tequila/Mezcal': ['Blanco', 'Reposado', 'Añejo', 'Extra Añejo', 'Mezcal Joven', 'Mezcal Reposado'],
+  'Brandy/Cognac': ['Cognac VS/VSOP', 'Cognac XO', 'Armagnac', 'Pisco', 'Calvados', 'Grappa'],
+  'Vodka': ['Plain', 'Flavored'],
+  'Liqueur': ['Fruit', 'Herbal/Amaro', 'Cream', 'Nut/Coffee', 'Triple Sec/Orange'],
+  'Other': ['Absinthe', 'Sake', 'Vermouth', 'Aperitif']
+};
 
 const CellarView: React.FC<CellarViewProps> = ({
   items, logs, onUpdateQty, onAddItem, onUpdateItem, onRemoveItem, onLogConsumption, onAddToList, activeFamily
@@ -40,7 +52,9 @@ const CellarView: React.FC<CellarViewProps> = ({
   const [consumptionOccasion, setConsumptionOccasion] = useState('');
   
   // Form state for dynamic varietals
+  const [selectedCategory, setSelectedCategory] = useState<'Wine' | 'Beer' | 'Spirits'>('Wine');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('Red');
+  const [formRating, setFormRating] = useState<number>(0);
 
   const stats = useMemo(() => {
     const wine = items.filter(i => i.category === 'Wine').reduce((acc, i) => acc + i.quantity, 0);
@@ -69,12 +83,16 @@ const CellarView: React.FC<CellarViewProps> = ({
   };
 
   const openAddModal = (cat: 'Wine' | 'Beer' | 'Spirits') => {
-    setSelectedSubCategory('Red');
+    setSelectedCategory(cat);
+    setSelectedSubCategory(cat === 'Wine' ? 'Red' : cat === 'Spirits' ? 'Whiskey' : '');
+    setFormRating(0);
     setIsAdding(cat);
   };
 
   const openEditModal = (item: CellarItem) => {
-    setSelectedSubCategory(item.subCategory || 'Red');
+    setSelectedCategory(item.category);
+    setSelectedSubCategory(item.subCategory || (item.category === 'Wine' ? 'Red' : item.category === 'Spirits' ? 'Whiskey' : ''));
+    setFormRating(item.rating || 0);
     setEditingItem(item);
   };
 
@@ -84,16 +102,17 @@ const CellarView: React.FC<CellarViewProps> = ({
 
     const producer = (document.getElementById('cellar-producer') as HTMLInputElement)?.value;
     const name = (document.getElementById('cellar-name') as HTMLInputElement).value;
-    const subCategory = cat === 'Wine' ? (document.getElementById('cellar-subcategory') as HTMLSelectElement)?.value : undefined;
+    const subCategory = (cat === 'Wine' || cat === 'Spirits') ? (document.getElementById('cellar-subcategory') as HTMLSelectElement)?.value : undefined;
     const type = (document.getElementById('cellar-type') as HTMLInputElement)?.value || (document.getElementById('cellar-type-select') as HTMLSelectElement)?.value;
     const vintage = (document.getElementById('cellar-vintage') as HTMLInputElement)?.value;
     const abv = (document.getElementById('cellar-abv') as HTMLInputElement)?.value;
     const quantity = Number((document.getElementById('cellar-qty') as HTMLInputElement).value);
     const threshold = Number((document.getElementById('cellar-threshold') as HTMLInputElement).value);
     const isOpened = (document.getElementById('cellar-opened') as HTMLInputElement).checked;
+    const notes = (document.getElementById('cellar-notes') as HTMLTextAreaElement)?.value;
 
     if (editingItem) {
-      onUpdateItem(editingItem.id, { producer, name, category: cat, subCategory, type, vintage, abv, quantity, lowStockThreshold: threshold, isOpened });
+      onUpdateItem(editingItem.id, { producer, name, category: cat, subCategory, type, vintage, abv, quantity, lowStockThreshold: threshold, isOpened, rating: formRating, notes });
     } else {
       onAddItem({ 
         producer, 
@@ -106,6 +125,8 @@ const CellarView: React.FC<CellarViewProps> = ({
         quantity, 
         lowStockThreshold: threshold, 
         isOpened, 
+        rating: formRating,
+        notes,
         unit: cat === 'Beer' ? 'cans' : 'bottles', 
         familyId: activeFamily?.id 
       });
@@ -189,6 +210,12 @@ const CellarView: React.FC<CellarViewProps> = ({
               <div className="flex-1 min-w-0 pr-4" onClick={() => openEditModal(item)}>
                 <div className="flex items-center space-x-2">
                   <h4 className="font-black text-slate-800 text-sm truncate uppercase leading-tight">{item.producer && <span className="text-slate-400 mr-1">{item.producer}</span>}{item.name}</h4>
+                  {item.rating && item.rating > 0 && (
+                    <span className="text-[10px] flex items-center">
+                      <span className="text-amber-400 mr-0.5">★</span>
+                      <span className="font-black text-slate-400">{item.rating}</span>
+                    </span>
+                  )}
                   {item.isOpened && (
                     <span className="bg-amber-100 text-amber-600 text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase">Opened</span>
                   )}
@@ -349,6 +376,15 @@ const CellarView: React.FC<CellarViewProps> = ({
                     </select>
                   </div>
                   <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vintage</label>
+                    <input 
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
+                      placeholder="e.g. 2023"
+                      defaultValue={editingItem?.vintage || ''} 
+                      id="cellar-vintage"
+                    />
+                  </div>
+                  <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ABV %</label>
                     <input 
                       className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
@@ -362,14 +398,25 @@ const CellarView: React.FC<CellarViewProps> = ({
 
               {(isAdding || editingItem?.category) === 'Spirits' && (
                 <>
-                  <div className="col-span-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</label>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Class</label>
+                    <select 
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500"
+                      value={selectedSubCategory}
+                      onChange={e => setSelectedSubCategory(e.target.value)}
+                      id="cellar-subcategory"
+                    >
+                      {SPIRIT_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Style</label>
                     <select 
                       className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500"
                       defaultValue={editingItem?.type || ''}
                       id="cellar-type"
                     >
-                      {SPIRIT_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+                      {SPIRIT_STYLES[selectedSubCategory]?.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                   <div>
@@ -410,6 +457,31 @@ const CellarView: React.FC<CellarViewProps> = ({
                   defaultChecked={editingItem?.isOpened || false}
                 />
                 <label htmlFor="cellar-opened" className="text-xs font-bold text-slate-700">Mark as Opened / Partial</label>
+              </div>
+
+              <div className="col-span-2 space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rating</label>
+                <div className="flex space-x-2">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button 
+                      key={star} 
+                      onClick={() => setFormRating(star)}
+                      className={`text-2xl transition-all active:scale-125 ${star <= formRating ? 'grayscale-0' : 'grayscale opacity-20'}`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Notes</label>
+                <textarea 
+                  className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none" 
+                  placeholder="Personal notes, tasting info, etc."
+                  defaultValue={editingItem?.notes || ''} 
+                  id="cellar-notes"
+                />
               </div>
             </div>
             

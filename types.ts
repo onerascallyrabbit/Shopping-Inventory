@@ -141,6 +141,7 @@ export interface MealIdea {
 
 export interface CellarItem {
   id: string;
+  producer?: string; // Winery, Brewery, Distillery
   name: string;
   category: 'Wine' | 'Beer' | 'Spirits';
   subCategory?: string; // Red, White, Rosé, etc.

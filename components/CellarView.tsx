@@ -228,22 +228,21 @@ const CellarView: React.FC<CellarViewProps> = ({
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5">
                 {item.quantity > 0 && (
                   <button 
                     onClick={() => setConsumingItem(item)}
-                    className="w-10 h-10 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                    className="w-8 h-8 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                   </button>
                 )}
-                <div className="flex items-center bg-slate-50 rounded-2xl p-1">
-                  <button onClick={() => onUpdateQty(item.id, -1)} className="w-10 h-10 text-slate-400 font-black text-lg">-</button>
-                  <div className="px-3 text-sm font-black text-slate-900 min-w-[3rem] text-center">
+                <div className="flex items-center bg-slate-50 rounded-xl p-0.5 border border-slate-100">
+                  <button onClick={() => onUpdateQty(item.id, -1)} className="w-7 h-7 flex items-center justify-center text-slate-400 font-black text-sm active:scale-90">-</button>
+                  <div className="px-1 text-[11px] font-black text-slate-900 min-w-[1.5rem] text-center">
                     {item.quantity}
-                    <span className="text-[10px] text-slate-400 ml-1 font-medium">{item.unit}</span>
                   </div>
-                  <button onClick={() => onUpdateQty(item.id, 1)} className="w-10 h-10 text-indigo-600 font-black text-lg">+</button>
+                  <button onClick={() => onUpdateQty(item.id, 1)} className="w-7 h-7 flex items-center justify-center text-indigo-600 font-black text-sm active:scale-90">+</button>
                 </div>
               </div>
             </div>

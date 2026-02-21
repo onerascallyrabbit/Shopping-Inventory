@@ -76,10 +76,9 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
       <DiagnosticBanner user={user} isGuest={isGuest} onExitGuest={() => { setIsGuest(false); localStorage.removeItem('pricewise_is_guest'); }} />
-      <Header user={user} onSettingsClick={() => setActiveTab('settings')} activeFamily={activeFamily} />
+      <Header user={user} onSettingsClick={() => setActiveTab('settings')} activeFamily={activeFamily} loading={loading} />
       
       <main className="flex-1 overflow-y-auto pb-32 px-4 pt-6">
-        {loading && <div className="text-center py-20 text-slate-300 font-black animate-pulse uppercase tracking-[0.2em] text-xs italic">Synchronizing Cloud Data...</div>}
         
         {activeTab === 'dashboard' && <Dashboard products={products} onAddToList={addToList} />}
         {activeTab === 'items' && <ItemBrowser products={products} categoryOrder={profile.categoryOrder} onAddToList={addToList} />}

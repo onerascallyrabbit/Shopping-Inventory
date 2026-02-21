@@ -20,4 +20,4 @@ Update: home page cleanup
 New: AI meal assistant***
 Fix: trying to get AI agent connected*********
 New: Copy stock to csv button
-Update: move in-sync alert
+Update: move in-sync alert*

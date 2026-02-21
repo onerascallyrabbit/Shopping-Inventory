@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Product, ShoppingItem, InventoryItem, StorageLocation, 
-  SubLocation, StoreLocation, Vehicle, Profile, Family, CustomCategory, CustomSubCategory, MealIdea
+  SubLocation, StoreLocation, Vehicle, Profile, Family, CustomCategory, CustomSubCategory, MealIdea, CellarItem, ConsumptionLog
 } from '../types';
 import { 
   fetchUserData, syncInventoryItem, syncStorageLocation, 
@@ -11,7 +11,8 @@ import {
   syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily,
   deleteInventoryItem, syncShoppingItem, deleteShoppingItem,
   syncCustomCategory, deleteCustomCategory, syncCustomSubCategory, deleteCustomSubCategory,
-  bulkSyncStorageLocations, bulkSyncMealIdeas, updateMealStats, saveMealRating
+  bulkSyncStorageLocations, bulkSyncMealIdeas, updateMealStats, saveMealRating,
+  syncCellarItem, deleteCellarItem, syncConsumptionLog
 } from '../services/supabaseService';
 import { generateMealIdeas } from '../services/geminiService';
 import { DEFAULT_CATEGORIES, DEFAULT_STORAGE } from '../constants';
@@ -23,6 +24,8 @@ export const useAppData = () => {
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [mealIdeas, setMealIdeas] = useState<MealIdea[]>([]);
+  const [cellarItems, setCellarItems] = useState<CellarItem[]>([]);
+  const [consumptionLogs, setConsumptionLogs] = useState<ConsumptionLog[]>([]);
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>(DEFAULT_STORAGE.map((s, i) => ({ ...s, sortOrder: i })));
   const [subLocations, setSubLocations] = useState<SubLocation[]>([]);
   const [stores, setStores] = useState<StoreLocation[]>([]);
@@ -66,6 +69,8 @@ export const useAppData = () => {
         setCustomCategories(data.customCategories || []);
         setCustomSubCategories(data.customSubCategories || []);
         setMealIdeas(data.mealIdeas || []);
+        setCellarItems(data.cellarItems || []);
+        setConsumptionLogs(data.consumptionLogs || []);
         
         if (data.inventory) {
           setInventory(data.inventory.map(i => ({
@@ -105,6 +110,8 @@ export const useAppData = () => {
       .on('postgres_changes', { event: '*', table: 'custom_sub_categories', schema: 'public' }, () => loadAllData(true))
       .on('postgres_changes', { event: '*', table: 'meal_ideas', schema: 'public' }, () => loadAllData(true))
       .on('postgres_changes', { event: '*', table: 'storage_locations', schema: 'public' }, () => loadAllData(true))
+      .on('postgres_changes', { event: '*', table: 'cellar_items', schema: 'public' }, () => loadAllData(true))
+      .on('postgres_changes', { event: '*', table: 'consumption_logs', schema: 'public' }, () => loadAllData(true))
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -230,8 +237,8 @@ export const useAppData = () => {
     });
   };
 
-  const addToList = async (name: string, qty: number, unit: string, productId?: string) => {
-    const newItem: ShoppingItem = { id: crypto.randomUUID(), productId: productId || 'manual', name, neededQuantity: qty, unit, isCompleted: false, userId: user?.id };
+  const addToList = async (name: string, qty: number, unit: string, productId?: string, category?: string) => {
+    const newItem: ShoppingItem = { id: crypto.randomUUID(), productId: productId || 'manual', name, neededQuantity: qty, unit, isCompleted: false, userId: user?.id, category };
     setShoppingList(prev => [newItem, ...prev]);
     if (user) try { await syncShoppingItem(newItem); } catch (e) { console.error(e); }
   };
@@ -268,6 +275,52 @@ export const useAppData = () => {
     const newItems = items.map(i => ({ ...i, id: crypto.randomUUID(), updatedAt: timestamp, userId: user?.id || '' })) as InventoryItem[];
     setInventory(prev => [...prev, ...newItems]);
     if (user) try { await bulkSyncInventory(newItems); } catch (err) { loadAllData(); throw err; }
+  };
+
+  const updateCellarQty = async (id: string, delta: number) => {
+    const target = cellarItems.find(i => i.id === id);
+    if (!target) return;
+    const newQty = Math.max(0, target.quantity + delta);
+    const updated = { ...target, quantity: newQty, updatedAt: new Date().toISOString() };
+    setCellarItems(prev => prev.map(i => i.id === id ? updated : i));
+    if (user) try { await syncCellarItem(updated); } catch (err) { loadAllData(); }
+  };
+
+  const addCellarItem = async (item: Omit<CellarItem, 'id' | 'updatedAt' | 'userId'>) => {
+    const newItem: CellarItem = { 
+      ...item, 
+      id: crypto.randomUUID(), 
+      userId: user?.id || '', 
+      updatedAt: new Date().toISOString() 
+    };
+    setCellarItems(prev => [...prev, newItem]);
+    if (user) try { await syncCellarItem(newItem); } catch (err) { loadAllData(); }
+  };
+
+  const updateCellarItem = async (id: string, updates: Partial<CellarItem>) => {
+    const target = cellarItems.find(i => i.id === id);
+    if (!target) return;
+    const updated = { ...target, ...updates, updatedAt: new Date().toISOString() };
+    setCellarItems(prev => prev.map(i => i.id === id ? updated : i));
+    if (user) try { await syncCellarItem(updated); } catch (err) { loadAllData(); }
+  };
+
+  const removeCellarItem = async (id: string) => {
+    setCellarItems(prev => prev.filter(i => i.id !== id));
+    if (user) try { await deleteCellarItem(id); } catch (err) { loadAllData(); }
+  };
+
+  const logConsumption = async (itemId: string, quantity: number, occasion?: string, notes?: string) => {
+    const newLog: ConsumptionLog = {
+      id: crypto.randomUUID(),
+      itemId,
+      quantity,
+      date: new Date().toISOString(),
+      occasion,
+      notes
+    };
+    setConsumptionLogs(prev => [newLog, ...prev]);
+    if (user) try { await syncConsumptionLog(newLog); } catch (err) { loadAllData(); }
   };
 
   const reorderStorageLocations = async (newOrder: StorageLocation[]) => {
@@ -323,7 +376,7 @@ export const useAppData = () => {
   };
 
   return {
-    user, loading, products, shoppingList, inventory, mealIdeas,
+    user, loading, products, shoppingList, inventory, mealIdeas, cellarItems, consumptionLogs,
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
     customCategories, customSubCategories,
@@ -331,6 +384,7 @@ export const useAppData = () => {
     updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
     addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem, 
     addToInventory, importBulkInventory, reorderStorageLocations, refresh: loadAllData,
-    refreshMeals, cookMeal, rateMeal
+    refreshMeals, cookMeal, rateMeal,
+    updateCellarQty, addCellarItem, updateCellarItem, removeCellarItem, logConsumption
   };
 };

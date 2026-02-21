@@ -1,6 +1,6 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.1';
-import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family, ShoppingItem, CustomCategory, CustomSubCategory, MealIdea } from '../types';
+import { createClient } from '@supabase/supabase-js';
+import { InventoryItem, SubLocation, StorageLocation, Profile, Vehicle, StoreLocation, Product, PriceRecord, Family, ShoppingItem, CustomCategory, CustomSubCategory, MealIdea, CellarItem, ConsumptionLog } from '../types';
 
 // Environment variables detection
 // @ts-ignore
@@ -121,6 +121,98 @@ export const deleteCustomSubCategory = async (id: string) => {
 };
 
 /**
+ * CELLAR SYNC
+ */
+export const fetchCellarItems = async (familyId?: string): Promise<CellarItem[]> => {
+  if (!supabase) return [];
+  let query = supabase.from('cellar_items').select('*');
+  if (familyId) {
+    query = query.or(`family_id.eq.${familyId},user_id.eq.${(await supabase.auth.getUser()).data.user?.id}`);
+  } else {
+    query = query.eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+  }
+  
+  const { data, error } = await query.order('name', { ascending: true });
+  if (error) return [];
+  return data.map(item => ({
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    type: item.type,
+    quantity: Number(item.quantity),
+    unit: item.unit,
+    lowStockThreshold: Number(item.low_stock_threshold),
+    isOpened: item.is_opened,
+    notes: item.notes,
+    vintage: item.vintage,
+    abv: item.abv,
+    price: Number(item.price),
+    location: item.location,
+    userId: item.user_id,
+    familyId: item.family_id,
+    updatedAt: item.updated_at
+  }));
+};
+
+export const syncCellarItem = async (item: CellarItem) => {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const payload = {
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    type: item.type,
+    quantity: item.quantity,
+    unit: item.unit,
+    low_stock_threshold: item.lowStockThreshold,
+    is_opened: item.isOpened,
+    notes: item.notes,
+    vintage: item.vintage,
+    abv: item.abv,
+    price: item.price,
+    location: item.location,
+    user_id: item.userId || user.id,
+    family_id: item.familyId,
+    updated_at: item.updatedAt
+  };
+
+  await supabase.from('cellar_items').upsert(payload);
+};
+
+export const deleteCellarItem = async (id: string) => {
+  if (!supabase) return;
+  await supabase.from('cellar_items').delete().eq('id', id);
+};
+
+export const fetchConsumptionLogs = async (itemIds: string[]): Promise<ConsumptionLog[]> => {
+  if (!supabase || itemIds.length === 0) return [];
+  const { data, error } = await supabase.from('consumption_logs').select('*').in('item_id', itemIds).order('date', { ascending: false });
+  if (error) return [];
+  return data.map(log => ({
+    id: log.id,
+    itemId: log.item_id,
+    quantity: Number(log.quantity),
+    date: log.date,
+    occasion: log.occasion,
+    notes: log.notes
+  }));
+};
+
+export const syncConsumptionLog = async (log: ConsumptionLog) => {
+  if (!supabase) return;
+  await supabase.from('consumption_logs').upsert({
+    id: log.id,
+    item_id: log.itemId,
+    quantity: log.quantity,
+    date: log.date,
+    occasion: log.occasion,
+    notes: log.notes
+  });
+};
+
+/**
  * GLOBAL DISCOVERY
  */
 export const fetchGlobalStores = async (query: string): Promise<StoreLocation[]> => {
@@ -182,6 +274,7 @@ export const fetchShoppingList = async (): Promise<ShoppingItem[]> => {
     unit: item.unit,
     isCompleted: item.is_completed,
     manualStore: item.manual_store,
+    category: item.category,
     userId: item.user_id
   }));
 };
@@ -200,6 +293,7 @@ export const syncShoppingItem = async (item: ShoppingItem) => {
     unit: item.unit,
     is_completed: item.isCompleted,
     manual_store: item.manualStore,
+    category: item.category,
     user_id: item.userId || user.id
   };
   
@@ -295,26 +389,34 @@ export const fetchUserData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const [profile, products, inventoryRes, storageRes, subsRes, storesRes, vehiclesRes, listRes] = await Promise.all([
-      fetchProfile().catch(() => null),
+    const profile = await fetchProfile().catch(() => null);
+
+    const [products, inventoryRes, storageRes, subsRes, storesRes, vehiclesRes, listRes, cellarRes] = await Promise.all([
       fetchPriceData().catch(() => []),
       supabase.from('inventory').select('*'),
       supabase.from('storage_locations').select('*').order('sort_order', { ascending: true }),
       supabase.from('sub_locations').select('*'),
       supabase.from('stores').select('*'),
       supabase.from('vehicles').select('*'),
-      fetchShoppingList().catch(() => [])
+      fetchShoppingList().catch(() => []),
+      fetchCellarItems(profile?.familyId).catch(() => [])
     ]);
 
     let customCats: CustomCategory[] = [];
     let customSubs: CustomSubCategory[] = [];
     let mealIdeas: MealIdea[] = [];
+    let consumptionLogs: ConsumptionLog[] = [];
+
     if (profile?.familyId) {
       [customCats, customSubs, mealIdeas] = await Promise.all([
         fetchCustomCategories(profile.familyId),
         fetchCustomSubCategories(profile.familyId),
         fetchMealIdeas(profile.familyId)
       ]);
+    }
+
+    if (cellarRes && cellarRes.length > 0) {
+      consumptionLogs = await fetchConsumptionLogs(cellarRes.map(i => i.id));
     }
 
     return {
@@ -328,7 +430,9 @@ export const fetchUserData = async () => {
       shoppingList: listRes || [],
       customCategories: customCats,
       customSubCategories: customSubs,
-      mealIdeas
+      mealIdeas,
+      cellarItems: cellarRes || [],
+      consumptionLogs
     };
   } catch (e) {
     console.error("Error fetching user data:", e);

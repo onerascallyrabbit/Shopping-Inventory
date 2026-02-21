@@ -13,7 +13,6 @@
     <link rel="apple-touch-icon" href="cart_logo.png">
     <link rel="icon" type="image/png" href="cart_logo.png">
     
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -70,18 +69,6 @@
             50% { transform: scale(1.05); opacity: 0.9; }
         }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react/": "https://esm.sh/react@19.0.0/",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "@google/genai": "https://esm.sh/@google/genai@^1.39.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
-  }
-}
-</script>
 </head>
 <body class="bg-slate-50 text-slate-900">
     <div id="boot-status" class="system-status">
@@ -98,26 +85,6 @@
 
     <div id="root"></div>
 
-    <script type="module" src="./index.tsx"></script>
-    
-    <script>
-        window.deferredPrompt = null;
-
-        window.addEventListener('beforeinstallprompt', (e) => {
-          e.preventDefault();
-          window.deferredPrompt = e;
-          window.dispatchEvent(new CustomEvent('app-installable'));
-        });
-
-        if ('serviceWorker' in navigator) {
-          window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').then(reg => {
-              console.log('SW Registered');
-            }).catch(err => {
-              console.warn('SW Failed');
-            });
-          });
-        }
-    </script>
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>

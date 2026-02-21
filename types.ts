@@ -151,6 +151,7 @@ export interface CellarItem {
   lowStockThreshold: number;
   isOpened: boolean;
   notes?: string;
+  rating?: number;
   vintage?: string;
   abv?: string;
   price?: number;

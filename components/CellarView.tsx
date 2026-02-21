@@ -15,15 +15,32 @@ interface CellarViewProps {
 
 const CELLAR_CATEGORIES = ['Wine', 'Beer', 'Spirits'] as const;
 
+const WINE_COLORS = ['Red', 'White', 'Rosé', 'Sparkling', 'Dessert', 'Fortified'] as const;
+
+const WINE_VARIETALS: Record<string, string[]> = {
+  'Red': ['Cabernet Sauvignon', 'Merlot', 'Pinot Noir', 'Syrah/Shiraz', 'Zinfandel', 'Malbec', 'Sangiovese', 'Tempranillo', 'Nebbiolo', 'Grenache', 'Red Blend'],
+  'White': ['Chardonnay', 'Sauvignon Blanc', 'Pinot Grigio/Gris', 'Riesling', 'Moscato', 'Chenin Blanc', 'Viognier', 'Gewürztraminer', 'White Blend'],
+  'Rosé': ['Provence Style', 'Grenache Rosé', 'Pinot Noir Rosé', 'Sangiovese Rosé'],
+  'Sparkling': ['Champagne', 'Prosecco', 'Cava', 'Crémant', 'Sparkling Wine'],
+  'Dessert': ['Sauternes', 'Ice Wine', 'Late Harvest'],
+  'Fortified': ['Port', 'Sherry', 'Madeira', 'Vermouth']
+};
+
+const BEER_STYLES = ['IPA', 'Lager', 'Pilsner', 'Stout', 'Porter', 'Sour', 'Wheat', 'Pale Ale', 'Amber', 'Belgian', 'Cider', 'Other'];
+const SPIRIT_TYPES = ['Whiskey', 'Bourbon', 'Scotch', 'Gin', 'Vodka', 'Rum', 'Tequila', 'Mezcal', 'Brandy', 'Cognac', 'Liqueur', 'Other'];
+
 const CellarView: React.FC<CellarViewProps> = ({
   items, logs, onUpdateQty, onAddItem, onUpdateItem, onRemoveItem, onLogConsumption, onAddToList, activeFamily
 }) => {
   const [activeTab, setActiveTab] = useState<'Wine' | 'Beer' | 'Spirits'>('Wine');
-  const [isAdding, setIsAdding] = useState(false);
+  const [isAdding, setIsAdding] = useState<'Wine' | 'Beer' | 'Spirits' | null>(null);
   const [editingItem, setEditingItem] = useState<CellarItem | null>(null);
   const [consumingItem, setConsumingItem] = useState<CellarItem | null>(null);
   const [consumptionNotes, setConsumptionNotes] = useState('');
   const [consumptionOccasion, setConsumptionOccasion] = useState('');
+  
+  // Form state for dynamic varietals
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('Red');
 
   const stats = useMemo(() => {
     const wine = items.filter(i => i.category === 'Wine').reduce((acc, i) => acc + i.quantity, 0);
@@ -51,6 +68,52 @@ const CellarView: React.FC<CellarViewProps> = ({
     setConsumptionOccasion('');
   };
 
+  const openAddModal = (cat: 'Wine' | 'Beer' | 'Spirits') => {
+    setSelectedSubCategory('Red');
+    setIsAdding(cat);
+  };
+
+  const openEditModal = (item: CellarItem) => {
+    setSelectedSubCategory(item.subCategory || 'Red');
+    setEditingItem(item);
+  };
+
+  const handleSave = () => {
+    const cat = isAdding || editingItem?.category;
+    if (!cat) return;
+
+    const producer = (document.getElementById('cellar-producer') as HTMLInputElement)?.value;
+    const name = (document.getElementById('cellar-name') as HTMLInputElement).value;
+    const subCategory = cat === 'Wine' ? (document.getElementById('cellar-subcategory') as HTMLSelectElement)?.value : undefined;
+    const type = (document.getElementById('cellar-type') as HTMLInputElement)?.value || (document.getElementById('cellar-type-select') as HTMLSelectElement)?.value;
+    const vintage = (document.getElementById('cellar-vintage') as HTMLInputElement)?.value;
+    const abv = (document.getElementById('cellar-abv') as HTMLInputElement)?.value;
+    const quantity = Number((document.getElementById('cellar-qty') as HTMLInputElement).value);
+    const threshold = Number((document.getElementById('cellar-threshold') as HTMLInputElement).value);
+    const isOpened = (document.getElementById('cellar-opened') as HTMLInputElement).checked;
+
+    if (editingItem) {
+      onUpdateItem(editingItem.id, { producer, name, category: cat, subCategory, type, vintage, abv, quantity, lowStockThreshold: threshold, isOpened });
+    } else {
+      onAddItem({ 
+        producer, 
+        name, 
+        category: cat, 
+        subCategory, 
+        type, 
+        vintage, 
+        abv, 
+        quantity, 
+        lowStockThreshold: threshold, 
+        isOpened, 
+        unit: cat === 'Beer' ? 'cans' : 'bottles', 
+        familyId: activeFamily?.id 
+      });
+    }
+    setIsAdding(null);
+    setEditingItem(null);
+  };
+
   return (
     <div className="space-y-6 pb-24">
       {/* Summary Stats */}
@@ -69,15 +132,33 @@ const CellarView: React.FC<CellarViewProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-2xl font-black text-slate-900">Cellar</h2>
-        <button 
-          onClick={() => setIsAdding(true)}
-          className="bg-indigo-600 text-white text-[10px] font-black uppercase px-4 py-2 rounded-xl active:scale-95 shadow-lg flex items-center space-x-1"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
-          <span>Add Item</span>
-        </button>
+      <div className="px-1 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-900">Cellar</h2>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <button 
+            onClick={() => openAddModal('Wine')}
+            className="bg-indigo-600 text-white text-[9px] font-black uppercase py-3 rounded-2xl active:scale-95 shadow-lg flex flex-col items-center justify-center space-y-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Wine</span>
+          </button>
+          <button 
+            onClick={() => openAddModal('Beer')}
+            className="bg-amber-500 text-white text-[9px] font-black uppercase py-3 rounded-2xl active:scale-95 shadow-lg flex flex-col items-center justify-center space-y-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Beer</span>
+          </button>
+          <button 
+            onClick={() => openAddModal('Spirits')}
+            className="bg-slate-800 text-white text-[9px] font-black uppercase py-3 rounded-2xl active:scale-95 shadow-lg flex flex-col items-center justify-center space-y-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Spirits</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -105,14 +186,16 @@ const CellarView: React.FC<CellarViewProps> = ({
         ) : (
           filteredItems.map(item => (
             <div key={item.id} className="bg-white border border-slate-100 p-5 rounded-[32px] shadow-sm flex items-center justify-between group active:scale-[0.98] transition-transform">
-              <div className="flex-1 min-w-0 pr-4" onClick={() => setEditingItem(item)}>
+              <div className="flex-1 min-w-0 pr-4" onClick={() => openEditModal(item)}>
                 <div className="flex items-center space-x-2">
-                  <h4 className="font-black text-slate-800 text-sm truncate uppercase leading-tight">{item.name}</h4>
+                  <h4 className="font-black text-slate-800 text-sm truncate uppercase leading-tight">{item.producer && <span className="text-slate-400 mr-1">{item.producer}</span>}{item.name}</h4>
                   {item.isOpened && (
                     <span className="bg-amber-100 text-amber-600 text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase">Opened</span>
                   )}
                 </div>
-                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-0.5">{item.type} {item.vintage && `• ${item.vintage}`}</p>
+                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-0.5">
+                  {item.subCategory && `${item.subCategory} • `}{item.type} {item.vintage && `• ${item.vintage}`} {item.abv && `• ${item.abv}%`}
+                </p>
                 <div className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full border text-[8px] font-black uppercase mt-2 ${getStockColor(item)}`}>
                   <span>{item.quantity <= item.lowStockThreshold ? 'Low Stock' : 'In Stock'}</span>
                 </div>
@@ -151,7 +234,7 @@ const CellarView: React.FC<CellarViewProps> = ({
           <div className="space-y-2">
             {items.filter(i => i.quantity <= i.lowStockThreshold).map(item => (
               <div key={item.id} className="flex items-center justify-between">
-                <p className="text-[11px] font-bold text-amber-800">{item.name} ({item.quantity} left)</p>
+                <p className="text-[11px] font-bold text-amber-800">{item.producer ? `${item.producer} ` : ''}{item.name} ({item.quantity} left)</p>
                 <button 
                   onClick={() => onAddToList(item.name, item.lowStockThreshold * 2, item.unit, undefined, 'Cellar Restock')}
                   className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-white px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm"
@@ -168,38 +251,141 @@ const CellarView: React.FC<CellarViewProps> = ({
       {(isAdding || editingItem) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="bg-white w-full max-w-lg rounded-[40px] p-8 space-y-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h3 className="text-xl font-black uppercase">{editingItem ? 'Edit Item' : 'Add to Cellar'}</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-black uppercase">
+                {editingItem ? `Edit ${editingItem.category}` : `Add ${isAdding}`}
+              </h3>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                (isAdding || editingItem?.category) === 'Wine' ? 'bg-indigo-100 text-indigo-600' :
+                (isAdding || editingItem?.category) === 'Beer' ? 'bg-amber-100 text-amber-600' :
+                'bg-slate-100 text-slate-600'
+              }`}>
+                {(isAdding || editingItem?.category) === 'Wine' ? '🍷' : (isAdding || editingItem?.category) === 'Beer' ? '🍺' : '🥃'}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase">Name / Label</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  {(isAdding || editingItem?.category) === 'Wine' ? 'Winery' : 
+                   (isAdding || editingItem?.category) === 'Beer' ? 'Brewery' : 'Distillery'}
+                </label>
                 <input 
                   className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
-                  placeholder="e.g. Whispering Angel"
+                  placeholder="Producer Name"
+                  defaultValue={editingItem?.producer || ''} 
+                  id="cellar-producer"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Label Name</label>
+                <input 
+                  className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
+                  placeholder="e.g. Reserve Selection"
                   defaultValue={editingItem?.name || ''} 
                   id="cellar-name"
                 />
               </div>
+
+              {(isAdding || editingItem?.category) === 'Wine' && (
+                <>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vintage</label>
+                    <input 
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
+                      placeholder="e.g. 2019"
+                      defaultValue={editingItem?.vintage || ''} 
+                      id="cellar-vintage"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Color / Class</label>
+                    <select 
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500"
+                      value={selectedSubCategory}
+                      onChange={e => setSelectedSubCategory(e.target.value)}
+                      id="cellar-subcategory"
+                    >
+                      {WINE_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Varietal / Style</label>
+                    <div className="relative">
+                      <select 
+                        className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+                        defaultValue={editingItem?.type || ''}
+                        id="cellar-type-select"
+                        onChange={e => {
+                          const input = document.getElementById('cellar-type') as HTMLInputElement;
+                          if (input) input.value = e.target.value;
+                        }}
+                      >
+                        <option value="">Select Varietal...</option>
+                        {WINE_VARIETALS[selectedSubCategory]?.map(v => <option key={v} value={v}>{v}</option>)}
+                        <option value="custom">Custom...</option>
+                      </select>
+                      <input 
+                        className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500 mt-2" 
+                        placeholder="Or type custom varietal..."
+                        defaultValue={editingItem?.type || ''} 
+                        id="cellar-type"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {(isAdding || editingItem?.category) === 'Beer' && (
+                <>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Style</label>
+                    <select 
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500"
+                      defaultValue={editingItem?.type || ''}
+                      id="cellar-type"
+                    >
+                      {BEER_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ABV %</label>
+                    <input 
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
+                      placeholder="e.g. 6.5"
+                      defaultValue={editingItem?.abv || ''} 
+                      id="cellar-abv"
+                    />
+                  </div>
+                </>
+              )}
+
+              {(isAdding || editingItem?.category) === 'Spirits' && (
+                <>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</label>
+                    <select 
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500"
+                      defaultValue={editingItem?.type || ''}
+                      id="cellar-type"
+                    >
+                      {SPIRIT_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ABV %</label>
+                    <input 
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
+                      placeholder="e.g. 40"
+                      defaultValue={editingItem?.abv || ''} 
+                      id="cellar-abv"
+                    />
+                  </div>
+                </>
+              )}
+
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Category</label>
-                <select 
-                  className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500"
-                  defaultValue={editingItem?.category || activeTab}
-                  id="cellar-category"
-                >
-                  {CELLAR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Type / Style</label>
-                <input 
-                  className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
-                  placeholder="e.g. Rosé"
-                  defaultValue={editingItem?.type || ''} 
-                  id="cellar-type"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Quantity</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</label>
                 <input 
                   type="number"
                   className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
@@ -208,7 +394,7 @@ const CellarView: React.FC<CellarViewProps> = ({
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Low Stock Alert</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Low Stock Alert</label>
                 <input 
                   type="number"
                   className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-sm border-none focus:ring-2 focus:ring-indigo-500" 
@@ -229,28 +415,13 @@ const CellarView: React.FC<CellarViewProps> = ({
             
             <div className="flex space-x-3 pt-4">
               <button 
-                onClick={() => { setIsAdding(false); setEditingItem(null); }} 
+                onClick={() => { setIsAdding(null); setEditingItem(null); }} 
                 className="flex-1 bg-slate-100 text-slate-500 font-black py-5 rounded-3xl uppercase text-[10px] tracking-widest"
               >
                 Cancel
               </button>
               <button 
-                onClick={() => {
-                  const name = (document.getElementById('cellar-name') as HTMLInputElement).value;
-                  const category = (document.getElementById('cellar-category') as HTMLSelectElement).value as any;
-                  const type = (document.getElementById('cellar-type') as HTMLInputElement).value;
-                  const quantity = Number((document.getElementById('cellar-qty') as HTMLInputElement).value);
-                  const threshold = Number((document.getElementById('cellar-threshold') as HTMLInputElement).value);
-                  const isOpened = (document.getElementById('cellar-opened') as HTMLInputElement).checked;
-
-                  if (editingItem) {
-                    onUpdateItem(editingItem.id, { name, category, type, quantity, lowStockThreshold: threshold, isOpened });
-                  } else {
-                    onAddItem({ name, category, type, quantity, lowStockThreshold: threshold, isOpened, unit: category === 'Beer' ? 'cans' : 'bottles', familyId: activeFamily?.id });
-                  }
-                  setIsAdding(false);
-                  setEditingItem(null);
-                }} 
+                onClick={handleSave} 
                 className="flex-1 bg-indigo-600 text-white font-black py-5 rounded-3xl uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-200"
               >
                 {editingItem ? 'Save Changes' : 'Add to Cellar'}

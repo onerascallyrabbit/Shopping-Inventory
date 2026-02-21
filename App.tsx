@@ -10,6 +10,7 @@ import Header from './components/Header';
 import AddItemModal from './components/AddItemModal';
 import SettingsView from './components/SettingsView';
 import InventoryView from './components/InventoryView';
+import CellarView from './components/CellarView';
 import MealPlanner from './components/MealPlanner';
 import DiagnosticBanner from './components/DiagnosticBanner';
 import { useAppData } from './hooks/useAppData';
@@ -24,7 +25,8 @@ const App: React.FC = () => {
     updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
     addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem,
     addToInventory, importBulkInventory, reorderStorageLocations, refresh,
-    refreshMeals, cookMeal, rateMeal
+    refreshMeals, cookMeal, rateMeal,
+    cellarItems, consumptionLogs, updateCellarQty, addCellarItem, updateCellarItem, removeCellarItem, logConsumption
   } = useAppData();
 
   const [isGuest, setIsGuest] = useState(() => localStorage.getItem('pricewise_is_guest') === 'true');
@@ -80,7 +82,7 @@ const App: React.FC = () => {
       
       <main className="flex-1 overflow-y-auto pb-32 px-4 pt-6">
         
-        {activeTab === 'dashboard' && <Dashboard products={products} onAddToList={addToList} />}
+        {activeTab === 'dashboard' && <Dashboard products={products} cellarItems={cellarItems} onAddToList={addToList} onTabChange={setActiveTab} />}
         {activeTab === 'items' && <ItemBrowser products={products} categoryOrder={profile.categoryOrder} onAddToList={addToList} />}
         {activeTab === 'inventory' && (
           <InventoryView 
@@ -91,9 +93,22 @@ const App: React.FC = () => {
             onAddToInventory={addToInventory} onBulkAdd={importBulkInventory} onAddToList={addToList}
           />
         )}
+        {activeTab === 'cellar' && (
+          <CellarView 
+            items={cellarItems} 
+            logs={consumptionLogs}
+            onUpdateQty={updateCellarQty}
+            onAddItem={addCellarItem}
+            onUpdateItem={updateCellarItem}
+            onRemoveItem={removeCellarItem}
+            onLogConsumption={logConsumption}
+            onAddToList={addToList}
+            activeFamily={activeFamily}
+          />
+        )}
         {activeTab === 'meals' && (
           <MealPlanner 
-            mealIdeas={mealIdeas} loading={loading} activeFamily={activeFamily}
+            mealIdeas={mealIdeas} cellarItems={cellarItems} loading={loading} activeFamily={activeFamily}
             onRefresh={refreshMeals} onCook={cookMeal} onRate={rateMeal} onAddToList={addToList}
           />
         )}

@@ -1,7 +1,5 @@
 
-
-
-Update: Added sub-categories to wines
+Update: Added sub-categories to wines*
 New: Cellar feature
 Update: better UI for STOCK buttons in upper-right
 Fix: restored missing functionality to STOCK 

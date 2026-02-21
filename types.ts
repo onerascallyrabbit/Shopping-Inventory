@@ -96,6 +96,7 @@ export interface Profile {
   activeVehicleId?: string;
   sharePrices: boolean;
   familyId?: string;
+  defaultTab?: AppTab;
 }
 
 export interface FamilyMember {

@@ -30,6 +30,7 @@ export interface ShoppingItem {
   unit: string;
   isCompleted: boolean;
   manualStore?: string;
+  category?: string;
   userId?: string;
 }
 
@@ -138,4 +139,32 @@ export interface MealIdea {
   generatedAt: string;
 }
 
-export type AppTab = 'dashboard' | 'items' | 'inventory' | 'list' | 'shop' | 'meals' | 'settings';
+export interface CellarItem {
+  id: string;
+  name: string;
+  category: 'Wine' | 'Beer' | 'Spirits';
+  type: string; // Pinot Noir, IPA, Whiskey, etc.
+  quantity: number;
+  unit: string; // bottles, cans, etc.
+  lowStockThreshold: number;
+  isOpened: boolean;
+  notes?: string;
+  vintage?: string;
+  abv?: string;
+  price?: number;
+  location?: string;
+  userId: string;
+  familyId?: string;
+  updatedAt: string;
+}
+
+export interface ConsumptionLog {
+  id: string;
+  itemId: string;
+  quantity: number;
+  date: string;
+  occasion?: string;
+  notes?: string;
+}
+
+export type AppTab = 'dashboard' | 'items' | 'inventory' | 'cellar' | 'list' | 'shop' | 'meals' | 'settings';

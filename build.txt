@@ -1,26 +1,29 @@
-added Google User login and user tracking
-added supabase auth and gemini key
-Google sign-in working
-Added additional database and "family" features
-Now storing price-history in database
-**Major Refactor**
-Added better "family" hub features
-Added Add Family Link*****
-Moved STOCK storage to database********
-Correcting to allow family to see STOCK
-New: depleted inventory gets added to list
-New: move items in inventory***
-New: add LIST/SHOP items to inventory
-Update: LIST is shared among family
-Update: category management
-Update: location order management*
-New: install as app with logo***
-Update: settings page cleanup
-Update: home page cleanup
-New: AI meal assistant***
-Fix: trying to get AI agent connected*********
-New: Copy stock to csv button
-Update: move in-sync alert*
-Fix: install tailwind
-Fix: restored missing functionality to STOCK 
+New: Cellar feature
 Update: better UI for STOCK buttons in upper-right
+Fix: restored missing functionality to STOCK 
+Fix: install tailwind
+Update: move in-sync alert*
+New: Copy stock to csv button
+Fix: trying to get AI agent connected*********
+New: AI meal assistant***
+Update: home page cleanup
+Update: settings page cleanup
+New: install as app with logo***
+Update: location order management*
+Update: category management
+Update: LIST is shared among family
+Update: LIST is shared among family
+New: add LIST/SHOP items to inventory
+New: add LIST/SHOP items to inventory
+New: move items in inventory***
+New: depleted inventory gets added to list
+Correcting to allow family to see STOCK
+Moved STOCK storage to database********
+Added Add Family Link*****
+Added better "family" hub features
+**Major Refactor**
+Now storing price-history in database
+Added additional database and "family" features
+Google sign-in working
+added supabase auth and gemini key
+added Google User login and user tracking

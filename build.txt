@@ -1,3 +1,4 @@
+Update: Cellar UI 
 Update: Separate alcohol add buttons
 Update: Added sub-categories to wines**
 New: Cellar feature

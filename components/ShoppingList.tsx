@@ -109,6 +109,9 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
                 ></button>
                 <div className="flex-1 min-w-0 pr-2">
                   <h4 className="font-black text-slate-800 text-sm truncate uppercase tracking-tight">{item.name}</h4>
+                  {item.category && (
+                    <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest leading-none mt-0.5">{item.category}</p>
+                  )}
                   <div 
                     onClick={() => setEditingId(editingId === item.id ? null : item.id)}
                     className="inline-flex items-center mt-0.5 cursor-pointer hover:bg-slate-50 rounded-md transition-colors"

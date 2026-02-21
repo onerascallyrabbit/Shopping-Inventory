@@ -21,3 +21,4 @@ New: AI meal assistant***
 Fix: trying to get AI agent connected*********
 New: Copy stock to csv button
 Update: move in-sync alert*
+Fix: install tailwind

@@ -153,31 +153,31 @@ const CellarView: React.FC<CellarViewProps> = ({
         </div>
       </div>
 
-      <div className="px-1 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-black text-slate-900">Cellar</h2>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-2xl font-black text-slate-900">Cellar</h2>
+        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-sm">
           <button 
             onClick={() => openAddModal('Wine')}
-            className="bg-indigo-600 text-white text-[9px] font-black uppercase py-3 rounded-2xl active:scale-95 shadow-lg flex flex-col items-center justify-center space-y-1"
+            className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white hover:shadow-sm transition-all active:scale-90"
+            title="Add Wine"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
-            <span>+ Wine</span>
+            <span className="text-lg">🍷</span>
           </button>
+          <div className="w-px h-6 bg-slate-200 self-center mx-0.5" />
           <button 
             onClick={() => openAddModal('Beer')}
-            className="bg-amber-500 text-white text-[9px] font-black uppercase py-3 rounded-2xl active:scale-95 shadow-lg flex flex-col items-center justify-center space-y-1"
+            className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white hover:shadow-sm transition-all active:scale-90"
+            title="Add Beer"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
-            <span>+ Beer</span>
+            <span className="text-lg">🍺</span>
           </button>
+          <div className="w-px h-6 bg-slate-200 self-center mx-0.5" />
           <button 
             onClick={() => openAddModal('Spirits')}
-            className="bg-slate-800 text-white text-[9px] font-black uppercase py-3 rounded-2xl active:scale-95 shadow-lg flex flex-col items-center justify-center space-y-1"
+            className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white hover:shadow-sm transition-all active:scale-90"
+            title="Add Spirits"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
-            <span>+ Spirits</span>
+            <span className="text-lg">🥃</span>
           </button>
         </div>
       </div>
@@ -237,12 +237,22 @@ const CellarView: React.FC<CellarViewProps> = ({
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                   </button>
                 )}
-                <div className="flex items-center bg-slate-50 rounded-xl p-0.5 border border-slate-100">
-                  <button onClick={() => onUpdateQty(item.id, -1)} className="w-7 h-7 flex items-center justify-center text-slate-400 font-black text-sm active:scale-90">-</button>
-                  <div className="px-1 text-[11px] font-black text-slate-900 min-w-[1.5rem] text-center">
+                <div className="flex items-center bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
+                  <button 
+                    onClick={() => onUpdateQty(item.id, -1)} 
+                    className="w-7 h-7 flex items-center justify-center text-slate-400 hover:bg-white hover:text-slate-600 transition-colors active:scale-90"
+                  >
+                    <span className="font-black text-xs">-</span>
+                  </button>
+                  <div className="px-2 text-[11px] font-black text-slate-900 min-w-[1.2rem] text-center bg-white h-7 flex items-center justify-center border-x border-slate-200">
                     {item.quantity}
                   </div>
-                  <button onClick={() => onUpdateQty(item.id, 1)} className="w-7 h-7 flex items-center justify-center text-indigo-600 font-black text-sm active:scale-90">+</button>
+                  <button 
+                    onClick={() => onUpdateQty(item.id, 1)} 
+                    className="w-7 h-7 flex items-center justify-center text-indigo-600 hover:bg-white transition-colors active:scale-90"
+                  >
+                    <span className="font-black text-xs">+</span>
+                  </button>
                 </div>
               </div>
             </div>

@@ -583,7 +583,18 @@ export const syncInventoryItem = async (item: InventoryItem) => {
 
   if (item.subCategory) payload.sub_category = item.subCategory;
   if (item.variety) payload.variety = item.variety;
+  if (item.brand) payload.brand = item.brand;
+  if (item.grade) payload.grade = item.grade;
+  if (item.style) payload.style = item.style;
+  if (item.origin) payload.origin = item.origin;
   if (item.subLocation) payload.sub_location = item.subLocation;
+  if (item.purchaseDate) payload.purchase_date = item.purchaseDate;
+  if (item.expirationDate) payload.expiration_date = item.expirationDate;
+  if (item.openedDate) payload.opened_date = item.openedDate;
+  if (item.notes) payload.notes = item.notes;
+  if (item.barcode) payload.barcode = item.barcode;
+  if (item.imageUrl) payload.image_url = item.imageUrl;
+  if (item.createdAt) payload.created_at = item.createdAt;
 
   const { error } = await supabase.from('inventory').upsert(payload);
 

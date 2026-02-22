@@ -337,11 +337,14 @@ export const syncProduct = async (product: Partial<Product>) => {
     id: product.id || crypto.randomUUID(),
     category: product.category,
     sub_category: product.subCategory,
-    // Fix: Using product.itemName instead of product.item_name to match Product interface
     item_name: product.itemName,
     variety: product.variety,
     brand: product.brand,
-    barcode: product.barcode
+    barcode: product.barcode,
+    origin: product.origin,
+    grade: product.grade,
+    style: product.style,
+    notes: product.notes
   }).select().single();
   
   if (error) {
@@ -381,6 +384,10 @@ export const fetchPriceData = async (): Promise<Product[]> => {
         variety: p.variety,
         brand: p.brand,
         barcode: p.barcode,
+        origin: p.origin,
+        grade: p.grade,
+        style: p.style,
+        notes: p.notes,
         history
       };
     }).filter(p => p.history.length > 0);

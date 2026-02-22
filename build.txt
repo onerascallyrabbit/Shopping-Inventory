@@ -1,4 +1,4 @@
-New: added "focus" option to meal planner
+New: added "focus" option to meal planner*
 Update: Cellar UI*
 Update: Separate alcohol add buttons
 Update: Added sub-categories to wines**

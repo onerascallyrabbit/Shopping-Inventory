@@ -74,10 +74,29 @@ export const useAppData = () => {
         
         if (data.inventory) {
           setInventory(data.inventory.map(i => ({
-            id: i.id, productId: i.product_id, itemName: i.item_name, category: i.category,
+            id: i.id, 
+            productId: i.product_id, 
+            itemName: i.item_name, 
+            category: i.category,
             subCategory: i.sub_category,
-            variety: i.variety, subLocation: i.sub_location, quantity: Number(i.quantity),
-            unit: i.unit, locationId: i.location_id, updatedAt: i.updated_at, userId: i.user_id
+            variety: i.variety, 
+            brand: i.brand,
+            grade: i.grade,
+            style: i.style,
+            origin: i.origin,
+            subLocation: i.sub_location, 
+            quantity: Number(i.quantity),
+            unit: i.unit, 
+            locationId: i.location_id, 
+            purchaseDate: i.purchase_date,
+            expirationDate: i.expiration_date,
+            openedDate: i.opened_date,
+            notes: i.notes,
+            barcode: i.barcode,
+            imageUrl: i.image_url,
+            createdAt: i.created_at,
+            updatedAt: i.updated_at, 
+            userId: i.user_id
           })));
         }
 
@@ -140,7 +159,7 @@ export const useAppData = () => {
     return () => subscription.unsubscribe();
   }, [loadAllData]);
 
-  const refreshMeals = async () => {
+  const refreshMeals = async (focus?: string) => {
     if (!activeFamily) {
       alert("No active Family Hub. Please join or create a Hub in Settings to enable shared meal planning.");
       return;
@@ -152,7 +171,7 @@ export const useAppData = () => {
 
     setLoading(true);
     try {
-      const newMeals = await generateMealIdeas(inventory);
+      const newMeals = await generateMealIdeas(inventory, focus);
       if (newMeals && newMeals.length > 0) {
         await bulkSyncMealIdeas(activeFamily.id, newMeals);
         await loadAllData(true);
@@ -264,8 +283,31 @@ export const useAppData = () => {
     if (user) try { await syncShoppingItem(updated); } catch (e) { console.error(e); }
   };
 
-  const addToInventory = async (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => {
-    const newItem: InventoryItem = { id: crypto.randomUUID(), productId, itemName, category, subCategory, variety, subLocation, quantity: qty, unit, locationId, updatedAt: new Date().toISOString(), userId: user?.id || '' };
+  const addToInventory = async (itemData: Partial<InventoryItem>) => {
+    const newItem: InventoryItem = { 
+      id: crypto.randomUUID(), 
+      productId: itemData.productId || 'manual', 
+      itemName: itemData.itemName || '', 
+      category: itemData.category || 'Other', 
+      subCategory: itemData.subCategory, 
+      variety: itemData.variety, 
+      brand: itemData.brand,
+      grade: itemData.grade,
+      style: itemData.style,
+      origin: itemData.origin,
+      subLocation: itemData.subLocation, 
+      quantity: itemData.quantity || 0, 
+      unit: itemData.unit || 'pc', 
+      locationId: itemData.locationId || '', 
+      purchaseDate: itemData.purchaseDate,
+      expirationDate: itemData.expirationDate,
+      openedDate: itemData.openedDate,
+      notes: itemData.notes,
+      barcode: itemData.barcode,
+      imageUrl: itemData.imageUrl,
+      updatedAt: new Date().toISOString(), 
+      userId: user?.id || '' 
+    };
     setInventory(prev => [...prev, newItem]);
     if (user) try { await syncInventoryItem(newItem); } catch (err) { loadAllData(); }
   };

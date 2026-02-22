@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShoppingItem, Product, StoreLocation, Vehicle, StorageLocation, SubLocation } from '../types';
+import { ShoppingItem, Product, StoreLocation, Vehicle, StorageLocation, SubLocation, InventoryItem } from '../types';
 import StockPurchasedModal from './StockPurchasedModal';
 
 interface ShopPlanProps {
@@ -15,7 +15,7 @@ interface ShopPlanProps {
   onToggle: (id: string) => void;
   onRemove: (id: string) => void;
   onOverrideStore: (id: string, store: string | undefined) => void;
-  onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
+  onAddToInventory: (item: Partial<InventoryItem>) => void;
 }
 
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -127,8 +127,8 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
     e.preventDefault();
   };
 
-  const handleStockConfirm = (...args: Parameters<typeof onAddToInventory>) => {
-    onAddToInventory(...args);
+  const handleStockConfirm = (item: Partial<InventoryItem>) => {
+    onAddToInventory(item);
     if (stockingItem) onRemove(stockingItem.id);
   };
 

@@ -31,6 +31,14 @@ const App: React.FC = () => {
 
   const [isGuest, setIsGuest] = useState(() => localStorage.getItem('pricewise_is_guest') === 'true');
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
+  const [hasSetDefaultTab, setHasSetDefaultTab] = useState(false);
+
+  useEffect(() => {
+    if (profile?.defaultTab && !hasSetDefaultTab) {
+      setActiveTab(profile.defaultTab);
+      setHasSetDefaultTab(true);
+    }
+  }, [profile?.defaultTab, hasSetDefaultTab]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addModalMode, setAddModalMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('type');
   const [lastUsedStore, setLastUsedStore] = useState<string>('');
@@ -82,7 +90,7 @@ const App: React.FC = () => {
       
       <main className="flex-1 overflow-y-auto pb-32 px-4 pt-6">
         
-        {activeTab === 'dashboard' && <Dashboard products={products} cellarItems={cellarItems} onAddToList={addToList} onTabChange={setActiveTab} />}
+        {activeTab === 'dashboard' && <Dashboard products={products} onAddToList={addToList} onTabChange={setActiveTab} />}
         {activeTab === 'items' && <ItemBrowser products={products} categoryOrder={profile.categoryOrder} onAddToList={addToList} />}
         {activeTab === 'inventory' && (
           <InventoryView 

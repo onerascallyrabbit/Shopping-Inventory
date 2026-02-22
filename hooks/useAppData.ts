@@ -33,10 +33,26 @@ export const useAppData = () => {
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [customSubCategories, setCustomSubCategories] = useState<CustomSubCategory[]>([]);
   const [activeFamily, setActiveFamily] = useState<Family | null>(null);
-  const [profile, setProfile] = useState<Profile>({ 
-    id: '', locationLabel: '', zip: '', gasPrice: 3.50, 
-    categoryOrder: DEFAULT_CATEGORIES, sharePrices: false 
+  const [profile, setProfile] = useState<Profile>(() => {
+    const saved = localStorage.getItem('aisle_be_back_profile');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved profile", e);
+      }
+    }
+    return { 
+      id: '', locationLabel: '', zip: '', gasPrice: 3.50, 
+      categoryOrder: DEFAULT_CATEGORIES, sharePrices: false 
+    };
   });
+
+  useEffect(() => {
+    if (!user) {
+      localStorage.setItem('aisle_be_back_profile', JSON.stringify(profile));
+    }
+  }, [profile, user]);
 
   const isSyncingReorder = useRef(false);
 
@@ -239,20 +255,20 @@ export const useAppData = () => {
     if (user) try { await deleteInventoryItem(id); } catch (err) { loadAllData(); }
   };
 
-  const addPriceRecord = async (category: string, itemName: string, variety: string, record: any, brand?: string, barcode?: string, subCategory?: string) => {
+  const addPriceRecord = async (category: string, itemName: string, variety: string, record: any, brand?: string, barcode?: string, subCategory?: string, origin?: string, grade?: string, style?: string, notes?: string) => {
     const newRecord = { ...record, id: crypto.randomUUID(), date: new Date().toISOString(), isPublic: profile.sharePrices };
     const existingProduct = products.find(p => (barcode && p.barcode === barcode) || (p.itemName.toLowerCase() === itemName.toLowerCase() && (p.variety || '').toLowerCase() === (variety || '').toLowerCase() && (p.brand || '').toLowerCase() === (brand || '').toLowerCase()));
     let productId = existingProduct?.id;
     if (user) {
       try {
-        const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode, subCategory });
+        const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode, subCategory, origin, grade, style, notes });
         productId = syncedProduct.id;
         await syncPriceRecord(productId, newRecord, user.id);
       } catch (err) { console.error(err); }
     }
     setProducts(prev => {
       if (existingProduct) return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history] } : p);
-      return [...prev, { id: productId || crypto.randomUUID(), category, subCategory, itemName, variety, brand, barcode, history: [newRecord] }];
+      return [...prev, { id: productId || crypto.randomUUID(), category, subCategory, itemName, variety, brand, barcode, origin, grade, style, notes, history: [newRecord] }];
     });
   };
 

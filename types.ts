@@ -59,18 +59,42 @@ export interface StorageLocation {
 }
 
 export interface InventoryItem {
+  // Core identification (always filled)
   id: string;
-  productId: string;
-  itemName: string;
-  category: string;
-  subCategory?: string;
-  variety?: string;
-  subLocation?: string; 
-  quantity: number;
-  unit: string;
+  productId: string; // 'manual' or a valid product UUID
+  itemName: string;        // "Cheddar", "Chicken Breast", "Tomatoes"
+  category: string;        // "Dairy", "Meat", "Produce"
+  
+  // Flexible descriptors (fill what's relevant)
+  variety?: string;        // "Sharp", "Bone-in", "Roma"
+  brand?: string;          // "Tillamook", "Organic Valley", "Driscoll's"
+  grade?: string;          // "Extra Sharp", "USDA Prime", "Grade A"
+  style?: string;          // "Aged", "Smoked", "Fresh"
+  origin?: string;         // "Wisconsin", "Local", "Imported"
+  subCategory?: string;    // Keeping legacy subCategory support
+  
+  // Quantity & units
+  quantity: number;        // 2, 1.5, 8
+  unit: string;           // "blocks", "lbs", "oz", "each", "packages"
+  
+  // Location (keeping existing feature)
   locationId: string;
+  subLocation?: string; 
+  
+  // Tracking
+  purchaseDate?: string;
+  expirationDate?: string;
+  openedDate?: string;     // For tracking after opening
+  
+  // Optional enrichment
+  notes?: string;          // Free-form for anything else
+  barcode?: string;
+  imageUrl?: string;
+  
+  // Metadata
+  userId?: string;
+  createdAt?: string;
   updatedAt: string;
-  userId?: string; 
 }
 
 export interface Vehicle {

@@ -324,6 +324,9 @@ export const syncPriceRecord = async (productId: string, record: PriceRecord, us
     price: record.price,
     quantity: record.quantity,
     unit: record.unit,
+    unit_size: record.unitSize,
+    unit_measure: record.unitMeasure,
+    container: record.container,
     date: record.date,
     image_url: record.image,
     is_public: record.isPublic || false
@@ -344,6 +347,9 @@ export const syncProduct = async (product: Partial<Product>) => {
     origin: product.origin,
     grade: product.grade,
     style: product.style,
+    unit_size: product.unitSize,
+    unit_measure: product.unitMeasure,
+    container: product.container,
     notes: product.notes
   }).select().single();
   
@@ -371,6 +377,9 @@ export const fetchPriceData = async (): Promise<Product[]> => {
           price: Number(h.price),
           quantity: Number(h.quantity),
           unit: h.unit,
+          unitSize: h.unit_size ? Number(h.unit_size) : undefined,
+          unitMeasure: h.unit_measure,
+          container: h.container,
           date: h.date,
           image: h.image_url,
           isPublic: h.is_public
@@ -387,6 +396,9 @@ export const fetchPriceData = async (): Promise<Product[]> => {
         origin: p.origin,
         grade: p.grade,
         style: p.style,
+        unitSize: p.unit_size ? Number(p.unit_size) : undefined,
+        unitMeasure: p.unit_measure,
+        container: p.container,
         notes: p.notes,
         history
       };
@@ -583,6 +595,9 @@ export const syncInventoryItem = async (item: InventoryItem) => {
     category: item.category,
     quantity: item.quantity,
     unit: item.unit,
+    unit_size: item.unitSize,
+    unit_measure: item.unitMeasure,
+    container: item.container,
     location_id: item.locationId,
     updated_at: item.updatedAt,
     user_id: item.userId || user.id

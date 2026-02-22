@@ -5,14 +5,16 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { inventory } = req.body;
+    const { inventory, focus } = req.body;
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const inventoryText = inventory.map(i => `${i.quantity} ${i.unit} of ${i.itemName}${i.variety ? ` (${i.variety})` : ''}`).join(', ');
     
+    const focusText = focus ? ` Focus the meal ideas on: ${focus}.` : '';
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Based on the following pantry/fridge inventory: [${inventoryText}]. Suggest exactly 6 meal ideas. Return as JSON.`,
+      contents: `Based on the following pantry/fridge inventory: [${inventoryText}].${focusText} Suggest exactly 6 meal ideas. Return as JSON.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {

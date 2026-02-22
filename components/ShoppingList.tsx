@@ -97,6 +97,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
 
       <div className="space-y-3">
         {activeItems.map(item => {
+          const product = products.find(p => p.id === item.productId) || products.find(p => p.itemName.toLowerCase() === item.name.toLowerCase());
           const suggestion = getSmartSuggestion(item.name);
           const genericImg = `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=120&h=120&grocery,${item.name}`;
 
@@ -109,12 +110,20 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
                 ></button>
                 <div className="flex-1 min-w-0 pr-2">
                   <h4 className="font-black text-slate-800 text-sm truncate uppercase tracking-tight">{item.name}</h4>
-                  {item.category && (
-                    <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest leading-none mt-0.5">{item.category}</p>
-                  )}
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                    {item.category && (
+                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest leading-none">{item.category}</p>
+                    )}
+                    {product?.brand && (
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none border-l pl-2 border-slate-200">{product.brand}</p>
+                    )}
+                    {product?.variety && (
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none border-l pl-2 border-slate-200">{product.variety}</p>
+                    )}
+                  </div>
                   <div 
                     onClick={() => setEditingId(editingId === item.id ? null : item.id)}
-                    className="inline-flex items-center mt-0.5 cursor-pointer hover:bg-slate-50 rounded-md transition-colors"
+                    className="inline-flex items-center mt-1 cursor-pointer hover:bg-slate-50 rounded-md transition-colors"
                   >
                     <span className="text-[10px] text-indigo-500 font-black uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-full">
                       {item.neededQuantity} {item.unit}

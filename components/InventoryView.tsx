@@ -194,6 +194,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <label className="text-[10px] font-black text-slate-400 uppercase">Item Name</label>
                 <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Cheddar" onChange={e => setEditingItem({ ...editingItem, itemName: e.target.value } as any)} />
               </div>
+              
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase">Category</label>
                 <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, category: e.target.value } as any)}>
@@ -201,21 +202,28 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 </select>
               </div>
               <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Brand</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Tillamook" onChange={e => setEditingItem({ ...editingItem, brand: e.target.value } as any)} />
+              </div>
+
+              <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase">Variety</label>
                 <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Sharp" onChange={e => setEditingItem({ ...editingItem, variety: e.target.value } as any)} />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Brand</label>
-                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Tillamook" onChange={e => setEditingItem({ ...editingItem, brand: e.target.value } as any)} />
+                <label className="text-[10px] font-black text-slate-400 uppercase">Style</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Aged" onChange={e => setEditingItem({ ...editingItem, style: e.target.value } as any)} />
               </div>
+
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase">Origin</label>
                 <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Local" onChange={e => setEditingItem({ ...editingItem, origin: e.target.value } as any)} />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Grade / Style</label>
-                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. USDA Prime" onChange={e => setEditingItem({ ...editingItem, grade: e.target.value, style: e.target.value } as any)} />
+                <label className="text-[10px] font-black text-slate-400 uppercase">Expiration</label>
+                <input type="date" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, expirationDate: e.target.value } as any)} />
               </div>
+
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase">Location</label>
                 <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, locationId: e.target.value } as any)}>
@@ -229,20 +237,27 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   {subLocations.filter(sl => sl.locationId === (editingItem?.locationId || locations[0]?.id)).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Quantity</label>
-                <input type="number" step="0.1" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" defaultValue="1" onChange={e => setEditingItem({ ...editingItem, quantity: parseFloat(e.target.value) || 0 } as any)} />
+
+              <div className="col-span-2 grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Qty</label>
+                  <input type="number" step="0.1" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" defaultValue="1" onChange={e => setEditingItem({ ...editingItem, quantity: parseFloat(e.target.value) || 0 } as any)} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Unit (Size)</label>
+                  <div className="flex space-x-1">
+                    <input type="number" step="0.1" className="w-1/2 bg-slate-50 rounded-xl px-2 py-3 font-bold" placeholder="12" onChange={e => setEditingItem({ ...editingItem, unitSize: parseFloat(e.target.value) || undefined } as any)} />
+                    <select className="w-1/2 bg-slate-50 rounded-xl px-1 py-3 font-bold text-xs" onChange={e => setEditingItem({ ...editingItem, unitMeasure: e.target.value } as any)}>
+                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Container</label>
+                  <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="cans" onChange={e => setEditingItem({ ...editingItem, container: e.target.value } as any)} />
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Unit</label>
-                <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, unit: e.target.value } as any)}>
-                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Expiration Date</label>
-                <input type="date" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, expirationDate: e.target.value } as any)} />
-              </div>
+
               <div className="col-span-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase">Notes</label>
                 <textarea className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold h-20 resize-none" placeholder="Notes..." onChange={e => setEditingItem({ ...editingItem, notes: e.target.value } as any)} />

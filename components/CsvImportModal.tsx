@@ -14,7 +14,7 @@ interface CsvImportModalProps {
   customSubCategories: CustomSubCategory[];
 }
 
-type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'ignore';
+type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'unit_size' | 'unit_measure' | 'container' | 'ignore';
 
 const CsvImportModal: React.FC<CsvImportModalProps> = ({ 
   onClose, onImport, locations, subLocations, activeLocationId, categoryOrder,
@@ -74,6 +74,9 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
         else if (lower.includes('origin')) initialMappings[index] = 'origin';
         else if (lower.includes('qty') || lower.includes('quantity')) initialMappings[index] = 'quantity';
         else if (lower.includes('unit')) initialMappings[index] = 'unit';
+        else if (lower.includes('size') || lower.includes('volume') || lower.includes('weight')) initialMappings[index] = 'unit_size';
+        else if (lower.includes('measure') || lower.includes('oz') || lower.includes('grams')) initialMappings[index] = 'unit_measure';
+        else if (lower.includes('container') || lower.includes('packaging') || lower.includes('type')) initialMappings[index] = 'container';
         else if (lower.includes('category')) initialMappings[index] = 'category';
         else if (lower.includes('expiry') || lower.includes('expiration')) initialMappings[index] = 'expirationDate';
         else if (lower.includes('purchase')) initialMappings[index] = 'purchaseDate';
@@ -95,30 +98,55 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
     reader.readAsText(file);
   };
 
-  const generateReviewItems = () => {
-    const items = csvRows.map(row => {
-      const item: any = { 
-        productId: 'manual', 
-        locationId: targetLocationId,
-        subLocation: targetSubLocation 
-      };
-      csvHeaders.forEach((_, idx) => {
-        const field = mappings[idx];
-        if (field && field !== 'ignore') {
-          let val = row[idx];
-          if (field === 'quantity') item[field] = parseFloat(val) || 0;
-          else if (field === 'category') item[field] = allAvailableCategories.find(c => c.toLowerCase() === val.toLowerCase()) || "Other";
-          else item[field] = val;
-        }
-      });
-      if (!item.category) item.category = "Other";
-      if (!item.unit) item.unit = 'pc';
-      return item as Omit<InventoryItem, 'id' | 'updatedAt'>;
-    }).filter(item => item.itemName);
-    setReviewItems(items);
-    setStep('review');
-  };
+const generateReviewItems = () => {
+  const items = csvRows.map(row => {
+    const item: any = { 
+      productId: 'manual', 
+      locationId: targetLocationId,
+      subLocation: targetSubLocation 
+    };
 
+    csvHeaders.forEach((_, idx) => {
+      const field = mappings[idx];
+      if (field && field !== 'ignore') {
+        const val = row[idx];
+        
+        // Handle Numeric Fields
+        if (field === 'quantity' || field === 'unit_size') {
+          item[field] = parseFloat(val) || 0;
+        } 
+        // Handle Category normalization
+        else if (field === 'category') {
+          item[field] = allAvailableCategories.find(
+            c => c.toLowerCase() === val.toLowerCase()
+          ) || "Other";
+        } 
+        // All other text fields (itemName, unit_measure, container, variety, etc.)
+        else {
+          item[field] = val;
+        }
+      }
+    });
+
+    // Default fallbacks for required non-nullable fields
+    if (!item.category) item.category = "Other";
+    if (!item.unit) item.unit = 'pc';
+    
+    return item as Omit<InventoryItem, 'id' | 'updatedAt'>;
+  }).filter(item => item.itemName); // Keep the filtering, but consider the validation alert mentioned earlier
+
+  setReviewItems(items);
+  setStep('review');
+};
+
+  if (errors.length > 0 && newItems.length === 0) {
+    alert(`Import Failed:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...' : ''}`);
+    return; // Don't move to the next step
+  }
+
+  setReviewItems(newItems);
+  setStep('review');
+};
   const updateReviewItem = (index: number, updates: Partial<Omit<InventoryItem, 'id' | 'updatedAt'>>) => {
     setReviewItems(prev => prev.map((item, idx) => idx === index ? { ...item, ...updates } : item));
   };

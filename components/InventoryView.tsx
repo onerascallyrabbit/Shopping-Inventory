@@ -118,7 +118,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
             </button>
             <button 
-              onClick={() => setIsAdding(true)} 
+              onClick={() => { setEditingItem({} as any); setIsAdding(true); }} 
               className="bg-indigo-600 text-white text-[10px] font-black uppercase px-3 py-2 rounded-xl active:scale-95 shadow-lg flex items-center space-x-1"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
@@ -205,6 +205,18 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Sharp" onChange={e => setEditingItem({ ...editingItem, variety: e.target.value } as any)} />
               </div>
               <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Brand</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Tillamook" onChange={e => setEditingItem({ ...editingItem, brand: e.target.value } as any)} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Origin</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Local" onChange={e => setEditingItem({ ...editingItem, origin: e.target.value } as any)} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Grade / Style</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. USDA Prime" onChange={e => setEditingItem({ ...editingItem, grade: e.target.value, style: e.target.value } as any)} />
+              </div>
+              <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase">Location</label>
                 <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, locationId: e.target.value } as any)}>
                   {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
@@ -226,6 +238,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, unit: e.target.value } as any)}>
                   {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Expiration Date</label>
+                <input type="date" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, expirationDate: e.target.value } as any)} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase">Notes</label>
+                <textarea className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold h-20 resize-none" placeholder="Notes..." onChange={e => setEditingItem({ ...editingItem, notes: e.target.value } as any)} />
               </div>
             </div>
             <div className="flex space-x-3">

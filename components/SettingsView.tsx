@@ -55,7 +55,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     
     // Test Health
     testDatabaseConnection().then(res => setDbStatus(res.success ? 'ok' : 'fail'));
-    setAiStatus(getEnv('API_KEY') ? 'ok' : 'fail');
+    
+    // Direct check of process.env.API_KEY as requested
+    const apiKey = (typeof process !== 'undefined' ? process.env.API_KEY : '') || getEnv('API_KEY');
+    setAiStatus(apiKey ? 'ok' : 'fail');
 
     return () => window.removeEventListener('app-installable', checkInstallable);
   }, []);
@@ -117,7 +120,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               <span className="text-[9px] font-black uppercase text-slate-400">Gemini AI</span>
               <div className={`w-2 h-2 rounded-full ${aiStatus === 'ok' ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-red-500'}`}></div>
             </div>
-            <p className="text-xs font-bold">{aiStatus === 'ok' ? 'Ready' : 'No API Key'}</p>
+            <p className="text-xs font-bold">{aiStatus === 'ok' ? 'Ready' : 'API_KEY Missing'}</p>
           </div>
         </div>
         {!activeFamily && user && (
@@ -126,27 +129,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         )}
       </section>
-
-      {/* Installation Prompt */}
-      {isInstallable && (
-        <section className="bg-indigo-600 p-6 rounded-[32px] shadow-lg shadow-indigo-100 text-white animate-bounce-subtle">
-          <div className="flex items-center space-x-4">
-            <div className="bg-white/20 p-3 rounded-2xl">
-              <img src="cart_logo.png" className="w-8 h-8 object-contain" alt="App Logo" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-black uppercase tracking-tight">Add to Home Screen</h3>
-              <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest mt-0.5">Install for quick access & offline use</p>
-            </div>
-            <button 
-              onClick={handleInstall}
-              className="bg-white text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm active:scale-95 transition-transform"
-            >
-              Install
-            </button>
-          </div>
-        </section>
-      )}
 
       {/* Hub Status */}
       {user && (
@@ -215,17 +197,35 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </section>
 
-      {/* Fuel Settings */}
+      {/* Fuel & Default View Settings */}
       <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
-        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Location & Fuel</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Zip Code</label>
-            <input type="text" className="w-full bg-slate-50 border rounded-2xl px-4 py-3 text-sm font-bold" value={profile.zip} onChange={(e) => onProfileChange({ zip: e.target.value })} />
+        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Preferences</h3>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Zip Code</label>
+              <input type="text" className="w-full bg-slate-50 border rounded-2xl px-4 py-3 text-sm font-bold" value={profile.zip} onChange={(e) => onProfileChange({ zip: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Gas Price</label>
+              <input type="number" step="0.01" className="w-full bg-slate-50 border rounded-2xl px-4 py-3 text-sm font-bold" value={profile.gasPrice} onChange={(e) => onProfileChange({ gasPrice: parseFloat(e.target.value) || 0 })} />
+            </div>
           </div>
+          
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Gas Price</label>
-            <input type="number" step="0.01" className="w-full bg-slate-50 border rounded-2xl px-4 py-3 text-sm font-bold" value={profile.gasPrice} onChange={(e) => onProfileChange({ gasPrice: parseFloat(e.target.value) || 0 })} />
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Default Home Screen</label>
+            <select 
+              className="w-full bg-slate-50 border rounded-2xl px-4 py-3 text-sm font-bold appearance-none text-indigo-600"
+              value={profile.defaultTab || 'dashboard'}
+              onChange={(e) => onProfileChange({ defaultTab: e.target.value as any })}
+            >
+              <option value="dashboard">Track (Price History)</option>
+              <option value="inventory">Stock (Inventory)</option>
+              <option value="cellar">Cellar (Drinks)</option>
+              <option value="meals">Meals (AI Planner)</option>
+              <option value="list">List (Shopping List)</option>
+              <option value="shop">Shop (Trip Plan)</option>
+            </select>
           </div>
         </div>
       </section>

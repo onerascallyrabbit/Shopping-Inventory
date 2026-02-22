@@ -64,15 +64,22 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
     setCsvRows(rows);
     
     const initialMappings: Record<number, MappingField> = {};
-    headers.forEach((header, index) => {
-      const lower = header.toLowerCase();
-      if (lower.includes('item') || lower.includes('name')) initialMappings[index] = 'itemName';
-      else if (lower.includes('variety')) initialMappings[index] = 'variety';
-      else if (lower.includes('qty') || lower.includes('quantity')) initialMappings[index] = 'quantity';
-      else if (lower.includes('unit')) initialMappings[index] = 'unit';
-      else if (lower.includes('category')) initialMappings[index] = 'category';
-      else initialMappings[index] = 'ignore';
-    });
+      headers.forEach((header, index) => {
+        const lower = header.toLowerCase();
+        if (lower.includes('item') || lower.includes('name')) initialMappings[index] = 'itemName';
+        else if (lower.includes('variety')) initialMappings[index] = 'variety';
+        else if (lower.includes('brand')) initialMappings[index] = 'brand';
+        else if (lower.includes('grade')) initialMappings[index] = 'grade';
+        else if (lower.includes('style')) initialMappings[index] = 'style';
+        else if (lower.includes('origin')) initialMappings[index] = 'origin';
+        else if (lower.includes('qty') || lower.includes('quantity')) initialMappings[index] = 'quantity';
+        else if (lower.includes('unit')) initialMappings[index] = 'unit';
+        else if (lower.includes('category')) initialMappings[index] = 'category';
+        else if (lower.includes('expiry') || lower.includes('expiration')) initialMappings[index] = 'expirationDate';
+        else if (lower.includes('purchase')) initialMappings[index] = 'purchaseDate';
+        else if (lower.includes('note')) initialMappings[index] = 'notes';
+        else initialMappings[index] = 'ignore';
+      });
     setMappings(initialMappings);
     setStep('map');
   };
@@ -241,9 +248,16 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         <option value="ignore">Skip</option>
                         <option value="itemName">Item Name</option>
                         <option value="variety">Variety</option>
+                        <option value="brand">Brand</option>
+                        <option value="grade">Grade</option>
+                        <option value="style">Style</option>
+                        <option value="origin">Origin</option>
                         <option value="quantity">Quantity</option>
                         <option value="unit">Unit</option>
                         <option value="category">Category</option>
+                        <option value="expirationDate">Expiration Date</option>
+                        <option value="purchaseDate">Purchase Date</option>
+                        <option value="notes">Notes</option>
                       </select>
                     </div>
                   ))}
@@ -297,15 +311,22 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         </select>
                       </div>
                       <div>
-                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Sub-Category</label>
-                        <select 
-                          className="w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-[10px] font-black text-indigo-600 appearance-none" 
-                          value={item.subCategory} 
-                          onChange={e => updateReviewItem(idx, { subCategory: e.target.value })}
-                        >
-                          <option value="">None</option>
-                          {getSubCategoriesFor(item.category).map(sc => <option key={sc} value={sc}>{sc}</option>)}
-                        </select>
+                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Variety</label>
+                        <input 
+                          className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-xs font-bold" 
+                          value={item.variety || ''} 
+                          onChange={e => updateReviewItem(idx, { variety: e.target.value })} 
+                          placeholder="e.g. Roma"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Brand</label>
+                        <input 
+                          className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-xs font-bold" 
+                          value={item.brand || ''} 
+                          onChange={e => updateReviewItem(idx, { brand: e.target.value })} 
+                          placeholder="e.g. Tillamook"
+                        />
                       </div>
                       <div>
                         <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Quantity</label>
@@ -325,6 +346,15 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         >
                           {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                         </select>
+                      </div>
+                      <div>
+                        <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Expiration Date</label>
+                        <input 
+                          type="date"
+                          className="w-full bg-slate-50 border-none rounded-xl px-4 py-2.5 text-xs font-bold" 
+                          value={item.expirationDate || ''} 
+                          onChange={e => updateReviewItem(idx, { expirationDate: e.target.value })} 
+                        />
                       </div>
                     </div>
                   </div>

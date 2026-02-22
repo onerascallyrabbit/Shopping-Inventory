@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { InventoryItem, StorageLocation, Product, SubLocation, CustomCategory, CustomSubCategory } from '../types';
 import CsvImportModal from './CsvImportModal';
-import { UNITS, SUB_CATEGORIES, DEFAULT_CATEGORIES } from '../constants';
+import { UNITS, SUB_CATEGORIES, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
 
 interface InventoryViewProps {
   inventory: InventoryItem[];
@@ -254,7 +254,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase">Container</label>
-                  <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="cans" onChange={e => setEditingItem({ ...editingItem, container: e.target.value } as any)} />
+                  <input 
+                    list="container-types"
+                    className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" 
+                    placeholder="cans" 
+                    onChange={e => setEditingItem({ ...editingItem, container: e.target.value } as any)} 
+                  />
+                  <datalist id="container-types">
+                    {CONTAINER_TYPES.map(type => <option key={type} value={type} />)}
+                  </datalist>
                 </div>
               </div>
 
@@ -320,19 +328,36 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.origin || ''} onChange={e => setEditingItem({...editingItem, origin: e.target.value})} placeholder="e.g. Local, Italy" />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Quantity</label>
-                <input type="number" step="0.1" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.quantity} onChange={e => setEditingItem({...editingItem, quantity: parseFloat(e.target.value) || 0})} />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase">Unit</label>
-                <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.unit} onChange={e => setEditingItem({...editingItem, unit: e.target.value})}>
-                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-              </div>
-              <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase">Expiration Date</label>
                 <input type="date" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.expirationDate || ''} onChange={e => setEditingItem({...editingItem, expirationDate: e.target.value})} />
               </div>
+
+              <div className="col-span-2 grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Qty</label>
+                  <input type="number" step="0.1" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.quantity} onChange={e => setEditingItem({...editingItem, quantity: parseFloat(e.target.value) || 0})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Unit (Size)</label>
+                  <div className="flex space-x-1">
+                    <input type="number" step="0.1" className="w-1/2 bg-slate-50 rounded-xl px-2 py-3 font-bold" value={editingItem.unitSize || ''} placeholder="12" onChange={e => setEditingItem({ ...editingItem, unitSize: parseFloat(e.target.value) || undefined } as any)} />
+                    <select className="w-1/2 bg-slate-50 rounded-xl px-1 py-3 font-bold text-xs" value={editingItem.unitMeasure || ''} onChange={e => setEditingItem({ ...editingItem, unitMeasure: e.target.value } as any)}>
+                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Container</label>
+                  <input 
+                    list="container-types"
+                    className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" 
+                    value={editingItem.container || ''} 
+                    placeholder="cans" 
+                    onChange={e => setEditingItem({ ...editingItem, container: e.target.value } as any)} 
+                  />
+                </div>
+              </div>
+
               <div className="col-span-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase">Notes</label>
                 <textarea className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold h-20 resize-none" value={editingItem.notes || ''} onChange={e => setEditingItem({...editingItem, notes: e.target.value})} placeholder="Any additional details..." />

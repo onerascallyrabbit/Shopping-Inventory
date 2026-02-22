@@ -197,6 +197,7 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
 
               <div className={`space-y-3 min-h-[40px] p-2 rounded-[36px] transition-all duration-300 ${draggedItemId ? 'bg-indigo-50/50 border-2 border-dashed border-indigo-200 ring-4 ring-indigo-50' : 'bg-transparent border-2 border-transparent'}`}>
                 {groupedByStore[storeName].map(item => {
+                  const product = products.find(p => p.id === item.productId) || products.find(p => p.itemName.toLowerCase() === item.name.toLowerCase());
                   const cost = getItemCost(item);
                   return (
                     <div 
@@ -214,7 +215,15 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
                         </button>
                         <div className="flex-1 min-w-0 pr-2">
                           <h4 className="font-black text-slate-800 text-sm truncate uppercase tracking-tight">{item.name}</h4>
-                          <div className="flex items-center space-x-2 mt-0.5">
+                          <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                            {product?.brand && (
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">{product.brand}</p>
+                            )}
+                            {product?.variety && (
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none border-l pl-2 border-slate-200">{product.variety}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2 mt-1">
                             <span className="text-[10px] text-slate-400 font-black uppercase tracking-tight">{item.neededQuantity} {item.unit}</span>
                             {cost !== null && (
                               <div className="flex items-center space-x-1 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">

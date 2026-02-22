@@ -6,7 +6,7 @@ interface MealPlannerProps {
   mealIdeas: MealIdea[];
   cellarItems: CellarItem[];
   loading: boolean;
-  onRefresh: () => void;
+  onRefresh: (focus?: string) => void;
   onCook: (id: string) => void;
   onRate: (id: string, rating: number) => void;
   onAddToList: (name: string, qty: number, unit: string, productId?: string, category?: string) => void;
@@ -18,6 +18,8 @@ const MealPlanner: React.FC<MealPlannerProps> = ({
 }) => {
   const [filter, setFilter] = useState<'all' | 'ready' | 'close'>('all');
   const [selectedMeal, setSelectedMeal] = useState<MealIdea | null>(null);
+  const [isFocusModalOpen, setIsFocusModalOpen] = useState(false);
+  const [focus, setFocus] = useState('');
 
   const filteredMeals = mealIdeas.filter(m => {
     if (filter === 'ready') return m.matchPercentage === 100;
@@ -29,27 +31,29 @@ const MealPlanner: React.FC<MealPlannerProps> = ({
 
   return (
     <div className="space-y-6 pb-24">
-      <div className="flex items-center justify-between px-1">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900">Meal Ideas</h2>
-          {lastGen && (
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-              Freshness: {lastGen.toLocaleDateString()} at {lastGen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          )}
+      <div className="flex flex-col space-y-4 px-1">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-black text-slate-900">Meal Ideas</h2>
+            {lastGen && (
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                Freshness: {lastGen.toLocaleDateString()} at {lastGen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+          </div>
+          <button 
+            onClick={() => setIsFocusModalOpen(true)} 
+            disabled={loading}
+            className={`bg-indigo-600 text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center space-x-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {loading ? (
+              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            )}
+            <span>{loading ? 'Thinking...' : 'New Ideas'}</span>
+          </button>
         </div>
-        <button 
-          onClick={onRefresh} 
-          disabled={loading}
-          className={`bg-indigo-600 text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center space-x-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          {loading ? (
-            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-          ) : (
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-          )}
-          <span>{loading ? 'Thinking...' : 'New Ideas'}</span>
-        </button>
       </div>
 
       <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
@@ -123,6 +127,70 @@ const MealPlanner: React.FC<MealPlannerProps> = ({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {isFocusModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Meal Focus</h3>
+                <button onClick={() => setIsFocusModalOpen(false)} className="text-slate-300 hover:text-slate-500">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
+                  Tell the AI what to prioritize. Leave blank for a general mix based on your stock.
+                </p>
+                
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    autoFocus
+                    placeholder="e.g. Chicken, Salmon, Vegan, Quick..." 
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:border-indigo-500 focus:ring-0 transition-all placeholder:text-slate-300"
+                    value={focus}
+                    onChange={(e) => setFocus(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        onRefresh(focus);
+                        setIsFocusModalOpen(false);
+                      }
+                    }}
+                  />
+                  {focus && (
+                    <button 
+                      onClick={() => setFocus('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex space-x-3 pt-2">
+                <button 
+                  onClick={() => setIsFocusModalOpen(false)}
+                  className="flex-1 bg-slate-100 text-slate-500 font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest active:scale-95 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    onRefresh(focus);
+                    setIsFocusModalOpen(false);
+                  }}
+                  className="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-200 active:scale-95 transition-all"
+                >
+                  Generate Ideas
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -217,7 +285,7 @@ const MealPlanner: React.FC<MealPlannerProps> = ({
                            <div key={item.id} className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/10">
                              <div>
                                <p className="text-[11px] font-bold text-white">{item.name}</p>
-                               <p className="text-[9px] font-black text-indigo-400 uppercase">{item.type} • {item.quantity} in stock</p>
+                               <p className="text-[9px] font-black text-indigo-400 uppercase">{item.subCategory && `${item.subCategory} • `}{item.type} • {item.quantity} in stock</p>
                              </div>
                              {item.quantity <= 0 && (
                                <button 

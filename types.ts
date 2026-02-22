@@ -18,6 +18,9 @@ export interface Product {
   variety?: string; 
   brand?: string;
   barcode?: string;
+  origin?: string;
+  grade?: string;
+  style?: string;
   history: PriceRecord[];
   notes?: string;
 }

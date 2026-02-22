@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ShoppingItem, Product, StorageLocation, SubLocation, Family } from '../types';
+import { ShoppingItem, Product, StorageLocation, SubLocation, Family, InventoryItem } from '../types';
 import StockPurchasedModal from './StockPurchasedModal';
 
 interface ShoppingListProps {
@@ -11,7 +11,7 @@ interface ShoppingListProps {
   onToggle: (id: string) => void;
   onRemove: (id: string) => void;
   onAdd: (name: string, qty: number, unit: string) => void;
-  onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
+  onAddToInventory: (item: Partial<InventoryItem>) => void;
   activeFamily: Family | null;
 }
 
@@ -46,8 +46,8 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
     }
   };
 
-  const handleStockConfirm = (...args: Parameters<typeof onAddToInventory>) => {
-    onAddToInventory(...args);
+  const handleStockConfirm = (item: Partial<InventoryItem>) => {
+    onAddToInventory(item);
     if (stockingItem) onRemove(stockingItem.id);
   };
 

@@ -46,6 +46,25 @@ try {
     console.log("Aisle Be Back: Application successfully mounted.");
   });
 
+  // Service Worker Registration
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').then(registration => {
+        console.log('SW registered: ', registration);
+      }).catch(registrationError => {
+        console.log('SW registration failed: ', registrationError);
+      });
+    });
+  }
+
+  // Install Prompt Handling
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    // @ts-ignore
+    window.deferredPrompt = e;
+    window.dispatchEvent(new CustomEvent('app-installable'));
+  });
+
 } catch (err) {
   reportError(err);
 }

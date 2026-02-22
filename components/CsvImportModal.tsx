@@ -21,6 +21,8 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
   customCategories, customSubCategories
 }) => {
   const [step, setStep] = useState<'upload' | 'map' | 'review'>('upload');
+  const [importMethod, setImportMethod] = useState<'file' | 'paste'>('file');
+  const [pastedText, setPastedText] = useState('');
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [mappings, setMappings] = useState<Record<number, MappingField>>({});
@@ -46,32 +48,42 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
     return Array.from(new Set([...globals, ...customs])).sort();
   };
 
+  const processTextData = (text: string) => {
+    if (!text) return;
+    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length < 2) return alert("Data must have a header row and content.");
+    
+    // Detect delimiter: check if first line has tabs or commas
+    const firstLine = lines[0];
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+    
+    const headers = lines[0].split(delimiter).map(h => h.trim());
+    const rows = lines.slice(1).map(l => l.split(delimiter).map(s => s.trim()));
+    
+    setCsvHeaders(headers);
+    setCsvRows(rows);
+    
+    const initialMappings: Record<number, MappingField> = {};
+    headers.forEach((header, index) => {
+      const lower = header.toLowerCase();
+      if (lower.includes('item') || lower.includes('name')) initialMappings[index] = 'itemName';
+      else if (lower.includes('variety')) initialMappings[index] = 'variety';
+      else if (lower.includes('qty') || lower.includes('quantity')) initialMappings[index] = 'quantity';
+      else if (lower.includes('unit')) initialMappings[index] = 'unit';
+      else if (lower.includes('category')) initialMappings[index] = 'category';
+      else initialMappings[index] = 'ignore';
+    });
+    setMappings(initialMappings);
+    setStep('map');
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      if (!text) return;
-      const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-      if (lines.length < 2) return alert("CSV must have a header row and data.");
-      const headers = lines[0].split(',').map(h => h.trim());
-      const rows = lines.slice(1).map(l => l.split(',').map(s => s.trim()));
-      setCsvHeaders(headers);
-      setCsvRows(rows);
-      
-      const initialMappings: Record<number, MappingField> = {};
-      headers.forEach((header, index) => {
-        const lower = header.toLowerCase();
-        if (lower.includes('item') || lower.includes('name')) initialMappings[index] = 'itemName';
-        else if (lower.includes('variety')) initialMappings[index] = 'variety';
-        else if (lower.includes('qty') || lower.includes('quantity')) initialMappings[index] = 'quantity';
-        else if (lower.includes('unit')) initialMappings[index] = 'unit';
-        else if (lower.includes('category')) initialMappings[index] = 'category';
-        else initialMappings[index] = 'ignore';
-      });
-      setMappings(initialMappings);
-      setStep('map');
+      processTextData(text);
     };
     reader.readAsText(file);
   };
@@ -131,13 +143,50 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30">
           {step === 'upload' && (
-            <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed rounded-[32px] bg-white border-slate-200">
-              <div className="bg-indigo-50 p-4 rounded-full mb-4 text-indigo-400">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <div className="space-y-6">
+              <div className="flex bg-slate-100 p-1 rounded-2xl">
+                <button 
+                  onClick={() => setImportMethod('file')}
+                  className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${importMethod === 'file' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+                >
+                  CSV File
+                </button>
+                <button 
+                  onClick={() => setImportMethod('paste')}
+                  className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${importMethod === 'paste' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+                >
+                  Paste Data
+                </button>
               </div>
-              <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-transform">Select CSV File</button>
-              <p className="mt-4 text-[10px] text-slate-400 font-bold uppercase">CSV must have a header row</p>
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv" />
+
+              {importMethod === 'file' ? (
+                <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed rounded-[32px] bg-white border-slate-200">
+                  <div className="bg-indigo-50 p-4 rounded-full mb-4 text-indigo-400">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                  </div>
+                  <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-transform">Select CSV File</button>
+                  <p className="mt-4 text-[10px] text-slate-400 font-bold uppercase">CSV must have a header row</p>
+                  <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-white border-2 border-slate-100 rounded-[32px] p-4 shadow-sm">
+                    <textarea 
+                      className="w-full h-64 bg-transparent border-none focus:ring-0 text-xs font-mono text-slate-600 placeholder:text-slate-300 resize-none"
+                      placeholder="Paste your spreadsheet data here...&#10;Include the header row (e.g. Item Name, Quantity, Unit)"
+                      value={pastedText}
+                      onChange={(e) => setPastedText(e.target.value)}
+                    />
+                  </div>
+                  <button 
+                    onClick={() => processTextData(pastedText)}
+                    disabled={!pastedText.trim()}
+                    className="w-full bg-indigo-600 text-white font-black py-5 rounded-[24px] uppercase text-xs tracking-[0.2em] shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
+                  >
+                    Process Pasted Data
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

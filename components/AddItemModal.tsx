@@ -6,7 +6,7 @@ import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES } from '../c
 
 interface AddItemModalProps {
   onClose: () => void;
-  onSubmit: (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string, subCategory?: string) => void;
+  onSubmit: (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string, subCategory?: string, origin?: string, grade?: string, style?: string, notes?: string) => void;
   onSaveToList: (name: string, qty: number, unit: string) => void;
   initialMode?: 'type' | 'barcode' | 'product' | 'tag';
   products: Product[];
@@ -25,7 +25,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   const [image, setImage] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('type');
   const [formData, setFormData] = useState({
-    category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc'
+    category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc', origin: '', grade: '', style: '', notes: ''
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -117,7 +117,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
     onSubmit(
       formData.category, formData.itemName, formData.variety, 
       { store: formData.store, price: parseFloat(formData.price), quantity: parseFloat(formData.quantity), unit: formData.unit, image: image || undefined }, 
-      formData.brand, formData.barcode, formData.subCategory
+      formData.brand, formData.barcode, formData.subCategory, formData.origin, formData.grade, formData.style, formData.notes
     );
   };
 
@@ -229,6 +229,28 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                      <option value="">General</option>
                      {subCatsForSelected.map(sc => <option key={sc} value={sc}>{sc}</option>)}
                    </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Brand</label>
+                   <input className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold focus:bg-white transition-all" placeholder="e.g. Tillamook" value={formData.brand} onChange={(e) => setFormData({...formData, brand: e.target.value})} />
+                </div>
+                <div className="space-y-1.5">
+                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Variety</label>
+                   <input className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold focus:bg-white transition-all" placeholder="e.g. Sharp" value={formData.variety} onChange={(e) => setFormData({...formData, variety: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Origin</label>
+                   <input className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold focus:bg-white transition-all" placeholder="e.g. Local" value={formData.origin} onChange={(e) => setFormData({...formData, origin: e.target.value})} />
+                </div>
+                <div className="space-y-1.5">
+                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Grade / Style</label>
+                   <input className="w-full bg-slate-50 border border-slate-100 rounded-[20px] px-4 py-4 text-sm font-bold focus:bg-white transition-all" placeholder="e.g. USDA Prime" value={formData.grade} onChange={(e) => setFormData({...formData, grade: e.target.value, style: e.target.value})} />
                 </div>
               </div>
 

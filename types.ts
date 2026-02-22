@@ -4,7 +4,10 @@ export interface PriceRecord {
   store: string;
   price: number;
   quantity: number;
-  unit: string; // e.g., 'oz', 'lb', 'count', 'ml'
+  unit: string; // Legacy/Display unit
+  unitSize?: number;
+  unitMeasure?: string;
+  container?: string;
   date: string;
   image?: string; // base64
   isPublic?: boolean;
@@ -21,6 +24,9 @@ export interface Product {
   origin?: string;
   grade?: string;
   style?: string;
+  unitSize?: number;
+  unitMeasure?: string;
+  container?: string;
   history: PriceRecord[];
   notes?: string;
 }
@@ -77,8 +83,11 @@ export interface InventoryItem {
   subCategory?: string;    // Keeping legacy subCategory support
   
   // Quantity & units
-  quantity: number;        // 2, 1.5, 8
-  unit: string;           // "blocks", "lbs", "oz", "each", "packages"
+  quantity: number;        // 2
+  unit: string;           // Legacy/Display unit
+  unitSize?: number;       // 12
+  unitMeasure?: string;    // "oz"
+  container?: string;      // "cans"
   
   // Location (keeping existing feature)
   locationId: string;

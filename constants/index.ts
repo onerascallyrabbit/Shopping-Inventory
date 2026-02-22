@@ -21,7 +21,11 @@ export const SUB_CATEGORIES: Record<string, string[]> = {
   "Other": ["General"]
 };
 
-export const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
+export const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g', 'qt', 'pt'];
+
+export const CONTAINER_TYPES = [
+  "cans", "boxes", "bags", "jars", "bottles", "cartons", "packs", "tubs", "ziplocks", "pouches", "wraps", "tins", "jugs"
+];
 
 // Fix: Added missing sortOrder property to satisfy StorageLocation interface
 export const DEFAULT_STORAGE: StorageLocation[] = [

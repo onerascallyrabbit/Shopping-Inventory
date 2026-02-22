@@ -14,7 +14,7 @@ interface InventoryViewProps {
   onUpdateQty: (id: string, delta: number) => void;
   onUpdateItem: (id: string, updates: Partial<InventoryItem>) => void;
   onRemoveItem: (id: string) => void;
-  onAddToInventory: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
+  onAddToInventory: (item: Partial<InventoryItem>) => void;
   onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<void>;
   onAddToList: (name: string, qty: number, unit: string, productId?: string) => void;
 }
@@ -153,8 +153,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               {(items as any[]).map(item => (
                 <div key={item.id} className="bg-white border p-4 rounded-[28px] shadow-sm flex items-center justify-between">
                   <div className="flex-1 min-w-0 pr-4">
-                    <h4 className="font-black text-slate-800 text-xs truncate uppercase leading-tight">{item.itemName}</h4>
-                    <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mt-0.5">{item.category} {item.subCategory && `> ${item.subCategory}`}</p>
+                    <h4 className="font-black text-slate-800 text-xs truncate uppercase leading-tight">
+                      {item.itemName}
+                      {item.variety && <span className="text-slate-400 font-bold ml-1">({item.variety})</span>}
+                    </h4>
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest leading-none">{item.category} {item.subCategory && `> ${item.subCategory}`}</p>
+                      {item.brand && <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none border-l pl-2 border-slate-200">{item.brand}</p>}
+                      {item.origin && <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none border-l pl-2 border-slate-200">{item.origin}</p>}
+                    </div>
+                    {item.expirationDate && (
+                      <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${new Date(item.expirationDate) < new Date() ? 'text-red-500' : 'text-amber-500'}`}>
+                        Exp: {new Date(item.expirationDate).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <button onClick={() => { onAddToList(item.itemName, 1, item.unit, item.productId); setRecentlyAddedToList(item.id); setTimeout(() => setRecentlyAddedToList(null), 2000); }} className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${recentlyAddedToList === item.id ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-400 hover:text-indigo-600'}`}>
@@ -173,14 +185,123 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         ))}
       </div>
 
-      {editingItem && (
+      {isAdding && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-white w-full max-w-lg rounded-[40px] p-6 space-y-6">
+          <div className="bg-white w-full max-w-lg rounded-[40px] p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-black uppercase">Add to Stock</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase">Item Name</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Cheddar" onChange={e => setEditingItem({ ...editingItem, itemName: e.target.value } as any)} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Category</label>
+                <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, category: e.target.value } as any)}>
+                  {allAvailableCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Variety</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" placeholder="e.g. Sharp" onChange={e => setEditingItem({ ...editingItem, variety: e.target.value } as any)} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Location</label>
+                <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, locationId: e.target.value } as any)}>
+                  {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Shelf</label>
+                <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, subLocation: e.target.value } as any)}>
+                  <option value="">General</option>
+                  {subLocations.filter(sl => sl.locationId === (editingItem?.locationId || locations[0]?.id)).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Quantity</label>
+                <input type="number" step="0.1" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" defaultValue="1" onChange={e => setEditingItem({ ...editingItem, quantity: parseFloat(e.target.value) || 0 } as any)} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Unit</label>
+                <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, unit: e.target.value } as any)}>
+                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex space-x-3">
+              <button onClick={() => { setIsAdding(false); setEditingItem(null); }} className="flex-1 bg-slate-100 text-slate-500 font-black py-4 rounded-2xl uppercase text-[10px]">Cancel</button>
+              <button 
+                onClick={() => { 
+                  if (editingItem?.itemName) {
+                    onAddToInventory({
+                      ...editingItem,
+                      locationId: editingItem.locationId || locations[0]?.id,
+                      category: editingItem.category || allAvailableCategories[0],
+                      unit: editingItem.unit || 'pc',
+                      quantity: editingItem.quantity || 1
+                    });
+                  }
+                  setIsAdding(false); 
+                  setEditingItem(null); 
+                }} 
+                className="flex-1 bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase text-[10px]"
+              >
+                Add Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingItem && !isAdding && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="bg-white w-full max-w-lg rounded-[40px] p-6 space-y-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-black uppercase">Edit Item</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2"><label className="text-[10px] font-black text-slate-400 uppercase">Item Name</label><input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.itemName} onChange={e => setEditingItem({...editingItem, itemName: e.target.value})} /></div>
-              <div><label className="text-[10px] font-black text-slate-400 uppercase">Category</label><select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.category} onChange={e => setEditingItem({...editingItem, category: e.target.value, subCategory: ''})}>{allAvailableCategories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-              <div><label className="text-[10px] font-black text-slate-400 uppercase">Sub-Category</label><select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.subCategory} onChange={e => setEditingItem({...editingItem, subCategory: e.target.value})}><option value="">None</option>{getSubCategoriesFor(editingItem.category).map(sc => <option key={sc} value={sc}>{sc}</option>)}</select></div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase">Item Name</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.itemName} onChange={e => setEditingItem({...editingItem, itemName: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Category</label>
+                <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.category} onChange={e => setEditingItem({...editingItem, category: e.target.value, subCategory: ''})}>
+                  {allAvailableCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Variety</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.variety || ''} onChange={e => setEditingItem({...editingItem, variety: e.target.value})} placeholder="e.g. Roma, Sharp" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Brand</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.brand || ''} onChange={e => setEditingItem({...editingItem, brand: e.target.value})} placeholder="e.g. Tillamook" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Grade / Style</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.grade || editingItem.style || ''} onChange={e => setEditingItem({...editingItem, grade: e.target.value, style: e.target.value})} placeholder="e.g. USDA Prime, Aged" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Origin</label>
+                <input className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.origin || ''} onChange={e => setEditingItem({...editingItem, origin: e.target.value})} placeholder="e.g. Local, Italy" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Quantity</label>
+                <input type="number" step="0.1" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.quantity} onChange={e => setEditingItem({...editingItem, quantity: parseFloat(e.target.value) || 0})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Unit</label>
+                <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.unit} onChange={e => setEditingItem({...editingItem, unit: e.target.value})}>
+                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Expiration Date</label>
+                <input type="date" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.expirationDate || ''} onChange={e => setEditingItem({...editingItem, expirationDate: e.target.value})} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase">Notes</label>
+                <textarea className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold h-20 resize-none" value={editingItem.notes || ''} onChange={e => setEditingItem({...editingItem, notes: e.target.value})} placeholder="Any additional details..." />
+              </div>
             </div>
             <div className="flex space-x-3">
               <button onClick={() => setEditingItem(null)} className="flex-1 bg-slate-100 text-slate-500 font-black py-4 rounded-2xl uppercase text-[10px]">Cancel</button>

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { StorageLocation, SubLocation, ShoppingItem, Product } from '../types';
+import { StorageLocation, SubLocation, ShoppingItem, Product, InventoryItem } from '../types';
 
 interface StockPurchasedModalProps {
   item: ShoppingItem;
@@ -8,7 +8,7 @@ interface StockPurchasedModalProps {
   storageLocations: StorageLocation[];
   subLocations: SubLocation[];
   onClose: () => void;
-  onConfirm: (productId: string, itemName: string, category: string, variety: string, qty: number, unit: string, locationId: string, subLocation: string, subCategory?: string) => void;
+  onConfirm: (item: Partial<InventoryItem>) => void;
 }
 
 const StockPurchasedModal: React.FC<StockPurchasedModalProps> = ({ item, products, storageLocations, subLocations, onClose, onConfirm }) => {
@@ -29,17 +29,19 @@ const StockPurchasedModal: React.FC<StockPurchasedModalProps> = ({ item, product
   }, [subLocations, formData.locationId]);
 
   const handleConfirm = () => {
-    onConfirm(
-      item.productId,
-      item.name,
-      product?.category || 'Other',
-      product?.variety || '',
-      parseFloat(formData.quantity) || 0,
-      formData.unit,
-      formData.locationId,
-      formData.subLocation,
-      product?.subCategory
-    );
+    onConfirm({
+      productId: item.productId,
+      itemName: item.name,
+      category: product?.category || 'Other',
+      variety: product?.variety || '',
+      brand: product?.brand,
+      barcode: product?.barcode,
+      quantity: parseFloat(formData.quantity) || 0,
+      unit: formData.unit,
+      locationId: formData.locationId,
+      subLocation: formData.subLocation,
+      subCategory: product?.subCategory
+    });
     onClose();
   };
 

@@ -1,14 +1,13 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const { inventory, focus } = req.body;
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     
-    const inventoryText = inventory.map(i => `${i.quantity} ${i.unit} of ${i.itemName}${i.variety ? ` (${i.variety})` : ''}`).join(', ');
+    const inventoryText = inventory.map((i: any) => `${i.quantity} ${i.unit} of ${i.itemName}${i.variety ? ` (${i.variety})` : ''}`).join(', ');
     
     const focusText = focus ? ` Focus the meal ideas on: ${focus}.` : '';
 
@@ -48,8 +47,8 @@ export default async function handler(req, res) {
       }
     });
 
-    res.status(200).json(JSON.parse(response.text));
-  } catch (error) {
+    res.status(200).json(JSON.parse(response.text || "[]"));
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 }

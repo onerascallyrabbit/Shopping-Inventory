@@ -1,12 +1,11 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const { storeQuery, locationContext } = req.body;
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-lite-latest',
@@ -20,7 +19,7 @@ export default async function handler(req, res) {
       text: response.text,
       chunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 }

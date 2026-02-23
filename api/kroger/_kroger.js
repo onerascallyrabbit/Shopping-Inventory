@@ -13,7 +13,11 @@ export async function getKrogerToken() {
   const CLIENT_SECRET = process.env.CLIENT_SECRET_KROGER || process.env.KROGER_CLIENT_SECRET;
 
   if (!CLIENT_ID || !CLIENT_SECRET) {
-    throw new Error("Kroger credentials missing");
+    console.error("Kroger Auth Error: Missing CLIENT_ID or CLIENT_SECRET", { 
+      hasId: !!CLIENT_ID, 
+      hasSecret: !!CLIENT_SECRET 
+    });
+    throw new Error("Kroger credentials missing. Please set KROGER_CLIENT_ID and KROGER_CLIENT_SECRET in environment variables.");
   }
 
   const auth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");

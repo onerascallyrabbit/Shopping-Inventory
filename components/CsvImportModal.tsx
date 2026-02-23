@@ -13,7 +13,7 @@ interface CsvImportModalProps {
   customSubCategories: CustomSubCategory[];
 }
 
-type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'unit_size' | 'unit_measure' | 'container' | 'style' | 'ignore';
+type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'ignore';
 
 const CsvImportModal: React.FC<CsvImportModalProps> = ({ 
   onClose, onImport, locations, subLocations, activeLocationId, categoryOrder,
@@ -64,8 +64,8 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
       else if (lower.includes('brand')) initialMappings[index] = 'brand';
       else if (lower.includes('qty') || lower.includes('quantity')) initialMappings[index] = 'quantity';
       else if (lower.includes('unit')) initialMappings[index] = 'unit';
-      else if (lower.includes('size') || lower.includes('volume') || lower.includes('weight')) initialMappings[index] = 'unit_size';
-      else if (lower.includes('measure') || lower.includes('oz') || lower.includes('grams')) initialMappings[index] = 'unit_measure';
+      else if (lower.includes('size') || lower.includes('volume') || lower.includes('weight')) initialMappings[index] = 'unitSize';
+      else if (lower.includes('measure') || lower.includes('oz') || lower.includes('grams')) initialMappings[index] = 'unitMeasure';
       else if (lower.includes('container') || lower.includes('packaging')) initialMappings[index] = 'container';
       else if (lower.includes('category')) initialMappings[index] = 'category';
       else if (lower.includes('expiry') || lower.includes('expiration')) initialMappings[index] = 'expirationDate';
@@ -100,7 +100,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
         const field = mappings[idx];
         if (field && field !== 'ignore') {
           const val = row[idx];
-          if (field === 'quantity' || field === 'unit_size') {
+          if (field === 'quantity' || field === 'unitSize') {
             item[field] = parseFloat(val) || 0;
           } else if (field === 'category') {
             item[field] = allAvailableCategories.find(
@@ -293,11 +293,11 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
       <div className="col-span-2 grid grid-cols-3 gap-2 bg-indigo-50/50 p-2 rounded-xl border border-indigo-100/50">
           <div>
             <label className="text-[7px] font-black text-indigo-400 uppercase ml-1">Size</label>
-            <input type="number" className="w-full bg-white border-none rounded-lg px-2 py-1.5 text-xs font-bold" value={item.unit_size || ''} onChange={e => updateReviewItem(idx, { unit_size: parseFloat(e.target.value) || 0 })} />
+            <input type="number" className="w-full bg-white border-none rounded-lg px-2 py-1.5 text-xs font-bold" value={item.unitSize || ''} onChange={e => updateReviewItem(idx, { unitSize: parseFloat(e.target.value) || 0 })} />
           </div>
           <div>
             <label className="text-[7px] font-black text-indigo-400 uppercase ml-1">Measure</label>
-            <input placeholder="oz/g" className="w-full bg-white border-none rounded-lg px-2 py-1.5 text-xs font-bold" value={item.unit_measure || ''} onChange={e => updateReviewItem(idx, { unit_measure: e.target.value })} />
+            <input placeholder="oz/g" className="w-full bg-white border-none rounded-lg px-2 py-1.5 text-xs font-bold" value={item.unitMeasure || ''} onChange={e => updateReviewItem(idx, { unitMeasure: e.target.value })} />
           </div>
           <div>
             <label className="text-[7px] font-black text-indigo-400 uppercase ml-1">Type</label>

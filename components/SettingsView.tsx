@@ -40,6 +40,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [copied, setCopied] = useState(false);
   const [dbStatus, setDbStatus] = useState<'testing' | 'ok' | 'fail'>('testing');
   const [aiStatus, setAiStatus] = useState<'ok' | 'fail'>('fail');
+  const [krogerStatus, setKrogerStatus] = useState<'ok' | 'fail'>('fail');
 
   // Modal Visibility States
   const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
@@ -57,9 +58,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     // Test Health
     testDatabaseConnection().then(res => setDbStatus(res.success ? 'ok' : 'fail'));
     
-    // Direct check of process.env.API_KEY as requested
-    const apiKey = (typeof process !== 'undefined' ? process.env.API_KEY : '') || getEnv('API_KEY');
-    setAiStatus(apiKey ? 'ok' : 'fail');
+    // Fetch server health
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => {
+        setAiStatus(data.gemini === 'ok' ? 'ok' : 'fail');
+        setKrogerStatus(data.kroger === 'ok' ? 'ok' : 'fail');
+      })
+      .catch(() => {
+        // Fallback to local check for Gemini if server health fails
+        const apiKey = (typeof process !== 'undefined' ? process.env.API_KEY : '') || getEnv('API_KEY');
+        setAiStatus(apiKey ? 'ok' : 'fail');
+        setKrogerStatus('fail');
+      });
 
     return () => window.removeEventListener('app-installable', checkInstallable);
   }, []);
@@ -108,20 +119,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       {/* System Health Section */}
       <section className="bg-slate-900 rounded-[32px] p-6 text-white shadow-xl">
         <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">System Health</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-black uppercase text-slate-400">Database</span>
-              <div className={`w-2 h-2 rounded-full ${dbStatus === 'ok' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : dbStatus === 'testing' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`}></div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[8px] font-black uppercase text-slate-400">Database</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${dbStatus === 'ok' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : dbStatus === 'testing' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`}></div>
             </div>
-            <p className="text-xs font-bold">{dbStatus === 'ok' ? 'Connected' : dbStatus === 'testing' ? 'Syncing...' : 'Disconnected'}</p>
+            <p className="text-[10px] font-bold">{dbStatus === 'ok' ? 'Connected' : dbStatus === 'testing' ? 'Syncing...' : 'Error'}</p>
           </div>
-          <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-black uppercase text-slate-400">Gemini AI</span>
-              <div className={`w-2 h-2 rounded-full ${aiStatus === 'ok' ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-red-500'}`}></div>
+          <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[8px] font-black uppercase text-slate-400">Gemini AI</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${aiStatus === 'ok' ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-red-500'}`}></div>
             </div>
-            <p className="text-xs font-bold">{aiStatus === 'ok' ? 'Ready' : 'API_KEY Missing'}</p>
+            <p className="text-[10px] font-bold">{aiStatus === 'ok' ? 'Ready' : 'Missing'}</p>
+          </div>
+          <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[8px] font-black uppercase text-slate-400">Kroger</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${krogerStatus === 'ok' ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-red-500'}`}></div>
+            </div>
+            <p className="text-[10px] font-bold">{krogerStatus === 'ok' ? 'Linked' : 'Missing'}</p>
           </div>
         </div>
         {!activeFamily && user && (

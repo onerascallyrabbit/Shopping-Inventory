@@ -23,7 +23,7 @@ const App: React.FC = () => {
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
     customCategories, customSubCategories, addCategory, removeCategory, addSubCategory, removeSubCategory,
     updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
-    addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem,
+    addPriceRecord, addToList, toggleListItem, removeListItem, updateShoppingItem, overrideStoreForListItem,
     addToInventory, importBulkInventory, reorderStorageLocations, refresh,
     refreshMeals, cookMeal, rateMeal,
     cellarItems, consumptionLogs, updateCellarQty, addCellarItem, updateCellarItem, removeCellarItem, logConsumption
@@ -40,6 +40,7 @@ const App: React.FC = () => {
     }
   }, [profile?.defaultTab, hasSetDefaultTab]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [addModalMode, setAddModalMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('type');
   const [lastUsedStore, setLastUsedStore] = useState<string>('');
 
@@ -120,7 +121,21 @@ const App: React.FC = () => {
             onRefresh={refreshMeals} onCook={cookMeal} onRate={rateMeal} onAddToList={addToList}
           />
         )}
-        {activeTab === 'list' && <ShoppingList items={shoppingList} products={products} storageLocations={storageLocations} subLocations={subLocations} onToggle={toggleListItem} onRemove={removeListItem} onAdd={addToList} onAddToInventory={addToInventory} activeFamily={activeFamily} />}
+        {activeTab === 'list' && (
+          <ShoppingList 
+            items={shoppingList} 
+            products={products} 
+            storageLocations={storageLocations} 
+            subLocations={subLocations} 
+            onToggle={toggleListItem} 
+            onRemove={removeListItem} 
+            onAdd={addToList} 
+            onUpdateItem={updateShoppingItem}
+            onAddToInventory={addToInventory} 
+            activeFamily={activeFamily} 
+            profile={profile}
+          />
+        )}
         {activeTab === 'shop' && <ShopPlan items={shoppingList} products={products} stores={stores} vehicles={vehicles} activeVehicleId={profile.activeVehicleId || ''} gasPrice={profile.gasPrice} storageLocations={storageLocations} subLocations={subLocations} onToggle={toggleListItem} onRemove={removeListItem} onOverrideStore={overrideStoreForListItem} onAddToInventory={addToInventory} />}
         {activeTab === 'settings' && (
           <SettingsView 
@@ -137,9 +152,34 @@ const App: React.FC = () => {
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} onAddClick={() => openAddModal('type')} />
       
       <div className="fixed bottom-24 right-4 z-40">
+        {isQuickAddOpen && (
+          <div className="absolute bottom-20 right-0 space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {[
+              { id: 'track', label: 'Track Price', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6', color: 'bg-indigo-600', action: () => openAddModal('type') },
+              { id: 'inventory', label: 'Add to Stock', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4', color: 'bg-emerald-600', action: () => setActiveTab('inventory') },
+              { id: 'cellar', label: 'Add to Cellar', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253', color: 'bg-amber-600', action: () => setActiveTab('cellar') },
+              { id: 'list', label: 'Add to List', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', color: 'bg-rose-600', action: () => setActiveTab('list') },
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => { opt.action(); setIsQuickAddOpen(false); }}
+                className="flex items-center space-x-3 group"
+              >
+                <span className="bg-white px-3 py-1.5 rounded-xl shadow-sm border border-slate-100 text-[10px] font-black text-slate-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  {opt.label}
+                </span>
+                <div className={`${opt.color} text-white p-3 rounded-2xl shadow-lg active:scale-90 transition-transform`}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d={opt.icon} />
+                  </svg>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
         <button 
-          onClick={() => openAddModal('type')}
-          className="bg-indigo-600 text-white rounded-full p-4 shadow-xl active:scale-95 transition-transform border-4 border-white"
+          onClick={() => setIsQuickAddOpen(!isQuickAddOpen)}
+          className={`bg-indigo-600 text-white rounded-full p-4 shadow-xl active:scale-95 transition-all border-4 border-white ${isQuickAddOpen ? 'rotate-45 bg-slate-800' : ''}`}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
         </button>
@@ -148,7 +188,11 @@ const App: React.FC = () => {
       {isAddModalOpen && (
         <AddItemModal 
           onClose={() => setIsAddModalOpen(false)} 
-          onSubmit={(cat, item, variety, rec, brand, bar) => { addPriceRecord(cat, item, variety, rec, brand, bar); setLastUsedStore(rec.store); setIsAddModalOpen(false); }} 
+          onSubmit={(cat, item, variety, rec, brand, bar, sub, origin, grade, style, notes, unitSize, unitMeasure, container) => { 
+            addPriceRecord(cat, item, variety, rec, brand, bar, sub, origin, grade, style, notes, unitSize, unitMeasure, container); 
+            setLastUsedStore(rec.store); 
+            setIsAddModalOpen(false); 
+          }} 
           onSaveToList={addToList} 
           initialMode={addModalMode}
           products={products} location={profile.locationLabel} savedStores={stores} lastUsedStore={lastUsedStore}

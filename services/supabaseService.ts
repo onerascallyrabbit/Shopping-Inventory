@@ -511,7 +511,7 @@ export const fetchProfile = async (): Promise<Profile | null> => {
       defaultTab: data.default_tab,
       krogerStoreId: data.kroger_store_id,
       krogerStoreName: data.kroger_store_name,
-      enableKroger: data.enable_kroger
+      enableKroger: !!data.enable_kroger
     };
   } catch (e) {
     return null;
@@ -535,9 +535,19 @@ export const syncProfile = async (profile: Partial<Profile>) => {
   if (profile.krogerStoreName !== undefined) payload.kroger_store_name = profile.krogerStoreName;
   if (profile.enableKroger !== undefined) payload.enable_kroger = profile.enableKroger;
   
-  const { data, error } = await supabase.from('profiles').upsert({ id: user.id, ...payload }).select().single();
-  if (error) throw error;
-  return data;
+  try {
+    const { data, error } = await supabase.from('profiles').upsert({ id: user.id, ...payload }).select().single();
+    if (error) {
+      console.error("Supabase Profile Sync Error:", error);
+      // If it's a missing column error, we might want to handle it differently, 
+      // but for now we throw so the caller knows it failed.
+      throw error;
+    }
+    return data;
+  } catch (err) {
+    console.error("syncProfile exception:", err);
+    throw err;
+  }
 };
 
 export const createFamily = async (name: string) => {

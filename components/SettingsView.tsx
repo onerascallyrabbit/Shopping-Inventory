@@ -4,6 +4,7 @@ import { StoreLocation, Vehicle, StorageLocation, SubLocation, Profile, Family, 
 import { createFamily, joinFamily, testDatabaseConnection, getEnv } from '../services/supabaseService';
 import StorageLocationsModal from './StorageLocationsModal';
 import TaxonomyModal from './TaxonomyModal';
+import KrogerStorePicker from './KrogerStorePicker';
 
 interface SettingsViewProps {
   user?: any;
@@ -228,6 +229,43 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             </select>
           </div>
         </div>
+      </section>
+
+      {/* Kroger Integration */}
+      <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Kroger Integration</h3>
+          <button 
+            onClick={() => onProfileChange({ enableKroger: !profile.enableKroger })}
+            className={`w-12 h-6 rounded-full transition-colors relative ${profile.enableKroger ? 'bg-indigo-600' : 'bg-slate-200'}`}
+          >
+            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${profile.enableKroger ? 'left-7' : 'left-1'}`} />
+          </button>
+        </div>
+        
+        {profile.enableKroger && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Preferred Store</label>
+              {profile.krogerStoreId ? (
+                <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3">
+                  <div>
+                    <p className="text-sm font-bold text-indigo-900">{profile.krogerStoreName}</p>
+                    <p className="text-[10px] text-indigo-400 font-bold uppercase">ID: {profile.krogerStoreId}</p>
+                  </div>
+                  <button 
+                    onClick={() => onProfileChange({ krogerStoreId: '', krogerStoreName: '' })}
+                    className="text-indigo-400 hover:text-indigo-600"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </div>
+              ) : (
+                <KrogerStorePicker zip={profile.zip} onSelect={(id, name) => onProfileChange({ krogerStoreId: id, krogerStoreName: name })} />
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Management Modals */}

@@ -44,7 +44,8 @@ export const useAppData = () => {
     }
     return { 
       id: '', locationLabel: '', zip: '', gasPrice: 3.50, 
-      categoryOrder: DEFAULT_CATEGORIES, sharePrices: false 
+      categoryOrder: DEFAULT_CATEGORIES, sharePrices: false,
+      enableKroger: false
     };
   });
 
@@ -219,12 +220,15 @@ export const useAppData = () => {
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
+    const oldProfile = { ...profile };
+    setProfile(prev => ({ ...prev, ...updates }));
     try {
       if (user) await syncProfile(updates);
-      setProfile(prev => ({ ...prev, ...updates }));
       if (updates.familyId !== undefined) await loadAllData();
     } catch (e) {
       console.error("Profile update failed:", e);
+      setProfile(oldProfile);
+      alert("Failed to save profile changes. Please check your connection.");
     }
   };
 

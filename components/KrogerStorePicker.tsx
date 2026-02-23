@@ -21,14 +21,19 @@ const KrogerStorePicker: React.FC<KrogerStorePickerProps> = ({ zip, onSelect }) 
     try {
       const response = await fetch(`/api/kroger/locations?zip=${zip}`);
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Server error');
+      }
+
       if (data.data) {
         setStores(data.data);
       } else {
         setStores([]);
         setError('No stores found in this area.');
       }
-    } catch (err) {
-      setError('Failed to fetch stores. Check Kroger API credentials.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch stores. Check Kroger API credentials.');
     } finally {
       setLoading(false);
     }

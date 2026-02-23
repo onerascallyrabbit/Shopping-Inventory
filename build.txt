@@ -1,3 +1,4 @@
+New: Kroger API integration
 Refactor: Increased inventory detail options****
 Update: added CSV pasting to bulk-import
 New: added "focus" option to meal planner*

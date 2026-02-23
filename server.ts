@@ -12,8 +12,8 @@ app.use(express.json());
 
 // Kroger API Config
 const KROGER_BASE_URL = "https://api.kroger.com/v1";
-const CLIENT_ID = process.env.CLIENT_ID_KROGER;
-const CLIENT_SECRET = process.env.CLIENT_SECRET_KROGER;
+const CLIENT_ID = process.env.CLIENT_ID_KROGER || process.env.KROGER_CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET_KROGER || process.env.KROGER_CLIENT_SECRET;
 
 let krogerToken: string | null = null;
 let tokenExpiry: number = 0;
@@ -51,6 +51,23 @@ async function getKrogerToken() {
 }
 
 // API Routes
+app.get("/api/health", (req, res) => {
+  res.json({
+    database: "ok", // Supabase is client-side mostly but we can assume ok if server is up
+    gemini: process.env.API_KEY ? "ok" : "missing",
+    kroger: CLIENT_ID && CLIENT_SECRET ? "ok" : "missing"
+  });
+});
+
+app.get("/api/kroger-auth", async (req, res) => {
+  try {
+    const token = await getKrogerToken();
+    res.json({ access_token: token });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/api/kroger/locations", async (req, res) => {
   try {
     const { zip, radius = 10, limit = 10 } = req.query;

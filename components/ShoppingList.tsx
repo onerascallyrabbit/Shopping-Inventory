@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { ShoppingItem, Product, StorageLocation, SubLocation, Family, InventoryItem } from '../types';
+import { ShoppingItem, Product, StorageLocation, SubLocation, Family, InventoryItem, Profile } from '../types';
 import StockPurchasedModal from './StockPurchasedModal';
 
 interface ShoppingListProps {
@@ -11,18 +10,62 @@ interface ShoppingListProps {
   onToggle: (id: string) => void;
   onRemove: (id: string) => void;
   onAdd: (name: string, qty: number, unit: string) => void;
+  onUpdateItem: (id: string, updates: Partial<ShoppingItem>) => void;
   onAddToInventory: (item: Partial<InventoryItem>) => void;
   activeFamily: Family | null;
+  profile: Profile;
 }
 
-const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
+const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g', 'qt', 'pt'];
 
-const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLocations, subLocations, onToggle, onRemove, onAdd, onAddToInventory, activeFamily }) => {
+const ShoppingList: React.FC<ShoppingListProps> = ({ 
+  items, products, storageLocations, subLocations, 
+  onToggle, onRemove, onAdd, onUpdateItem, onAddToInventory, 
+  activeFamily, profile 
+}) => {
   const [newItemName, setNewItemName] = useState('');
   const [newQty, setNewQty] = useState('1');
   const [newUnit, setNewUnit] = useState('pc');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [stockingItem, setStockingItem] = useState<ShoppingItem | null>(null);
+  const [matchingId, setMatchingId] = useState<string | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  const matchKrogerProduct = async (item: ShoppingItem) => {
+    if (!profile.enableKroger || !profile.krogerStoreId) return;
+    
+    setMatchingId(item.id);
+    setSearchLoading(true);
+    try {
+      const response = await fetch(`/api/kroger/products?term=${encodeURIComponent(item.name)}&locationId=${profile.krogerStoreId}`);
+      const data = await response.json();
+      setSearchResults(data.data || []);
+    } catch (err) {
+      console.error("Kroger Search Error:", err);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const selectKrogerProduct = (itemId: string, krogerProduct: any) => {
+    const priceData = krogerProduct.items?.[0]?.price;
+    const imageUrl = krogerProduct.images?.find((img: any) => img.perspective === 'front')?.sizes?.find((s: any) => s.size === 'medium')?.url;
+    
+    onUpdateItem(itemId, {
+      krogerProductId: krogerProduct.productId,
+      krogerData: {
+        price: priceData?.promo || priceData?.regular || 0,
+        regularPrice: priceData?.regular || 0,
+        onSale: !!priceData?.promo,
+        imageUrl,
+        inStock: krogerProduct.items?.[0]?.inventory?.stockLevel !== 'TEMPORARILY_OUT_OF_STOCK',
+        brand: krogerProduct.brand
+      }
+    });
+    setMatchingId(null);
+    setSearchResults([]);
+  };
 
   const getSmartSuggestion = (itemName: string) => {
     const product = products.find(p => p.itemName.toLowerCase().includes(itemName.toLowerCase()));
@@ -99,37 +142,52 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
         {activeItems.map(item => {
           const product = products.find(p => p.id === item.productId) || products.find(p => p.itemName.toLowerCase() === item.name.toLowerCase());
           const suggestion = getSmartSuggestion(item.name);
-          const genericImg = `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=120&h=120&grocery,${item.name}`;
+          const krogerData = item.krogerData;
+          const displayImg = krogerData?.imageUrl || suggestion?.image || `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=120&h=120&grocery,${item.name}`;
 
           return (
             <div key={item.id} className="bg-white border border-slate-100 p-4 rounded-[32px] shadow-sm animate-in slide-in-from-left-4">
               <div className="flex items-center">
                 <button 
                   onClick={() => onToggle(item.id)}
-                  className="w-8 h-8 rounded-full border-2 border-slate-100 mr-3 shrink-0 active:bg-indigo-50"
-                ></button>
+                  className="w-8 h-8 rounded-full border-2 border-slate-100 mr-3 shrink-0 active:bg-indigo-50 flex items-center justify-center"
+                >
+                  {item.isCompleted && <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
+                </button>
+                <div className="w-12 h-12 rounded-2xl overflow-hidden bg-slate-50 mr-3 shrink-0 border border-slate-100">
+                  <img src={displayImg} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </div>
                 <div className="flex-1 min-w-0 pr-2">
                   <h4 className="font-black text-slate-800 text-sm truncate uppercase tracking-tight">{item.name}</h4>
                   <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.neededQuantity} {item.unit}</p>
                     {item.category && (
-                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest leading-none">{item.category}</p>
-                    )}
-                    {product?.brand && (
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none border-l pl-2 border-slate-200">{product.brand}</p>
-                    )}
-                    {product?.variety && (
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none border-l pl-2 border-slate-200">{product.variety}</p>
+                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest leading-none mt-1">{item.category}</p>
                     )}
                   </div>
-                  <div 
-                    onClick={() => setEditingId(editingId === item.id ? null : item.id)}
-                    className="inline-flex items-center mt-1 cursor-pointer hover:bg-slate-50 rounded-md transition-colors"
-                  >
-                    <span className="text-[10px] text-indigo-500 font-black uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-full">
-                      {item.neededQuantity} {item.unit}
-                    </span>
-                    <svg className="w-3 h-3 text-slate-300 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                  </div>
+                  
+                  {profile.enableKroger && profile.krogerStoreId && (
+                    <div className="mt-2">
+                      {krogerData ? (
+                        <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                            <span className="text-[9px] font-black text-emerald-600">${krogerData.price.toFixed(2)}</span>
+                            {krogerData.onSale && <span className="text-[7px] font-black text-white bg-emerald-500 px-1 rounded uppercase">Sale</span>}
+                          </div>
+                          {!krogerData.inStock && <span className="text-[7px] font-black text-red-500 uppercase tracking-widest">Out of Stock</span>}
+                          <button onClick={() => matchKrogerProduct(item)} className="text-[7px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600">Change Match</button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => matchKrogerProduct(item)}
+                          className="flex items-center space-x-1 text-[8px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 active:scale-95 transition-transform"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                          <span>Match Kroger Product</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center space-x-1">
                   <button 
@@ -145,54 +203,45 @@ const ShoppingList: React.FC<ShoppingListProps> = ({ items, products, storageLoc
                 </div>
               </div>
 
-              {editingId === item.id && (
-                <div className="mt-4 pt-4 border-t border-slate-50 animate-in slide-in-from-top-2">
-                  <div className="flex items-center space-x-2">
-                     <div className="flex-1">
-                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Update Needed</label>
-                        <div className="flex items-center space-x-2">
-                          <input 
-                            type="number" 
-                            className="w-20 bg-slate-50 border border-slate-100 rounded-xl px-2 py-2 text-xs font-black text-center" 
-                            defaultValue={item.neededQuantity}
-                            onBlur={(e) => {
-                               const val = parseFloat(e.target.value) || 1;
-                               // In useAppData we use a generic update if needed, but here we can rely on onAdd's behavior or similar
-                               // Since ShoppingList doesn't have an 'onUpdateItem' prop specifically, we'll just log that this UI might need it.
-                               // However, let's just make it call onToggle or similar if we wanted, but for now we'll stick to Toggle/Remove.
-                               setEditingId(null);
-                            }}
-                          />
-                          <select 
-                            className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-2 py-2 text-xs font-bold appearance-none text-indigo-600"
-                            defaultValue={item.unit}
-                            onChange={(e) => {
-                               setEditingId(null);
-                            }}
-                          >
-                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                          </select>
-                        </div>
-                     </div>
+              {matchingId === item.id && (
+                <div className="mt-4 pt-4 border-t border-slate-50 space-y-3 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Kroger Matches</h5>
+                    <button onClick={() => setMatchingId(null)} className="text-[9px] font-black text-slate-300 uppercase">Close</button>
                   </div>
-                </div>
-              )}
-              
-              {suggestion && (
-                <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 overflow-hidden border border-slate-50">
-                      <img src={suggestion.image || genericImg} className="w-full h-full object-cover" />
+                  {searchLoading ? (
+                    <div className="flex justify-center py-4">
+                      <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                     </div>
-                    <div>
-                      <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-1">Best recorded</p>
-                      <p className="text-[10px] font-bold text-slate-600 leading-none">{suggestion.store}</p>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                      {searchResults.length === 0 ? (
+                        <p className="text-[10px] text-slate-400 font-bold text-center py-4">No matches found.</p>
+                      ) : (
+                        searchResults.map(res => {
+                          const price = res.items?.[0]?.price;
+                          const img = res.images?.find((i: any) => i.perspective === 'front')?.sizes?.find((s: any) => s.size === 'small')?.url;
+                          return (
+                            <button 
+                              key={res.productId}
+                              onClick={() => selectKrogerProduct(item.id, res)}
+                              className="w-full flex items-center p-2 bg-slate-50 hover:bg-indigo-50 border border-slate-100 rounded-2xl transition-all text-left"
+                            >
+                              <img src={img} alt="" className="w-8 h-8 rounded-lg object-cover mr-3 bg-white border border-slate-100" referrerPolicy="no-referrer" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-black text-slate-700 truncate uppercase">{res.description}</p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase">{res.brand} • {res.items?.[0]?.size}</p>
+                              </div>
+                              <div className="text-right ml-2">
+                                <p className="text-[10px] font-black text-emerald-600">${(price?.promo || price?.regular || 0).toFixed(2)}</p>
+                                {price?.promo && <p className="text-[7px] font-bold text-slate-400 line-through">${price.regular.toFixed(2)}</p>}
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-black text-slate-900 leading-none">${suggestion.price.toFixed(2)}</p>
-                    <p className="text-[9px] font-bold text-slate-400 mt-1">/{suggestion.qty}{suggestion.unit}</p>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

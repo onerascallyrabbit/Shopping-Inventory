@@ -2,11 +2,11 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PriceRecord, Product, StoreLocation, CustomCategory, CustomSubCategory } from '../types';
 import { identifyProductFromImage } from '../services/geminiService';
-import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES } from '../constants';
+import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
 
 interface AddItemModalProps {
   onClose: () => void;
-  onSubmit: (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string, subCategory?: string, origin?: string, grade?: string, style?: string, notes?: string) => void;
+  onSubmit: (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string, subCategory?: string, origin?: string, grade?: string, style?: string, notes?: string, unitSize?: number, unitMeasure?: string, container?: string) => void;
   onSaveToList: (name: string, qty: number, unit: string) => void;
   initialMode?: 'type' | 'barcode' | 'product' | 'tag';
   products: Product[];
@@ -25,7 +25,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   const [image, setImage] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('type');
   const [formData, setFormData] = useState({
-    category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc', origin: '', grade: '', style: '', notes: ''
+    category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc', unitSize: '', unitMeasure: 'oz', container: '', origin: '', grade: '', style: '', notes: ''
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -116,8 +116,20 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
     e.preventDefault();
     onSubmit(
       formData.category, formData.itemName, formData.variety, 
-      { store: formData.store, price: parseFloat(formData.price), quantity: parseFloat(formData.quantity), unit: formData.unit, image: image || undefined }, 
-      formData.brand, formData.barcode, formData.subCategory, formData.origin, formData.grade, formData.style, formData.notes
+      { 
+        store: formData.store, 
+        price: parseFloat(formData.price), 
+        quantity: parseFloat(formData.quantity), 
+        unit: formData.unit, 
+        unitSize: parseFloat(formData.unitSize) || undefined,
+        unitMeasure: formData.unitMeasure,
+        container: formData.container,
+        image: image || undefined 
+      }, 
+      formData.brand, formData.barcode, formData.subCategory, formData.origin, formData.grade, formData.style, formData.notes,
+      parseFloat(formData.unitSize) || undefined,
+      formData.unitMeasure,
+      formData.container
     );
   };
 
@@ -264,7 +276,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                    )}
                 </div>
                 <div className="flex space-x-2">
-                  <div className="flex-[2] space-y-1">
+                  <div className="flex-1 space-y-1">
                     <label className="text-[8px] font-black text-indigo-300 uppercase ml-1">Total Price</label>
                     <div className="relative">
                       <span className="absolute left-3 top-3.5 text-xs font-black text-indigo-300">$</span>
@@ -276,10 +288,20 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                     <input required type="number" step="0.01" className="w-full bg-white border-none rounded-xl px-2 py-3 text-xs font-bold text-center" placeholder="1" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} />
                   </div>
                   <div className="flex-1 space-y-1">
-                    <label className="text-[8px] font-black text-indigo-300 uppercase ml-1">Unit</label>
-                    <select className="w-full bg-white border-none rounded-xl px-2 py-3 text-[10px] font-black text-indigo-600 appearance-none text-center uppercase" value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})}>
-                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
+                    <label className="text-[8px] font-black text-indigo-300 uppercase ml-1">Unit Size</label>
+                    <div className="flex space-x-1">
+                      <input type="number" step="0.1" className="w-1/2 bg-white border-none rounded-xl px-1 py-3 text-[10px] font-bold text-center" placeholder="12" value={formData.unitSize} onChange={(e) => setFormData({...formData, unitSize: e.target.value})} />
+                      <select className="w-1/2 bg-white border-none rounded-xl px-1 py-3 text-[10px] font-black text-indigo-600 appearance-none text-center" value={formData.unitMeasure} onChange={(e) => setFormData({...formData, unitMeasure: e.target.value})}>
+                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[8px] font-black text-indigo-300 uppercase ml-1">Container</label>
+                    <input list="track-container-types" className="w-full bg-white border-none rounded-xl px-2 py-3 text-[10px] font-bold text-center" placeholder="cans" value={formData.container} onChange={(e) => setFormData({...formData, container: e.target.value})} />
+                    <datalist id="track-container-types">
+                      {CONTAINER_TYPES.map(type => <option key={type} value={type} />)}
+                    </datalist>
                   </div>
                 </div>
               </div>

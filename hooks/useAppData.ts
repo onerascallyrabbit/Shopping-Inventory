@@ -255,20 +255,20 @@ export const useAppData = () => {
     if (user) try { await deleteInventoryItem(id); } catch (err) { loadAllData(); }
   };
 
-  const addPriceRecord = async (category: string, itemName: string, variety: string, record: any, brand?: string, barcode?: string, subCategory?: string, origin?: string, grade?: string, style?: string, notes?: string) => {
+  const addPriceRecord = async (category: string, itemName: string, variety: string, record: any, brand?: string, barcode?: string, subCategory?: string, origin?: string, grade?: string, style?: string, notes?: string, unitSize?: number, unitMeasure?: string, container?: string) => {
     const newRecord = { ...record, id: crypto.randomUUID(), date: new Date().toISOString(), isPublic: profile.sharePrices };
     const existingProduct = products.find(p => (barcode && p.barcode === barcode) || (p.itemName.toLowerCase() === itemName.toLowerCase() && (p.variety || '').toLowerCase() === (variety || '').toLowerCase() && (p.brand || '').toLowerCase() === (brand || '').toLowerCase()));
     let productId = existingProduct?.id;
     if (user) {
       try {
-        const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode, subCategory, origin, grade, style, notes });
+        const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode, subCategory, origin, grade, style, notes, unitSize, unitMeasure, container });
         productId = syncedProduct.id;
         await syncPriceRecord(productId, newRecord, user.id);
       } catch (err) { console.error(err); }
     }
     setProducts(prev => {
       if (existingProduct) return prev.map(p => p.id === existingProduct.id ? { ...p, history: [newRecord, ...p.history] } : p);
-      return [...prev, { id: productId || crypto.randomUUID(), category, subCategory, itemName, variety, brand, barcode, origin, grade, style, notes, history: [newRecord] }];
+      return [...prev, { id: productId || crypto.randomUUID(), category, subCategory, itemName, variety, brand, barcode, origin, grade, style, notes, unitSize, unitMeasure, container, history: [newRecord] }];
     });
   };
 
@@ -289,6 +289,14 @@ export const useAppData = () => {
   const removeListItem = async (id: string) => {
     setShoppingList(prev => prev.filter(i => i.id !== id));
     if (user) try { await deleteShoppingItem(id); } catch (e) { console.error(e); }
+  };
+
+  const updateShoppingItem = async (id: string, updates: Partial<ShoppingItem>) => {
+    const item = shoppingList.find(i => i.id === id);
+    if (!item) return;
+    const updated = { ...item, ...updates };
+    setShoppingList(prev => prev.map(i => i.id === id ? updated : i));
+    if (user) try { await syncShoppingItem(updated); } catch (e) { console.error(e); }
   };
 
   const overrideStoreForListItem = async (id: string, store: string | undefined) => {
@@ -440,7 +448,7 @@ export const useAppData = () => {
     customCategories, customSubCategories,
     addCategory, removeCategory, addSubCategory, removeSubCategory,
     updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
-    addPriceRecord, addToList, toggleListItem, removeListItem, overrideStoreForListItem, 
+    addPriceRecord, addToList, toggleListItem, removeListItem, updateShoppingItem, overrideStoreForListItem, 
     addToInventory, importBulkInventory, reorderStorageLocations, refresh: loadAllData,
     refreshMeals, cookMeal, rateMeal,
     updateCellarQty, addCellarItem, updateCellarItem, removeCellarItem, logConsumption

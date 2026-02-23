@@ -281,7 +281,9 @@ export const fetchShoppingList = async (): Promise<ShoppingItem[]> => {
     isCompleted: item.is_completed,
     manualStore: item.manual_store,
     category: item.category,
-    userId: item.user_id
+    userId: item.user_id,
+    krogerProductId: item.kroger_product_id,
+    krogerData: item.kroger_data
   }));
 };
 
@@ -300,7 +302,9 @@ export const syncShoppingItem = async (item: ShoppingItem) => {
     is_completed: item.isCompleted,
     manual_store: item.manualStore,
     category: item.category,
-    user_id: item.userId || user.id
+    user_id: item.userId || user.id,
+    kroger_product_id: item.krogerProductId,
+    kroger_data: item.krogerData
   };
   
   await supabase.from('shopping_list').upsert(payload);
@@ -504,7 +508,10 @@ export const fetchProfile = async (): Promise<Profile | null> => {
       activeVehicleId: data.active_vehicle_id, 
       sharePrices: data.share_prices, 
       familyId: data.family_id,
-      defaultTab: data.default_tab
+      defaultTab: data.default_tab,
+      krogerStoreId: data.kroger_store_id,
+      krogerStoreName: data.kroger_store_name,
+      enableKroger: data.enable_kroger
     };
   } catch (e) {
     return null;
@@ -524,6 +531,9 @@ export const syncProfile = async (profile: Partial<Profile>) => {
   if (profile.sharePrices !== undefined) payload.share_prices = profile.sharePrices;
   if (profile.familyId !== undefined) payload.family_id = profile.familyId;
   if (profile.defaultTab !== undefined) payload.default_tab = profile.defaultTab;
+  if (profile.krogerStoreId !== undefined) payload.kroger_store_id = profile.krogerStoreId;
+  if (profile.krogerStoreName !== undefined) payload.kroger_store_name = profile.krogerStoreName;
+  if (profile.enableKroger !== undefined) payload.enable_kroger = profile.enableKroger;
   
   const { data, error } = await supabase.from('profiles').upsert({ id: user.id, ...payload }).select().single();
   if (error) throw error;

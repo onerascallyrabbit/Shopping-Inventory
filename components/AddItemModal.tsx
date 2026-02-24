@@ -4,7 +4,7 @@ import { PriceRecord, Product, StoreLocation, CustomCategory, CustomSubCategory,
 import { identifyProductFromImage } from '../services/geminiService';
 import { lookupKrogerProduct, compareKrogerPrices } from '../services/krogerService';
 import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
-import { Html5Qrcode } from "html5-qrcode";
+import * as html5QrCodeNamespace from "html5-qrcode";
 
 interface AddItemModalProps {
   onClose: () => void;
@@ -36,7 +36,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   const [showComparison, setShowComparison] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerRef = useRef<html5QrCodeNamespace.Html5Qrcode | null>(null);
 
   // Default to manual entry
   useEffect(() => {
@@ -62,11 +62,8 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
 
   const startScanner = async () => {
   try {
-    // Ensure the element exists before trying to attach
-    const scannerElement = document.getElementById("barcode-scanner-viewport");
-    if (!scannerElement) return;
-
-    const html5QrCodeInstance = new Html5Qrcode("barcode-scanner-viewport");
+    // Update the constructor call to use the namespace
+    const html5QrCodeInstance = new html5QrCodeNamespace.Html5Qrcode("barcode-scanner-viewport");
     scannerRef.current = html5QrCodeInstance;
     setIsScannerActive(true);
 
@@ -77,7 +74,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
       config,
       async (decodedText) => {
         console.log("Barcode detected:", decodedText);
-        // Important: Stop first, then handle data
+        // Important: Stop first, then handle data to prevent race conditions
         await stopScanner(); 
         handleBarcodeDetected(decodedText);
       },
@@ -88,6 +85,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
     setIsScannerActive(false);
   }
 };
+
 
   const stopScanner = async () => {
     if (scannerRef.current && scannerRef.current.isScanning) {

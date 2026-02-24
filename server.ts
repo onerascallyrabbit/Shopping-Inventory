@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 // @ts-ignore
 import healthHandler from "./api/health.js";
 // @ts-ignore
-import krogerAuthHandler from "./api/kroger-auth.js";
+import krogerAuthHandler from "./api/kroger/auth.js";
 // @ts-ignore
 import krogerLocationsHandler from "./api/kroger/locations.js";
 // @ts-ignore
@@ -24,10 +24,24 @@ import searchStoreHandler from "./api/search-store.js";
 
 dotenv.config();
 
+console.log("Starting server with environment:", {
+  NODE_ENV: process.env.NODE_ENV,
+  has_kroger_id: !!process.env.CLIENT_ID_KROGER,
+  has_kroger_secret: !!process.env.CLIENT_SECRET_KROGER
+});
+
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Logging middleware
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    console.log(`[API] ${req.method} ${req.path}`);
+  }
+  next();
+});
 
 // API Routes mapped to handlers in /api folder
 app.all("/api/health", healthHandler);
@@ -40,23 +54,34 @@ app.all("/api/identify-product", identifyProductHandler);
 app.all("/api/lookup-market", lookupMarketHandler);
 app.all("/api/search-store", searchStoreHandler);
 
-async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    app.use(express.static("dist"));
-    app.get("*", (req, res) => {
-      res.sendFile("dist/index.html", { root: "." });
-    });
-  }
+// 404 for API routes to prevent SPA fallback
+app.all("/api/*", (req, res) => {
+  console.warn(`[API] 404 Not Found: ${req.method} ${req.path}`);
+  res.status(404).json({ error: "API route not found" });
+});
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+async function startServer() {
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      app.use(express.static("dist"));
+      app.get("*", (req, res) => {
+        res.sendFile("dist/index.html", { root: "." });
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
 }
 
 startServer();

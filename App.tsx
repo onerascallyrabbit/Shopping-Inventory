@@ -197,6 +197,7 @@ const App: React.FC = () => {
           initialMode={addModalMode}
           products={products} location={profile.locationLabel} savedStores={stores} lastUsedStore={lastUsedStore}
           customCategories={customCategories} customSubCategories={customSubCategories}
+          profile={profile}
         />
       )}
     </div>

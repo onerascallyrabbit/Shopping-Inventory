@@ -11,11 +11,12 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       plugins: [tailwindcss(), react()],
-resolve: {
-  alias: {
-    '@': path.resolve(__dirname, '.')
-  }
-},
+      resolve: {
+        alias: {
+          // Keep the @ alias, but REMOVE the html5-qrcode alias
+          '@': path.resolve(__dirname, '.'),
+        }
+      },
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)

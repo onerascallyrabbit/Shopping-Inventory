@@ -1,4 +1,4 @@
-export default function handler(req: any, res: any) {
+export default function handler(req, res) {
   const CLIENT_ID = process.env.CLIENT_ID_KROGER;
   const CLIENT_SECRET = process.env.CLIENT_SECRET_KROGER;
 

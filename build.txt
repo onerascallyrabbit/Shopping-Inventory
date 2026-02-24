@@ -1,3 +1,4 @@
+Fix: minor bugs
 New: Kroger UPC scanner
 New: Kroger API integration*********
 Refactor: Increased inventory detail options****

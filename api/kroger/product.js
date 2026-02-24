@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getKrogerToken, KROGER_BASE_URL } from '../_kroger.js';
+import { getKrogerToken, KROGER_BASE_URL } from './_utils.js';
 
 export default async function handler(req, res) {
   try {
@@ -18,6 +18,7 @@ export default async function handler(req, res) {
     
     res.json(response.data);
   } catch (error) {
+    console.error("Kroger Products Error:", error.response?.data || error.message);
     res.status(500).json({ error: error.message });
   }
 }

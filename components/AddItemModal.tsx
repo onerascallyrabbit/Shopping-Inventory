@@ -1,13 +1,16 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { PriceRecord, Product, StoreLocation, CustomCategory, CustomSubCategory } from '../types';
+import { PriceRecord, Product, StoreLocation, CustomCategory, CustomSubCategory, Profile } from '../types';
 import { identifyProductFromImage } from '../services/geminiService';
+import { lookupKrogerProduct, compareKrogerPrices } from '../services/krogerService';
 import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
+import { Html5Qrcode } from 'html5-qrcode';
 
 interface AddItemModalProps {
   onClose: () => void;
   onSubmit: (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string, subCategory?: string, origin?: string, grade?: string, style?: string, notes?: string, unitSize?: number, unitMeasure?: string, container?: string) => void;
   onSaveToList: (name: string, qty: number, unit: string) => void;
+  onProfileChange?: (updates: Partial<Profile>) => void;
   initialMode?: 'type' | 'barcode' | 'product' | 'tag';
   products: Product[];
   location?: string;
@@ -15,20 +18,25 @@ interface AddItemModalProps {
   lastUsedStore?: string;
   customCategories: CustomCategory[];
   customSubCategories: CustomSubCategory[];
+  profile: Profile;
 }
 
 const AddItemModal: React.FC<AddItemModalProps> = ({ 
   onClose, onSubmit, products, initialMode = 'type', location = '', savedStores, lastUsedStore,
-  customCategories, customSubCategories
+  customCategories, customSubCategories, profile, onProfileChange
 }) => {
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('type');
+  const [isScannerActive, setIsScannerActive] = useState(false);
   const [formData, setFormData] = useState({
     category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc', unitSize: '', unitMeasure: 'oz', container: '', origin: '', grade: '', style: '', notes: ''
   });
+  const [comparisonResults, setComparisonResults] = useState<any[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   // Default to manual entry
   useEffect(() => {
@@ -38,6 +46,101 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
       setInputMode('type');
     }
   }, [initialMode]);
+
+  // Scanner Lifecycle
+  useEffect(() => {
+    if (inputMode === 'barcode' && !isScannerActive) {
+      startScanner();
+    } else if (inputMode !== 'barcode' && isScannerActive) {
+      stopScanner();
+    }
+
+    return () => {
+      stopScanner();
+    };
+  }, [inputMode]);
+
+  const startScanner = async () => {
+    try {
+      const html5QrCode = new Html5Qrcode("barcode-scanner-viewport");
+      scannerRef.current = html5QrCode;
+      setIsScannerActive(true);
+
+      const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+      
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        async (decodedText) => {
+          // Success!
+          console.log("Barcode detected:", decodedText);
+          handleBarcodeDetected(decodedText);
+          stopScanner();
+        },
+        (errorMessage) => {
+          // parse error, ignore
+        }
+      );
+    } catch (err) {
+      console.error("Failed to start scanner", err);
+      setIsScannerActive(false);
+    }
+  };
+
+  const stopScanner = async () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      await scannerRef.current.stop();
+      scannerRef.current = null;
+    }
+    setIsScannerActive(false);
+  };
+
+  const handleBarcodeDetected = async (barcode: string) => {
+    setFormData(prev => ({ ...prev, barcode }));
+    setLoading(true);
+    
+    try {
+      // 1. Try Kroger Lookup first
+      const krogerProduct = await lookupKrogerProduct(barcode, profile.krogerStoreId);
+      
+      if (krogerProduct) {
+        console.log("Kroger product found:", krogerProduct);
+        const price = krogerProduct.items?.[0]?.price?.regular || 0;
+        
+        setFormData(prev => ({
+          ...prev,
+          itemName: krogerProduct.description || prev.itemName,
+          brand: krogerProduct.brand || prev.brand,
+          price: price > 0 ? price.toString() : prev.price,
+          barcode: barcode,
+          store: profile.krogerStoreName || prev.store || 'Kroger',
+        }));
+
+        if (krogerProduct.images?.[0]?.sizes?.find((s: any) => s.size === 'medium')?.url) {
+          setImage(krogerProduct.images[0].sizes.find((s: any) => s.size === 'medium').url);
+        }
+
+        // 2. If we have a zip, fetch comparison
+        if (profile.zip) {
+          const comparison = await compareKrogerPrices(barcode, profile.zip);
+          if (comparison && comparison.length > 0) {
+            setComparisonResults(comparison);
+            setShowComparison(true);
+          }
+        }
+      } else {
+        // 2. Fallback to Gemini if Kroger fails
+        console.log("Kroger lookup failed, falling back to Gemini...");
+        // Since we don't have an image here (it was a real-time scan), 
+        // we might want to prompt the user to take a photo or just use the barcode string if Gemini supports it.
+        // For now, we'll just keep the barcode and let the user fill the rest or take a photo.
+      }
+    } catch (err) {
+      console.error("Barcode processing error", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const allCategories = useMemo(() => {
     return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories.map(c => c.name)])).sort();
@@ -135,6 +238,24 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
 
   const currentVal = parseFloat(formData.price) / (parseFloat(formData.quantity) || 1);
 
+  const selectComparisonStore = (res: any) => {
+    setFormData(prev => ({
+      ...prev,
+      store: res.storeName,
+      price: res.price.toString()
+    }));
+    
+    // Save to profile as preferred Kroger store
+    if (onProfileChange) {
+      onProfileChange({
+        krogerStoreId: res.storeId,
+        krogerStoreName: res.storeName
+      });
+    }
+    
+    setShowComparison(false);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 animate-in fade-in">
       <div className="bg-white w-full max-w-lg h-[95vh] sm:h-auto sm:max-h-[90vh] sm:rounded-[40px] rounded-t-[40px] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-10">
@@ -158,6 +279,34 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {showComparison && comparisonResults.length > 0 && (
+            <div className="bg-indigo-600 rounded-[32px] p-6 text-white space-y-4 animate-in zoom-in-95">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-widest">Nearby Store Prices</h4>
+                <button onClick={() => setShowComparison(false)} className="text-[10px] font-bold uppercase opacity-60">Skip</button>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                {comparisonResults.map((res, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => selectComparisonStore(res)}
+                    className="w-full bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl p-3 flex items-center justify-between transition-all text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-black truncate uppercase">{res.storeName}</p>
+                      <p className="text-[9px] font-bold opacity-60 uppercase">{res.distance.toFixed(1)} miles • {res.city}</p>
+                    </div>
+                    <div className="text-right ml-3">
+                      <p className="text-sm font-black">${res.price.toFixed(2)}</p>
+                      {res.onSale && <span className="text-[8px] font-black bg-white text-indigo-600 px-1.5 py-0.5 rounded-full uppercase">Sale</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[9px] font-bold opacity-60 text-center uppercase">Select a store to update your entry</p>
+            </div>
+          )}
+
           {priceMemory && (
             <div className={`p-4 rounded-[28px] border animate-in slide-in-from-top-4 ${priceMemory.isBetter ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
               <div className="flex items-center justify-between mb-2">
@@ -183,13 +332,31 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
 
           {inputMode !== 'type' && (
             <div 
-              onClick={() => fileInputRef.current?.click()} 
-              className={`h-48 rounded-[32px] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative group transition-all ${image ? 'bg-slate-900 border-none overflow-hidden' : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-indigo-200'}`}
+              className={`h-64 rounded-[32px] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative group transition-all ${image || isScannerActive ? 'bg-slate-900 border-none overflow-hidden' : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-indigo-200'}`}
             >
-              {image ? (
-                <img src={image} className="w-full h-full object-contain" alt="Preview" />
+              {inputMode === 'barcode' && !image ? (
+                <div id="barcode-scanner-viewport" className="w-full h-full">
+                  {!isScannerActive && (
+                    <div onClick={startScanner} className="w-full h-full flex flex-col items-center justify-center space-y-2">
+                       <div className="bg-indigo-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-indigo-500">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
+                      </div>
+                      <p className="text-[11px] font-black uppercase text-slate-400 tracking-widest">Tap to start scanner</p>
+                    </div>
+                  )}
+                </div>
+              ) : image ? (
+                <div className="relative w-full h-full">
+                  <img src={image} className="w-full h-full object-contain" alt="Preview" />
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setImage(null); if(inputMode === 'barcode') startScanner(); }}
+                    className="absolute top-4 right-4 bg-white/20 backdrop-blur-md p-2 rounded-full text-white hover:bg-white/40 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
               ) : (
-                <div className="text-center space-y-2">
+                <div onClick={() => fileInputRef.current?.click()} className="text-center space-y-2">
                   <div className="bg-indigo-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-indigo-500 group-hover:scale-110 transition-transform">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
                   </div>

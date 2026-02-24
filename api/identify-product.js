@@ -1,13 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const { base64Image, mode } = req.body;
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     
-    const prompts: Record<string, string> = {
+    const prompts = {
       barcode: "This is a photo of a barcode. Extract the UPC/EAN digits. Also, identify the product hierarchy: Category, Item Name, and Variety.",
       product: "This is a photo of a product. Identify the hierarchy: Category, Item Name, and Variety. Also find the brand.",
       tag: "This is a photo of a price tag. Extract hierarchy: Category, Item Name, and Variety. Also extract total price, quantity, unit, and store name."
@@ -41,7 +41,7 @@ export default async function handler(req: any, res: any) {
     });
 
     res.status(200).json(JSON.parse(response.text || "{}"));
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 }

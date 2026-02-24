@@ -15,6 +15,7 @@ interface ShoppingListProps {
   onAddToInventory: (item: Partial<InventoryItem>) => void;
   activeFamily: Family | null;
   profile: Profile;
+  onProfileChange?: (updates: Partial<Profile>) => void;
 }
 
 const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g', 'qt', 'pt'];
@@ -22,7 +23,7 @@ const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g', 
 const ShoppingList: React.FC<ShoppingListProps> = ({ 
   items, products, storageLocations, subLocations, 
   onToggle, onRemove, onAdd, onUpdateItem, onAddToInventory, 
-  activeFamily, profile 
+  activeFamily, profile, onProfileChange
 }) => {
   const [newItemName, setNewItemName] = useState('');
   const [newQty, setNewQty] = useState('1');
@@ -56,6 +57,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({
     
     onUpdateItem(itemId, {
       krogerProductId: krogerProduct.productId,
+      manualStore: profile.krogerStoreName || 'Kroger',
       krogerData: {
         price: priceData?.promo || priceData?.regular || 0,
         regularPrice: priceData?.regular || 0,
@@ -305,6 +307,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({
             selectKrogerProduct(selectedKrogerProduct.itemId, product);
             setSelectedKrogerProduct(null);
           }}
+          onProfileChange={onProfileChange}
         />
       )}
     </div>

@@ -26,3 +26,16 @@ export const searchKrogerLocations = async (zip: string, radius: number = 10) =>
     return null;
   }
 };
+
+export const compareKrogerPrices = async (upc: string, zip: string, radius: number = 20) => {
+  try {
+    const params = new URLSearchParams({ upc, zip, radius: radius.toString() });
+    const response = await fetch(`/api/kroger/compare?${params.toString()}`);
+    if (!response.ok) throw new Error('Failed to compare Kroger prices');
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error("Kroger Compare Error:", error);
+    return [];
+  }
+};

@@ -1,3 +1,4 @@
+New: Kroger item details
 Fix: minor bugs
 New: Kroger UPC scanner
 New: Kroger API integration*********

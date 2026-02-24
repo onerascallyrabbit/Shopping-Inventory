@@ -292,7 +292,6 @@ export const syncShoppingItem = async (item: ShoppingItem) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
   
-  // Fix: use item.neededQuantity and item.manualStore to match type definition
   const payload = {
     id: item.id,
     product_id: item.productId,
@@ -307,7 +306,13 @@ export const syncShoppingItem = async (item: ShoppingItem) => {
     kroger_data: item.krogerData
   };
   
-  await supabase.from('shopping_list').upsert(payload);
+  const { error } = await supabase.from('shopping_list').upsert(payload);
+  if (error) {
+    console.error("syncShoppingItem FAILED:", error);
+    // If you see this error in console, ensure your shopping_list table 
+    // has kroger_product_id (TEXT) and kroger_data (JSONB) columns.
+    throw error;
+  }
 };
 
 export const deleteShoppingItem = async (id: string) => {

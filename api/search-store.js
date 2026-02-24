@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
@@ -19,7 +19,7 @@ export default async function handler(req: any, res: any) {
       text: response.text,
       chunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 }

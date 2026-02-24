@@ -134,6 +134,7 @@ const App: React.FC = () => {
             onAddToInventory={addToInventory} 
             activeFamily={activeFamily} 
             profile={profile}
+            onProfileChange={updateProfile}
           />
         )}
         {activeTab === 'shop' && <ShopPlan items={shoppingList} products={products} stores={stores} vehicles={vehicles} activeVehicleId={profile.activeVehicleId || ''} gasPrice={profile.gasPrice} storageLocations={storageLocations} subLocations={subLocations} onToggle={toggleListItem} onRemove={removeListItem} onOverrideStore={overrideStoreForListItem} onAddToInventory={addToInventory} />}
@@ -194,6 +195,7 @@ const App: React.FC = () => {
             setIsAddModalOpen(false); 
           }} 
           onSaveToList={addToList} 
+          onProfileChange={updateProfile}
           initialMode={addModalMode}
           products={products} location={profile.locationLabel} savedStores={stores} lastUsedStore={lastUsedStore}
           customCategories={customCategories} customSubCategories={customSubCategories}

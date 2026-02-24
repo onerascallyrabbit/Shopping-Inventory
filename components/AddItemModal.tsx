@@ -4,7 +4,7 @@ import { PriceRecord, Product, StoreLocation, CustomCategory, CustomSubCategory,
 import { identifyProductFromImage } from '../services/geminiService';
 import { lookupKrogerProduct, compareKrogerPrices } from '../services/krogerService';
 import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
-import * as html5QrCode from 'html5-qrcode';
+import { Html5Qrcode } from "html5-qrcode";
 
 interface AddItemModalProps {
   onClose: () => void;
@@ -36,7 +36,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   const [showComparison, setShowComparison] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scannerRef = useRef<any>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   // Default to manual entry
   useEffect(() => {
@@ -61,32 +61,33 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   }, [inputMode]);
 
   const startScanner = async () => {
-    try {
-      const Html5Qrcode = html5QrCode.Html5Qrcode;
-      const html5QrCodeInstance = new Html5Qrcode("barcode-scanner-viewport");
-      scannerRef.current = html5QrCodeInstance;
-      setIsScannerActive(true);
+  try {
+    // Ensure the element exists before trying to attach
+    const scannerElement = document.getElementById("barcode-scanner-viewport");
+    if (!scannerElement) return;
 
-      const config = { fps: 10, qrbox: { width: 250, height: 150 } };
-      
-      await html5QrCodeInstance.start(
-        { facingMode: "environment" },
-        config,
-        async (decodedText) => {
-          // Success!
-          console.log("Barcode detected:", decodedText);
-          handleBarcodeDetected(decodedText);
-          stopScanner();
-        },
-        (errorMessage) => {
-          // parse error, ignore
-        }
-      );
-    } catch (err) {
-      console.error("Failed to start scanner", err);
-      setIsScannerActive(false);
-    }
-  };
+    const html5QrCodeInstance = new Html5Qrcode("barcode-scanner-viewport");
+    scannerRef.current = html5QrCodeInstance;
+    setIsScannerActive(true);
+
+    const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+    
+    await html5QrCodeInstance.start(
+      { facingMode: "environment" },
+      config,
+      async (decodedText) => {
+        console.log("Barcode detected:", decodedText);
+        // Important: Stop first, then handle data
+        await stopScanner(); 
+        handleBarcodeDetected(decodedText);
+      },
+      () => { /* ignore frame errors */ }
+    );
+  } catch (err) {
+    console.error("Failed to start scanner", err);
+    setIsScannerActive(false);
+  }
+};
 
   const stopScanner = async () => {
     if (scannerRef.current && scannerRef.current.isScanning) {

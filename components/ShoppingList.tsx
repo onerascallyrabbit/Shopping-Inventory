@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShoppingItem, Product, StorageLocation, SubLocation, Family, InventoryItem, Profile } from '../types';
 import StockPurchasedModal from './StockPurchasedModal';
+import KrogerProductDetailsModal from './KrogerProductDetailsModal';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
@@ -31,6 +32,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedKrogerProduct, setSelectedKrogerProduct] = useState<{itemId: string, product: any} | null>(null);
 
   const matchKrogerProduct = async (item: ShoppingItem) => {
     if (!profile.enableKroger || !profile.krogerStoreId) return;
@@ -224,7 +226,7 @@ const ShoppingList: React.FC<ShoppingListProps> = ({
                           return (
                             <button 
                               key={res.productId}
-                              onClick={() => selectKrogerProduct(item.id, res)}
+                              onClick={() => setSelectedKrogerProduct({ itemId: item.id, product: res })}
                               className="w-full flex items-center p-2 bg-slate-50 hover:bg-indigo-50 border border-slate-100 rounded-2xl transition-all text-left"
                             >
                               <img src={img} alt="" className="w-8 h-8 rounded-lg object-cover mr-3 bg-white border border-slate-100" referrerPolicy="no-referrer" />
@@ -291,6 +293,18 @@ const ShoppingList: React.FC<ShoppingListProps> = ({
           subLocations={subLocations}
           onClose={() => setStockingItem(null)}
           onConfirm={handleStockConfirm}
+        />
+      )}
+
+      {selectedKrogerProduct && (
+        <KrogerProductDetailsModal 
+          product={selectedKrogerProduct.product}
+          profile={profile}
+          onClose={() => setSelectedKrogerProduct(null)}
+          onConfirm={(product) => {
+            selectKrogerProduct(selectedKrogerProduct.itemId, product);
+            setSelectedKrogerProduct(null);
+          }}
         />
       )}
     </div>

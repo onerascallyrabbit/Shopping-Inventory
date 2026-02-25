@@ -5,9 +5,8 @@ import {
   SubLocation, StoreLocation, Vehicle, Profile, Family, CustomCategory, CustomSubCategory, MealIdea, CellarItem, ConsumptionLog
 } from '../types';
 import { 
-  fetchUserData, syncInventoryItem, syncStorageLocation, 
-  deleteStorageLocation, syncSubLocation, deleteSubLocation,
-  syncProfile, syncVehicle, deleteVehicle, syncStore,
+  fetchUserData, syncInventoryItem, 
+  syncProfile, 
   syncProduct, syncPriceRecord, supabase, bulkSyncInventory, fetchFamily,
   deleteInventoryItem, syncShoppingItem, deleteShoppingItem,
   syncCustomCategory, deleteCustomCategory, syncCustomSubCategory, deleteCustomSubCategory,
@@ -150,7 +149,7 @@ export const useAppData = () => {
       .on('postgres_changes', { event: '*', table: 'consumption_logs', schema: 'public' }, () => loadAllData(true))
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabase?.removeChannel(channel); };
   }, [supabase, user, loadAllData]);
 
   useEffect(() => {
@@ -266,8 +265,10 @@ export const useAppData = () => {
     if (user) {
       try {
         const syncedProduct = await syncProduct({ id: productId, category, itemName, variety, brand, barcode, subCategory, origin, grade, style, notes, unitSize, unitMeasure, container });
-        productId = syncedProduct.id;
-        await syncPriceRecord(productId, newRecord, user.id);
+        if (syncedProduct && syncedProduct.id) {
+          productId = syncedProduct.id;
+          await syncPriceRecord(productId as string, newRecord, user.id);
+        }
       } catch (err) { console.error(err); }
     }
     setProducts(prev => {

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { InventoryItem, StorageLocation, SubLocation, CustomCategory, CustomSubCategory } from '../types';
-import { UNITS, SUB_CATEGORIES, DEFAULT_CATEGORIES } from '../constants';
+import { InventoryItem, StorageLocation, SubLocation, CustomCategory } from '../types';
+import { DEFAULT_CATEGORIES } from '../constants';
 
 interface CsvImportModalProps {
   onClose: () => void;
@@ -8,16 +8,14 @@ interface CsvImportModalProps {
   locations: StorageLocation[];
   subLocations: SubLocation[];
   activeLocationId: string;
-  categoryOrder: string[];
   customCategories: CustomCategory[];
-  customSubCategories: CustomSubCategory[];
 }
 
 type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'ignore';
 
 const CsvImportModal: React.FC<CsvImportModalProps> = ({ 
-  onClose, onImport, locations, subLocations, activeLocationId, categoryOrder,
-  customCategories, customSubCategories
+  onClose, onImport, locations, subLocations, activeLocationId,
+  customCategories
 }) => {
   const [step, setStep] = useState<'upload' | 'map' | 'review'>('upload');
   const [importMethod, setImportMethod] = useState<'file' | 'paste'>('file');

@@ -8,7 +8,7 @@ interface BottomNavProps {
   onAddClick: () => void;
 }
 
-const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, onAddClick }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 safe-bottom z-40">
       <div className="flex items-center justify-around h-16">

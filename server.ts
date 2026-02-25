@@ -14,6 +14,8 @@ import krogerProductsHandler from "./api/kroger/products.js";
 // @ts-ignore
 import krogerCouponsHandler from "./api/kroger/coupons.js";
 // @ts-ignore
+import krogerCompareHandler from "./api/kroger/compare.js";
+// @ts-ignore
 import generateMealsHandler from "./api/generate-meals.js";
 // @ts-ignore
 import identifyProductHandler from "./api/identify-product.js";
@@ -49,6 +51,7 @@ app.all("/api/kroger-auth", krogerAuthHandler);
 app.all("/api/kroger/locations", krogerLocationsHandler);
 app.all("/api/kroger/products", krogerProductsHandler);
 app.all("/api/kroger/coupons", krogerCouponsHandler);
+app.all("/api/kroger/compare", krogerCompareHandler);
 app.all("/api/generate-meals", generateMealsHandler);
 app.all("/api/identify-product", identifyProductHandler);
 app.all("/api/lookup-market", lookupMarketHandler);

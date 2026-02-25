@@ -15,7 +15,7 @@ interface TaxonomyModalProps {
 }
 
 const TaxonomyModal: React.FC<TaxonomyModalProps> = ({
-  activeFamily, customCategories, customSubCategories, onClose,
+  customCategories, customSubCategories, onClose,
   onAddCategory, onRemoveCategory, onAddSubCategory, onRemoveSubCategory
 }) => {
   const [activeTab, setActiveTab] = useState<'categories' | 'subcategories'>('categories');

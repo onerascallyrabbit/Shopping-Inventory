@@ -1,31 +1,27 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { InventoryItem, StorageLocation, Product, SubLocation, CustomCategory, CustomSubCategory } from '../types';
+import React, { useState, useMemo } from 'react';
+import { InventoryItem, StorageLocation, SubLocation, CustomCategory } from '../types';
 import CsvImportModal from './CsvImportModal';
-import { UNITS, SUB_CATEGORIES, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
+import { UNITS, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
 
 interface InventoryViewProps {
   inventory: InventoryItem[];
   locations: StorageLocation[];
   subLocations: SubLocation[];
-  products: Product[];
-  categoryOrder: string[];
   customCategories: CustomCategory[];
-  customSubCategories: CustomSubCategory[];
   onUpdateQty: (id: string, delta: number) => void;
   onUpdateItem: (id: string, updates: Partial<InventoryItem>) => void;
-  onRemoveItem: (id: string) => void;
   onAddToInventory: (item: Partial<InventoryItem>) => void;
   onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<void>;
   onAddToList: (name: string, qty: number, unit: string, productId?: string) => void;
 }
 
 const InventoryView: React.FC<InventoryViewProps> = ({ 
-  inventory, locations, subLocations, products, categoryOrder, 
-  customCategories, customSubCategories,
-  onUpdateQty, onUpdateItem, onRemoveItem, onAddToInventory, onBulkAdd, onAddToList
+  inventory, locations, subLocations, 
+  customCategories,
+  onUpdateQty, onUpdateItem, onAddToInventory, onBulkAdd, onAddToList
 }) => {
   const [activeLocationId, setActiveLocationId] = useState<string>('All');
-  const [activeSubLocation, setActiveSubLocation] = useState<string>('All');
+  const [activeSubLocation] = useState<string>('All');
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [isAdding, setIsAdding] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -38,12 +34,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const allAvailableCategories = useMemo(() => {
     return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories.map(c => c.name)])).sort();
   }, [customCategories]);
-
-  const getSubCategoriesFor = (catName: string) => {
-    const globals = SUB_CATEGORIES[catName] || [];
-    const customs = customSubCategories.filter(sc => sc.categoryId === catName).map(sc => sc.name);
-    return Array.from(new Set([...globals, ...customs])).sort();
-  };
 
   const filteredInventory = useMemo(() => {
     return inventory.filter(item => {
@@ -408,8 +398,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         <CsvImportModal 
           onClose={() => setIsImporting(false)} 
           onImport={async (items) => { await onBulkAdd(items); setIsImporting(false); }} 
-          locations={locations} subLocations={subLocations} activeLocationId={activeLocationId === 'All' ? locations[0]?.id : activeLocationId} categoryOrder={categoryOrder}
-          customCategories={customCategories} customSubCategories={customSubCategories}
+          locations={locations} subLocations={subLocations} activeLocationId={activeLocationId === 'All' ? locations[0]?.id : activeLocationId}
+          customCategories={customCategories}
         />
       )}
     </div>

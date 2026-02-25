@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { Product, CellarItem } from '../types';
+import React, { useState } from 'react';
+import { Product } from '../types';
 
 interface DashboardProps {
   products: Product[];
@@ -10,7 +10,7 @@ interface DashboardProps {
 
 const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
 
-const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList, onTabChange }) => {
+const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
   const [promptingId, setPromptingId] = useState<string | null>(null);
   const [promptQty, setPromptQty] = useState('1');
   const [promptUnit, setPromptUnit] = useState('pc');

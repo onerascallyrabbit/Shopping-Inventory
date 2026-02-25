@@ -36,7 +36,7 @@ const PORT = 3000;
 app.use(express.json());
 
 // Logging middleware
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   if (req.path.startsWith('/api')) {
     console.log(`[API] ${req.method} ${req.path}`);
   }
@@ -70,7 +70,7 @@ async function startServer() {
       app.use(vite.middlewares);
     } else {
       app.use(express.static("dist"));
-      app.get("*", (req, res) => {
+      app.get("*", (_req, res) => {
         res.sendFile("dist/index.html", { root: "." });
       });
     }

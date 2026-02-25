@@ -1,3 +1,4 @@
+Fix: Just trying to get the app to build again
 New: Kroger item details******
 Fix: minor bugs
 New: Kroger UPC scanner

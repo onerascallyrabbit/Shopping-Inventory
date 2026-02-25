@@ -22,7 +22,7 @@ interface AddItemModalProps {
 }
 
 const AddItemModal: React.FC<AddItemModalProps> = ({ 
-  onClose, onSubmit, products, initialMode = 'type', location = '', savedStores, lastUsedStore,
+  onClose, onSubmit, products, initialMode = 'type', savedStores, lastUsedStore,
   customCategories, customSubCategories, profile, onProfileChange
 }) => {
   const [loading, setLoading] = useState(false);

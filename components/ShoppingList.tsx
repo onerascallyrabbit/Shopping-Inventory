@@ -28,7 +28,6 @@ const ShoppingList: React.FC<ShoppingListProps> = ({
   const [newItemName, setNewItemName] = useState('');
   const [newQty, setNewQty] = useState('1');
   const [newUnit, setNewUnit] = useState('pc');
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [stockingItem, setStockingItem] = useState<ShoppingItem | null>(null);
   const [matchingId, setMatchingId] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -144,7 +143,6 @@ const ShoppingList: React.FC<ShoppingListProps> = ({
 
       <div className="space-y-3">
         {activeItems.map(item => {
-          const product = products.find(p => p.id === item.productId) || products.find(p => p.itemName.toLowerCase() === item.name.toLowerCase());
           const suggestion = getSmartSuggestion(item.name);
           const krogerData = item.krogerData;
           const displayImg = krogerData?.imageUrl || suggestion?.image || `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=120&h=120&grocery,${item.name}`;

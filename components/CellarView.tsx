@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { CellarItem, ConsumptionLog, Family } from '../types';
+import { CellarItem, Family } from '../types';
 
 interface CellarViewProps {
   items: CellarItem[];
-  logs: ConsumptionLog[];
   onUpdateQty: (id: string, delta: number) => void;
   onAddItem: (item: Omit<CellarItem, 'id' | 'updatedAt' | 'userId'>) => void;
   onUpdateItem: (id: string, updates: Partial<CellarItem>) => void;
@@ -42,7 +41,7 @@ const SPIRIT_STYLES: Record<string, string[]> = {
 };
 
 const CellarView: React.FC<CellarViewProps> = ({
-  items, logs, onUpdateQty, onAddItem, onUpdateItem, onRemoveItem, onLogConsumption, onAddToList, activeFamily
+  items, onUpdateQty, onAddItem, onUpdateItem, onRemoveItem, onLogConsumption, onAddToList, activeFamily
 }) => {
   const [activeTab, setActiveTab] = useState<'Wine' | 'Beer' | 'Spirits'>('Wine');
   const [isAdding, setIsAdding] = useState<'Wine' | 'Beer' | 'Spirits' | null>(null);
@@ -52,7 +51,6 @@ const CellarView: React.FC<CellarViewProps> = ({
   const [consumptionOccasion, setConsumptionOccasion] = useState('');
   
   // Form state for dynamic varietals
-  const [selectedCategory, setSelectedCategory] = useState<'Wine' | 'Beer' | 'Spirits'>('Wine');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('Red');
   const [formRating, setFormRating] = useState<number>(0);
 
@@ -83,14 +81,12 @@ const CellarView: React.FC<CellarViewProps> = ({
   };
 
   const openAddModal = (cat: 'Wine' | 'Beer' | 'Spirits') => {
-    setSelectedCategory(cat);
     setSelectedSubCategory(cat === 'Wine' ? 'Red' : cat === 'Spirits' ? 'Whiskey' : '');
     setFormRating(0);
     setIsAdding(cat);
   };
 
   const openEditModal = (item: CellarItem) => {
-    setSelectedCategory(item.category);
     setSelectedSubCategory(item.subCategory || (item.category === 'Wine' ? 'Red' : item.category === 'Spirits' ? 'Whiskey' : ''));
     setFormRating(item.rating || 0);
     setEditingItem(item);

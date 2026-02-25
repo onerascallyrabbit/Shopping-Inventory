@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StoreLocation, Vehicle, StorageLocation, SubLocation, Profile, Family, CustomCategory, CustomSubCategory } from '../types';
 import { createFamily, joinFamily, testDatabaseConnection, getEnv } from '../services/supabaseService';
 import StorageLocationsModal from './StorageLocationsModal';
@@ -45,16 +45,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   // Modal Visibility States
   const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
   const [isTaxonomyModalOpen, setIsTaxonomyModalOpen] = useState(false);
-  const [isInstallable, setIsInstallable] = useState(false);
 
   useEffect(() => {
-    const checkInstallable = () => {
-      // @ts-ignore
-      setIsInstallable(!!window.deferredPrompt);
-    };
-    window.addEventListener('app-installable', checkInstallable);
-    checkInstallable();
-    
     // Test Health
     testDatabaseConnection().then(res => setDbStatus(res.success ? 'ok' : 'fail'));
     
@@ -71,20 +63,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         setAiStatus(apiKey ? 'ok' : 'fail');
         setKrogerStatus('fail');
       });
-
-    return () => window.removeEventListener('app-installable', checkInstallable);
   }, []);
-
-  const handleInstall = async () => {
-    // @ts-ignore
-    const promptEvent = window.deferredPrompt;
-    if (!promptEvent) return;
-    promptEvent.prompt();
-    const { outcome } = await promptEvent.userChoice;
-    // @ts-ignore
-    window.deferredPrompt = null;
-    setIsInstallable(false);
-  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

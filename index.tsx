@@ -70,7 +70,7 @@ try {
 }
 
 // Catch global errors during execution
-window.onerror = (message, source, lineno, colno, error) => {
+window.onerror = (message, _source, _lineno, _colno, error) => {
   reportError(error || message);
   return true;
 };

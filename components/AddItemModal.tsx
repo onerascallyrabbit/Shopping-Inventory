@@ -4,7 +4,7 @@ import { PriceRecord, Product, StoreLocation, CustomCategory, CustomSubCategory,
 import { identifyProductFromImage } from '../services/geminiService';
 import { lookupKrogerProduct, compareKrogerPrices } from '../services/krogerService';
 import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
-import * as html5QrCodeNamespace from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface AddItemModalProps {
   onClose: () => void;
@@ -36,7 +36,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   const [showComparison, setShowComparison] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scannerRef = useRef<html5QrCodeNamespace.Html5Qrcode | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   // Default to manual entry
   useEffect(() => {
@@ -62,8 +62,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
 
   const startScanner = async () => {
   try {
-    // Update the constructor call to use the namespace
-    const html5QrCodeInstance = new html5QrCodeNamespace.Html5Qrcode("barcode-scanner-viewport");
+    const html5QrCodeInstance = new Html5Qrcode("barcode-scanner-viewport");
     scannerRef.current = html5QrCodeInstance;
     setIsScannerActive(true);
 

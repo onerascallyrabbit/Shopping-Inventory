@@ -22,11 +22,11 @@ const App: React.FC = () => {
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
     customCategories, customSubCategories, addCategory, removeCategory, addSubCategory, removeSubCategory,
-    updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
+    updateProfile, updateInventoryQty, updateInventoryItem, 
     addPriceRecord, addToList, toggleListItem, removeListItem, updateShoppingItem, overrideStoreForListItem,
-    addToInventory, importBulkInventory, reorderStorageLocations, refresh,
+    addToInventory, importBulkInventory, reorderStorageLocations,
     refreshMeals, cookMeal, rateMeal,
-    cellarItems, consumptionLogs, updateCellarQty, addCellarItem, updateCellarItem, removeCellarItem, logConsumption
+    cellarItems, updateCellarQty, addCellarItem, updateCellarItem, removeCellarItem, logConsumption
   } = useAppData();
 
   const [isGuest, setIsGuest] = useState(() => localStorage.getItem('pricewise_is_guest') === 'true');
@@ -96,16 +96,14 @@ const App: React.FC = () => {
         {activeTab === 'inventory' && (
           <InventoryView 
             inventory={inventory} locations={storageLocations} subLocations={subLocations} 
-            products={products} categoryOrder={profile.categoryOrder} 
-            customCategories={customCategories} customSubCategories={customSubCategories}
-            onUpdateQty={updateInventoryQty} onUpdateItem={updateInventoryItem} onRemoveItem={removeInventoryItem}
+            customCategories={customCategories}
+            onUpdateQty={updateInventoryQty} onUpdateItem={updateInventoryItem}
             onAddToInventory={addToInventory} onBulkAdd={importBulkInventory} onAddToList={addToList}
           />
         )}
         {activeTab === 'cellar' && (
           <CellarView 
             items={cellarItems} 
-            logs={consumptionLogs}
             onUpdateQty={updateCellarQty}
             onAddItem={addCellarItem}
             onUpdateItem={updateCellarItem}

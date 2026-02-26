@@ -13,12 +13,14 @@ interface InventoryViewProps {
   onAddToInventory: (item: Partial<InventoryItem>) => void;
   onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<void>;
   onAddToList: (name: string, qty: number, unit: string, productId?: string) => void;
+  onAddSubLocation?: (locId: string, name: string) => void;
 }
 
 const InventoryView: React.FC<InventoryViewProps> = ({ 
   inventory, locations, subLocations, 
   customCategories,
-  onUpdateQty, onUpdateItem, onAddToInventory, onBulkAdd, onAddToList
+  onUpdateQty, onUpdateItem, onAddToInventory, onBulkAdd, onAddToList,
+  onAddSubLocation
 }) => {
   const [activeLocationId, setActiveLocationId] = useState<string>('All');
   const [activeSubLocation] = useState<string>('All');
@@ -26,6 +28,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [isAdding, setIsAdding] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [newShelfName, setNewShelfName] = useState('');
+  const [isAddingShelf, setIsAddingShelf] = useState(false);
   const [depletedItem, setDepletedItem] = useState<InventoryItem | null>(null);
   const [search, setSearch] = useState('');
   const [recentlyAddedToList, setRecentlyAddedToList] = useState<string | null>(null);
@@ -222,10 +226,58 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase">Shelf</label>
-                <select className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" onChange={e => setEditingItem({ ...editingItem, subLocation: e.target.value } as any)}>
-                  <option value="">General</option>
-                  {subLocations.filter(sl => sl.locationId === (editingItem?.locationId || locations[0]?.id)).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
-                </select>
+                <div className="flex space-x-2">
+                  <select 
+                    className="flex-1 bg-slate-50 rounded-xl px-4 py-3 font-bold" 
+                    value={editingItem?.subLocation || ''}
+                    onChange={e => setEditingItem({ ...editingItem, subLocation: e.target.value } as any)}
+                  >
+                    <option value="">General</option>
+                    {subLocations.filter(sl => sl.locationId === (editingItem?.locationId || locations[0]?.id)).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+                  </select>
+                  <button 
+                    type="button"
+                    onClick={() => setIsAddingShelf(!isAddingShelf)}
+                    className={`p-3 rounded-xl transition-all ${isAddingShelf ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 hover:text-indigo-600'}`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                  </button>
+                </div>
+                {isAddingShelf && (
+                  <div className="mt-2 flex space-x-2 animate-in slide-in-from-top-2">
+                    <input 
+                      className="flex-1 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2 text-xs font-bold placeholder:text-indigo-300" 
+                      placeholder="Shelf name..." 
+                      value={newShelfName}
+                      onChange={e => setNewShelfName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newShelfName && onAddSubLocation) {
+                            onAddSubLocation(editingItem?.locationId || locations[0]?.id, newShelfName);
+                            setEditingItem({ ...editingItem, subLocation: newShelfName } as any);
+                            setNewShelfName('');
+                            setIsAddingShelf(false);
+                          }
+                        }
+                      }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if (newShelfName && onAddSubLocation) {
+                          onAddSubLocation(editingItem?.locationId || locations[0]?.id, newShelfName);
+                          setEditingItem({ ...editingItem, subLocation: newShelfName } as any);
+                          setNewShelfName('');
+                          setIsAddingShelf(false);
+                        }
+                      }}
+                      className="bg-indigo-600 text-white px-3 rounded-xl text-[10px] font-black uppercase"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="col-span-2 grid grid-cols-3 gap-2">

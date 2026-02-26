@@ -1,3 +1,4 @@
+Fix: Restore ability to add sub-locations
 New: Make app "installable"
 Fix: Just trying to get the app to build again*
 New: Kroger item details******

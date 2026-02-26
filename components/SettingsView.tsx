@@ -25,14 +25,18 @@ interface SettingsViewProps {
   onRemoveCategory: (id: string) => void;
   onAddSubCategory: (catName: string, name: string) => void;
   onRemoveSubCategory: (id: string) => void;
+  onAddSubLocation: (locId: string, name: string) => void;
+  onRemoveSubLocation: (id: string) => void;
   onReorderStorageLocations?: (locs: StorageLocation[]) => void;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ 
   user, profile, activeFamily, onProfileChange,
   storageLocations, onStorageLocationsChange,
+  subLocations, onSubLocationsChange,
   customCategories, customSubCategories,
   onAddCategory, onRemoveCategory, onAddSubCategory, onRemoveSubCategory,
+  onAddSubLocation, onRemoveSubLocation,
   onReorderStorageLocations
 }) => {
   const [familyInviteCode, setFamilyInviteCode] = useState('');
@@ -270,8 +274,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         <StorageLocationsModal 
           user={user}
           storageLocations={storageLocations}
+          subLocations={subLocations}
           onClose={() => setIsStorageModalOpen(false)}
           onStorageLocationsChange={onStorageLocationsChange}
+          onSubLocationsChange={onSubLocationsChange}
+          onAddSubLocation={onAddSubLocation}
+          onRemoveSubLocation={onRemoveSubLocation}
           onReorderStorageLocations={onReorderStorageLocations}
         />
       )}

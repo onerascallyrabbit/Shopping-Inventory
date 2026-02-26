@@ -13,6 +13,7 @@ import InventoryView from './components/InventoryView';
 import CellarView from './components/CellarView';
 import MealPlanner from './components/MealPlanner';
 import DiagnosticBanner from './components/DiagnosticBanner';
+import InstallPrompt from './components/InstallPrompt';
 import { useAppData } from './hooks/useAppData';
 import { signInWithGoogle, supabase } from './services/supabaseService';
 
@@ -22,6 +23,7 @@ const App: React.FC = () => {
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
     customCategories, customSubCategories, addCategory, removeCategory, addSubCategory, removeSubCategory,
+    addSubLocation, removeSubLocation,
     updateProfile, updateInventoryQty, updateInventoryItem, 
     addPriceRecord, addToList, toggleListItem, removeListItem, updateShoppingItem, overrideStoreForListItem,
     addToInventory, importBulkInventory, reorderStorageLocations,
@@ -99,6 +101,7 @@ const App: React.FC = () => {
             customCategories={customCategories}
             onUpdateQty={updateInventoryQty} onUpdateItem={updateInventoryItem}
             onAddToInventory={addToInventory} onBulkAdd={importBulkInventory} onAddToList={addToList}
+            onAddSubLocation={addSubLocation}
           />
         )}
         {activeTab === 'cellar' && (
@@ -143,12 +146,14 @@ const App: React.FC = () => {
             storageLocations={storageLocations} onStorageLocationsChange={setStorageLocations} subLocations={subLocations} onSubLocationsChange={setSubLocations}
             customCategories={customCategories} customSubCategories={customSubCategories}
             onAddCategory={addCategory} onRemoveCategory={removeCategory} onAddSubCategory={addSubCategory} onRemoveSubCategory={removeSubCategory}
+            onAddSubLocation={addSubLocation} onRemoveSubLocation={removeSubLocation}
             onReorderStorageLocations={reorderStorageLocations}
           />
         )}
       </main>
 
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} onAddClick={() => openAddModal('type')} />
+      <InstallPrompt />
       
       <div className="fixed bottom-24 right-4 z-40">
         {isQuickAddOpen && (

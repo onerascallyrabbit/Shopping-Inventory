@@ -269,6 +269,30 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         )}
       </section>
 
+      {/* Device & App Settings */}
+      <section className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
+        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Device & App</h3>
+        <button 
+          onClick={() => window.dispatchEvent(new CustomEvent('trigger-install-prompt'))}
+          className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors rounded-2xl border border-slate-100 group"
+        >
+          <div className="flex items-center space-x-4">
+            <div className="bg-indigo-100 p-2.5 rounded-xl text-indigo-600 group-hover:scale-110 transition-transform">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Add to Home Screen</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Create a shortcut on your phone</p>
+            </div>
+          </div>
+          <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </section>
+
       {/* Management Modals */}
       {isStorageModalOpen && (
         <StorageLocationsModal 

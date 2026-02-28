@@ -23,6 +23,8 @@ import identifyProductHandler from "./api/identify-product.js";
 import lookupMarketHandler from "./api/lookup-market.js";
 // @ts-ignore
 import searchStoreHandler from "./api/search-store.js";
+// @ts-ignore
+import parseVoiceInventoryHandler from "./api/parse-voice-inventory.js";
 
 dotenv.config();
 
@@ -47,7 +49,7 @@ app.use((req, _res, next) => {
 
 // API Routes mapped to handlers in /api folder
 app.all("/api/health", healthHandler);
-app.all("/api/kroger-auth", krogerAuthHandler);
+app.all("/api/kroger/auth", krogerAuthHandler);
 app.all("/api/kroger/locations", krogerLocationsHandler);
 app.all("/api/kroger/products", krogerProductsHandler);
 app.all("/api/kroger/coupons", krogerCouponsHandler);
@@ -56,6 +58,7 @@ app.all("/api/generate-meals", generateMealsHandler);
 app.all("/api/identify-product", identifyProductHandler);
 app.all("/api/lookup-market", lookupMarketHandler);
 app.all("/api/search-store", searchStoreHandler);
+app.all("/api/parse-voice-inventory", parseVoiceInventoryHandler);
 
 // 404 for API routes to prevent SPA fallback
 app.all("/api/*", (req, res) => {

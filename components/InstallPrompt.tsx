@@ -28,6 +28,12 @@ const InstallPrompt: React.FC = () => {
     };
 
     window.addEventListener('app-installable', handleInstallable);
+    
+    // Manual trigger for settings menu
+    const handleManualTrigger = () => {
+      setShowPrompt(true);
+    };
+    window.addEventListener('trigger-install-prompt', handleManualTrigger);
 
     // If it's iOS and not standalone, show prompt after a short delay
     if (isIOSDevice && !isStandaloneMode) {
@@ -37,10 +43,16 @@ const InstallPrompt: React.FC = () => {
           setShowPrompt(true);
         }
       }, 3000);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('trigger-install-prompt', handleManualTrigger);
+      };
     }
 
-    return () => window.removeEventListener('app-installable', handleInstallable);
+    return () => {
+      window.removeEventListener('app-installable', handleInstallable);
+      window.removeEventListener('trigger-install-prompt', handleManualTrigger);
+    };
   }, [isStandalone]);
 
   const handleInstallClick = async () => {

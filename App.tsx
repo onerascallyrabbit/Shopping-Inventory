@@ -43,7 +43,7 @@ const App: React.FC = () => {
   }, [profile?.defaultTab, hasSetDefaultTab]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [addModalMode, setAddModalMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('type');
+  const [addModalMode, setAddModalMode] = useState<'type' | 'barcode' | 'product' | 'tag' | 'voice'>('type');
   const [lastUsedStore, setLastUsedStore] = useState<string>('');
 
   useEffect(() => {
@@ -60,7 +60,7 @@ const App: React.FC = () => {
     return () => document.removeEventListener('openAddModal', handleOpenAddModal);
   }, []);
 
-  const openAddModal = (mode: 'type' | 'barcode' | 'product' | 'tag' = 'type') => {
+  const openAddModal = (mode: 'type' | 'barcode' | 'product' | 'tag' | 'voice' = 'type') => {
     setAddModalMode(mode);
     setIsAddModalOpen(true);
   };
@@ -159,6 +159,7 @@ const App: React.FC = () => {
         {isQuickAddOpen && (
           <div className="absolute bottom-20 right-0 space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
             {[
+              { id: 'voice', label: 'Voice Add', icon: 'M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z', color: 'bg-indigo-600', action: () => openAddModal('voice') },
               { id: 'track', label: 'Track Price', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6', color: 'bg-indigo-600', action: () => openAddModal('type') },
               { id: 'inventory', label: 'Add to Stock', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4', color: 'bg-emerald-600', action: () => setActiveTab('inventory') },
               { id: 'cellar', label: 'Add to Cellar', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253', color: 'bg-amber-600', action: () => setActiveTab('cellar') },
@@ -198,10 +199,12 @@ const App: React.FC = () => {
             setIsAddModalOpen(false); 
           }} 
           onSaveToList={addToList} 
+          onAddToInventory={addToInventory}
           onProfileChange={updateProfile}
           initialMode={addModalMode}
           products={products} location={profile.locationLabel} savedStores={stores} lastUsedStore={lastUsedStore}
           customCategories={customCategories} customSubCategories={customSubCategories}
+          storageLocations={storageLocations} subLocations={subLocations}
           profile={profile}
         />
       )}

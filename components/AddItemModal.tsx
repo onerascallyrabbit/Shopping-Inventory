@@ -1,36 +1,41 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { PriceRecord, Product, StoreLocation, CustomCategory, CustomSubCategory, Profile } from '../types';
+import { PriceRecord, Product, StoreLocation, CustomCategory, CustomSubCategory, Profile, InventoryItem, StorageLocation, SubLocation } from '../types';
 import { identifyProductFromImage } from '../services/geminiService';
 import { lookupKrogerProduct, compareKrogerPrices } from '../services/krogerService';
 import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
 import { Html5Qrcode } from "html5-qrcode";
 
+import VoiceInventoryAdd from './VoiceInventoryAdd';
+
 interface AddItemModalProps {
   onClose: () => void;
   onSubmit: (category: string, itemName: string, variety: string, record: Omit<PriceRecord, 'id' | 'date'>, brand?: string, barcode?: string, subCategory?: string, origin?: string, grade?: string, style?: string, notes?: string, unitSize?: number, unitMeasure?: string, container?: string) => void;
   onSaveToList: (name: string, qty: number, unit: string) => void;
+  onAddToInventory?: (item: Partial<InventoryItem>) => void;
   onProfileChange?: (updates: Partial<Profile>) => void;
-  initialMode?: 'type' | 'barcode' | 'product' | 'tag';
+  initialMode?: 'type' | 'barcode' | 'product' | 'tag' | 'voice';
   products: Product[];
   location?: string;
   savedStores: StoreLocation[];
   lastUsedStore?: string;
   customCategories: CustomCategory[];
   customSubCategories: CustomSubCategory[];
+  storageLocations: StorageLocation[];
+  subLocations: SubLocation[];
   profile: Profile;
 }
 
 const AddItemModal: React.FC<AddItemModalProps> = ({ 
-  onClose, onSubmit, products, initialMode = 'type', savedStores, lastUsedStore,
-  customCategories, customSubCategories, profile, onProfileChange
+  onClose, onSubmit, onAddToInventory, products, initialMode = 'type', savedStores, lastUsedStore,
+  customCategories, customSubCategories, storageLocations, subLocations, profile, onProfileChange
 }) => {
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState<string | null>(null);
-  const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag'>('type');
+  const [inputMode, setInputMode] = useState<'type' | 'barcode' | 'product' | 'tag' | 'voice'>('type');
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [formData, setFormData] = useState({
-    category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc', unitSize: '', unitMeasure: 'oz', container: '', origin: '', grade: '', style: '', notes: ''
+    category: 'Produce', subCategory: '', itemName: '', variety: '', brand: '', barcode: '', store: lastUsedStore || '', price: '', quantity: '1', unit: 'pc', unitSize: '', unitMeasure: 'oz', container: '', origin: '', grade: '', style: '', notes: '', subLocation: ''
   });
   const [comparisonResults, setComparisonResults] = useState<any[]>([]);
   const [showComparison, setShowComparison] = useState(false);
@@ -41,7 +46,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
   // Default to manual entry
   useEffect(() => {
     if (initialMode && initialMode !== 'tag') {
-      setInputMode(initialMode);
+      setInputMode(initialMode as any);
     } else {
       setInputMode('type');
     }
@@ -190,7 +195,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
         setImage(base64);
         setLoading(true);
         try {
-          const analyzed = await identifyProductFromImage(base64, inputMode === 'type' ? 'tag' : inputMode);
+          const analyzed = await identifyProductFromImage(base64, (inputMode === 'type' || inputMode === 'voice') ? 'tag' : inputMode);
           if (analyzed) {
             setFormData(prev => ({
               ...prev,
@@ -263,14 +268,14 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
           <div className="flex bg-slate-100 p-1 rounded-2xl">
-              {(['type', 'product', 'barcode'] as const).map(mode => (
+              {(['type', 'product', 'barcode', 'voice'] as const).map(mode => (
                 <button 
                   key={mode} 
                   type="button"
                   onClick={() => setInputMode(mode)} 
-                  className={`px-4 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${inputMode === mode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`px-3 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${inputMode === mode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                 >
-                  {mode === 'type' ? 'Manual' : mode === 'product' ? 'Photo' : 'UPC'}
+                  {mode === 'type' ? 'Manual' : mode === 'product' ? 'Photo' : mode === 'barcode' ? 'UPC' : 'Voice'}
                 </button>
               ))}
           </div>
@@ -278,7 +283,35 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {showComparison && comparisonResults.length > 0 && (
+          {inputMode === 'voice' ? (
+            <VoiceInventoryAdd 
+              storageLocations={storageLocations}
+              subLocations={subLocations}
+              onItemParsed={(item) => {
+                if (onAddToInventory) {
+                  onAddToInventory(item);
+                  onClose();
+                } else {
+                  // Fallback to manual form if onAddToInventory not provided
+                  setFormData(prev => ({
+                    ...prev,
+                    itemName: item.itemName || prev.itemName,
+                    category: item.category || prev.category,
+                    variety: item.variety || prev.variety,
+                    brand: item.brand || prev.brand,
+                    quantity: item.quantity?.toString() || prev.quantity,
+                    unit: item.unit || prev.unit,
+                    unitSize: item.unitSize?.toString() || prev.unitSize || '',
+                    unitMeasure: item.unitMeasure || prev.unitMeasure,
+                    subLocation: item.subLocation || prev.subLocation || ''
+                  }));
+                  setInputMode('type');
+                }
+              }}
+            />
+          ) : (
+            <>
+              {showComparison && comparisonResults.length > 0 && (
             <div className="bg-indigo-600 rounded-[32px] p-6 text-white space-y-4 animate-in zoom-in-95">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-black uppercase tracking-widest">Nearby Store Prices</h4>
@@ -479,6 +512,8 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
               Log Price Entry
             </button>
           </form>
+          </>
+          )}
         </div>
       </div>
     </div>

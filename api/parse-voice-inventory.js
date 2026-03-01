@@ -27,7 +27,9 @@ Rules:
 - Infer category from product (ketchup=Pantry, beef=Meat, milk=Dairy).
 - If brand not mentioned, leave empty.
 - Convert spoken numbers to digits (three = 3, two = 2).
-- Handle various phrasings: "put in", "add to", "store in".`;
+- Handle various phrasings: "put in", "add to", "store in".
+- For unitMeasure, extract strings like "18-count", "12-ounce", "2-pound", etc.
+- For container, extract strings like "carton", "can", "bottle", "package", "bag", etc.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -44,8 +46,9 @@ Rules:
               variety: { type: Type.STRING, description: "type/flavor if mentioned" },
               quantity: { type: Type.NUMBER },
               unit: { type: Type.STRING, description: "bottles|lbs|oz|each|packages|etc" },
-              unitSize: { type: Type.NUMBER, description: "if size mentioned like '12oz'" },
-              unitMeasure: { type: Type.STRING, description: "oz|ml|lb|g (if size mentioned)" },
+              unitSize: { type: Type.NUMBER, description: "if size mentioned like '12oz', this is 12" },
+              unitMeasure: { type: Type.STRING, description: "the full measure string like '12-ounce' or '18-count'" },
+              container: { type: Type.STRING, description: "carton|can|bottle|package|etc" },
               category: { type: Type.STRING, description: "best matching category" },
               locationId: { type: Type.STRING, description: "The ID of the matched location" },
               subLocation: { type: Type.STRING, description: "shelf/drawer name if mentioned" }

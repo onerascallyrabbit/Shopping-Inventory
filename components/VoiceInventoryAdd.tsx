@@ -22,7 +22,7 @@ export default function VoiceInventoryAdd({
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [parsedItem, setParsedItem] = useState<any>(null);
+  const [parsedItems, setParsedItems] = useState<any[]>([]);
 
   // Use Web Speech API for voice recognition
   const startListening = () => {
@@ -40,7 +40,7 @@ export default function VoiceInventoryAdd({
     recognition.onstart = () => {
       setIsListening(true);
       setTranscript('');
-      setParsedItem(null);
+      setParsedItems([]);
     };
     
     recognition.onresult = async (event: any) => {
@@ -80,7 +80,7 @@ export default function VoiceInventoryAdd({
 
       if (!response.ok) throw new Error('Failed to parse voice command');
       const parsed = await response.json();
-      setParsedItem(parsed);
+      setParsedItems(Array.isArray(parsed) ? parsed : [parsed]);
     } catch (error) {
       console.error('Parse error:', error);
       alert('Could not understand command. Please try again.');
@@ -90,11 +90,15 @@ export default function VoiceInventoryAdd({
   };
 
   const confirmAndAdd = () => {
-    if (parsedItem) {
-      onItemParsed(parsedItem);
-      setParsedItem(null);
+    if (parsedItems.length > 0) {
+      parsedItems.forEach(item => onItemParsed(item));
+      setParsedItems([]);
       setTranscript('');
     }
+  };
+
+  const removeItem = (index: number) => {
+    setParsedItems(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -140,7 +144,7 @@ export default function VoiceInventoryAdd({
             </div>
             <div className="text-center">
               <span className="block text-sm font-black uppercase tracking-[0.1em]">Tap to Speak</span>
-              <span className="text-[10px] opacity-60 font-bold uppercase tracking-widest mt-1 block">Add to stock naturally</span>
+              <span className="text-[10px] opacity-60 font-bold uppercase tracking-widest mt-1 block">Add multiple items at once</span>
             </div>
           </div>
         )}
@@ -154,79 +158,84 @@ export default function VoiceInventoryAdd({
         </div>
       )}
 
-      {/* Show parsed result for confirmation */}
-      {parsedItem && (
-        <div className="bg-white rounded-[32px] p-6 border-2 border-indigo-100 shadow-2xl space-y-5 animate-in zoom-in-95 duration-300">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <h4 className="text-lg font-black text-slate-900 truncate uppercase tracking-tight">{parsedItem.itemName}</h4>
-              {parsedItem.brand && (
-                <p className="text-[11px] text-indigo-500 font-black uppercase tracking-widest mt-0.5">{parsedItem.brand}</p>
-              )}
-            </div>
-            <div className="text-right ml-4">
-              <p className="text-2xl font-black text-indigo-600 leading-none">
-                {parsedItem.quantity}
-              </p>
-              <p className="text-[10px] font-black text-indigo-300 uppercase mt-1">{parsedItem.unit}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-slate-50 p-3 rounded-2xl">
-              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Category</p>
-              <p className="text-[11px] text-slate-900 font-black uppercase">{parsedItem.category}</p>
-            </div>
-            {parsedItem.variety && (
-              <div className="bg-slate-50 p-3 rounded-2xl">
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Variety</p>
-                <p className="text-[11px] text-slate-900 font-black uppercase">{parsedItem.variety}</p>
-              </div>
-            )}
-            <div className="bg-slate-50 p-3 rounded-2xl">
-              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Location</p>
-              <p className="text-[11px] text-slate-900 font-black uppercase">
-                {storageLocations.find(l => l.id === parsedItem.locationId)?.name || 'Unknown'}
-              </p>
-            </div>
-            {parsedItem.subLocation && (
-              <div className="bg-slate-50 p-3 rounded-2xl">
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Shelf</p>
-                <p className="text-[11px] text-slate-900 font-black uppercase">{parsedItem.subLocation}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <button
-              onClick={() => {
-                setParsedItem(null);
-                setTranscript('');
-              }}
-              className="py-4 bg-slate-100 text-slate-500 rounded-[20px] font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-colors"
+      {/* Show parsed results for confirmation */}
+      {parsedItems.length > 0 && (
+        <div className="space-y-4 animate-in zoom-in-95 duration-300">
+          <div className="flex items-center justify-between px-2">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Confirm Items ({parsedItems.length})</h4>
+            <button 
+              onClick={() => { setParsedItems([]); setTranscript(''); }}
+              className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:text-rose-600"
             >
-              Cancel
+              Clear All
             </button>
+          </div>
+
+          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+            {parsedItems.map((item, idx) => (
+              <div key={idx} className="bg-white rounded-[28px] p-5 border-2 border-indigo-50 shadow-sm relative group">
+                <button 
+                  onClick={() => removeItem(idx)}
+                  className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1 min-w-0 pr-6">
+                    <h4 className="text-base font-black text-slate-900 truncate uppercase tracking-tight">{item.itemName}</h4>
+                    {item.brand && (
+                      <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest mt-0.5">{item.brand}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-indigo-600 leading-none">{item.quantity}</p>
+                    <p className="text-[9px] font-black text-indigo-300 uppercase mt-1">{item.unit}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 p-2.5 rounded-xl">
+                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Category</p>
+                    <p className="text-[10px] text-slate-900 font-black uppercase truncate">{item.category}</p>
+                  </div>
+                  <div className="bg-slate-50 p-2.5 rounded-xl">
+                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Location</p>
+                    <p className="text-[10px] text-slate-900 font-black uppercase truncate">
+                      {storageLocations.find(l => l.id === item.locationId)?.name || 'Unknown'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="pt-2">
             <button
               onClick={confirmAndAdd}
-              className="py-4 bg-emerald-500 text-white rounded-[20px] font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-colors"
+              className="w-full py-5 bg-emerald-500 text-white rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-emerald-100 hover:bg-emerald-600 transition-all active:scale-95 flex items-center justify-center space-x-3"
             >
-              Add to Stock
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Confirm & Add All</span>
             </button>
           </div>
         </div>
       )}
 
       {/* Example commands */}
-      {!parsedItem && !isListening && !isProcessing && (
+      {parsedItems.length === 0 && !isListening && !isProcessing && (
         <div className="bg-indigo-50/50 rounded-[28px] p-5 border border-indigo-100/50">
           <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.15em] mb-3 px-1">Try saying:</p>
           <div className="space-y-2">
             {[
-              "Add 3 bottles of Heinz ketchup to pantry 2",
-              "Two pounds of ground beef in freezer one",
-              "Sharp cheddar one block in cheese drawer",
-              "Five Roma tomatoes in the fridge"
+              "Add 3 18-count eggs and 2 12-count eggs to the fridge",
+              "Add 3 4oz and 8 12oz cans of tomato sauce to pantry",
+              "Two pounds of chicken and one block of cheese in fridge",
+              "Put 5 apples and 10 oranges in the fruit bowl"
             ].map((ex, i) => (
               <div key={i} className="flex items-start space-x-2 text-[11px] font-bold text-slate-500 italic">
                 <span className="text-indigo-300 mt-0.5">•</span>

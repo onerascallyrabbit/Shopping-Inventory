@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { StorageLocation, SubLocation, InventoryItem } from '../types';
+import { DEFAULT_CATEGORIES, UNITS, CONTAINER_TYPES } from '../constants';
 
 interface VoiceInventoryAddProps {
   storageLocations: StorageLocation[];
@@ -59,20 +60,18 @@ export default function VoiceInventoryAdd({
     };
     
     recognition.onresult = (event: any) => {
-      let finalTranscript = '';
+      let final = '';
       let interim = '';
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
+      for (let i = 0; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
+          final += (final ? ' ' : '') + event.results[i][0].transcript;
         } else {
           interim += event.results[i][0].transcript;
         }
       }
 
-      if (finalTranscript) {
-        setTranscript(prev => prev + (prev ? ' ' : '') + finalTranscript);
-      }
+      setTranscript(final);
       setInterimTranscript(interim);
     };
 
@@ -145,6 +144,14 @@ export default function VoiceInventoryAdd({
 
   const removeItem = (index: number) => {
     setParsedItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, updates: any) => {
+    setParsedItems(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...updates };
+      return next;
+    });
   };
 
   return (
@@ -220,54 +227,126 @@ export default function VoiceInventoryAdd({
             </button>
           </div>
 
-          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
             {parsedItems.map((item, idx) => (
-              <div key={idx} className="bg-white rounded-[28px] p-5 border-2 border-indigo-50 shadow-sm relative group">
+              <div key={idx} className="bg-white rounded-[28px] p-6 border-2 border-indigo-50 shadow-sm relative group space-y-4">
                 <button 
                   onClick={() => removeItem(idx)}
-                  className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 transition-colors"
+                  className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 transition-colors z-10"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
 
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1 min-w-0 pr-6">
-                    <h4 className="text-base font-black text-slate-900 truncate uppercase tracking-tight">{item.itemName}</h4>
-                    {item.brand && (
-                      <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest mt-0.5">{item.brand}</p>
-                    )}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-2">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Name</label>
+                    <input 
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all" 
+                      value={item.itemName || ''} 
+                      onChange={(e) => updateItem(idx, { itemName: e.target.value })}
+                    />
                   </div>
-                  <div className="text-right">
-                    <p className="text-xl font-black text-indigo-600 leading-none">{item.quantity}</p>
-                    <p className="text-[9px] font-black text-indigo-300 uppercase mt-1">{item.unit}</p>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-50 p-2.5 rounded-xl">
-                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Category</p>
-                    <p className="text-[10px] text-slate-900 font-black uppercase truncate">{item.category}</p>
-                  </div>
-                  <div className="bg-slate-50 p-2.5 rounded-xl">
-                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Location</p>
-                    <p className="text-[10px] text-slate-900 font-black uppercase truncate">
-                      {storageLocations.find(l => l.id === item.locationId)?.name || 'Unknown'}
-                    </p>
-                  </div>
-                  {item.unitMeasure && (
-                    <div className="bg-slate-50 p-2.5 rounded-xl">
-                      <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Measure</p>
-                      <p className="text-[10px] text-slate-900 font-black uppercase truncate">{item.unitMeasure}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Brand</label>
+                      <input 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all" 
+                        value={item.brand || ''} 
+                        onChange={(e) => updateItem(idx, { brand: e.target.value })}
+                        placeholder="None"
+                      />
                     </div>
-                  )}
-                  {item.container && (
-                    <div className="bg-slate-50 p-2.5 rounded-xl">
-                      <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Container</p>
-                      <p className="text-[10px] text-slate-900 font-black uppercase truncate">{item.container}</p>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Variety</label>
+                      <input 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all" 
+                        value={item.variety || ''} 
+                        onChange={(e) => updateItem(idx, { variety: e.target.value })}
+                        placeholder="None"
+                      />
                     </div>
-                  )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Qty</label>
+                      <input 
+                        type="number"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all" 
+                        value={item.quantity || 0} 
+                        onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit</label>
+                      <select 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all appearance-none" 
+                        value={item.unit || 'pc'} 
+                        onChange={(e) => updateItem(idx, { unit: e.target.value })}
+                      >
+                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
+                      <select 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all appearance-none" 
+                        value={item.category || 'Other'} 
+                        onChange={(e) => updateItem(idx, { category: e.target.value })}
+                      >
+                        {DEFAULT_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Location</label>
+                      <select 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all appearance-none" 
+                        value={item.locationId || ''} 
+                        onChange={(e) => updateItem(idx, { locationId: e.target.value })}
+                      >
+                        <option value="">Select Location</option>
+                        {storageLocations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Measure</label>
+                      <input 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all" 
+                        value={item.unitMeasure || ''} 
+                        onChange={(e) => updateItem(idx, { unitMeasure: e.target.value })}
+                        placeholder="e.g. 18-count"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Container</label>
+                      <select 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all appearance-none" 
+                        value={item.container || ''} 
+                        onChange={(e) => updateItem(idx, { container: e.target.value })}
+                      >
+                        <option value="">None</option>
+                        {CONTAINER_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Shelf/Sub</label>
+                      <input 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all" 
+                        value={item.subLocation || ''} 
+                        onChange={(e) => updateItem(idx, { subLocation: e.target.value })}
+                        placeholder="None"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -296,7 +375,8 @@ export default function VoiceInventoryAdd({
               "Add 3 18-count eggs and 2 12-count eggs to the fridge",
               "Add 3 4oz and 8 12oz cans of tomato sauce to pantry",
               "Two pounds of chicken and one block of cheese in fridge",
-              "Put 5 apples and 10 oranges in the fruit bowl"
+              "Put 5 apples and 10 oranges in the fruit bowl",
+              "Three eighteen count eggs in the fridge"
             ].map((ex, i) => (
               <div key={i} className="flex items-start space-x-2 text-[11px] font-bold text-slate-500 italic">
                 <span className="text-indigo-300 mt-0.5">•</span>

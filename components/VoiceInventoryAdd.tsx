@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { StorageLocation, SubLocation, InventoryItem } from '../types';
 
 interface VoiceInventoryAddProps {
   storageLocations: StorageLocation[];
   subLocations: SubLocation[];
   onItemParsed: (item: Omit<InventoryItem, 'id' | 'updatedAt' | 'userId'>) => void;
+  autoStart?: boolean;
 }
 
 declare global {
@@ -17,12 +18,24 @@ declare global {
 export default function VoiceInventoryAdd({ 
   storageLocations, 
   subLocations, 
-  onItemParsed 
+  onItemParsed,
+  autoStart = false
 }: VoiceInventoryAddProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [parsedItems, setParsedItems] = useState<any[]>([]);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (autoStart) {
+      const timer = setTimeout(() => {
+        startListening();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [autoStart]);
 
   // Use Web Speech API for voice recognition
   const startListening = () => {
@@ -33,31 +46,64 @@ export default function VoiceInventoryAdd({
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = 'en-US';
+    recognitionRef.current = recognition;
 
     recognition.onstart = () => {
       setIsListening(true);
       setTranscript('');
+      setInterimTranscript('');
       setParsedItems([]);
     };
     
-    recognition.onresult = async (event: any) => {
-      const spokenText = event.results[0][0].transcript;
-      setTranscript(spokenText);
-      setIsListening(false);
-      await parseVoiceCommand(spokenText);
+    recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      let interim = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+
+      if (finalTranscript) {
+        setTranscript(prev => prev + (prev ? ' ' : '') + finalTranscript);
+      }
+      setInterimTranscript(interim);
     };
 
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
-      setIsListening(false);
+      if (event.error !== 'no-speech') {
+        setIsListening(false);
+      }
     };
 
-    recognition.onend = () => setIsListening(false);
+    recognition.onend = () => {
+      // Don't auto-process if we're in continuous mode, 
+      // let the user stop it manually or handle it here.
+      // But user said "it cuts off listening too soon", 
+      // so continuous=true helps.
+    };
 
     recognition.start();
+  };
+
+  const stopListening = async () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      
+      // Combine final and interim if any
+      const fullText = (transcript + ' ' + interimTranscript).trim();
+      if (fullText) {
+        await parseVoiceCommand(fullText);
+      }
+    }
   };
 
   const parseVoiceCommand = async (spokenText: string) => {
@@ -105,8 +151,8 @@ export default function VoiceInventoryAdd({
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Voice Input Button */}
       <button
-        onClick={startListening}
-        disabled={isListening || isProcessing}
+        onClick={isListening ? stopListening : startListening}
+        disabled={isProcessing}
         className={`w-full p-8 rounded-[32px] transition-all relative overflow-hidden group ${
           isListening 
             ? 'bg-red-500 shadow-xl shadow-red-100' 
@@ -127,7 +173,7 @@ export default function VoiceInventoryAdd({
                 <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
               </svg>
             </div>
-            <span className="text-xs font-black uppercase tracking-[0.2em]">Listening...</span>
+            <span className="text-xs font-black uppercase tracking-[0.2em]">Tap to Stop</span>
           </div>
         ) : isProcessing ? (
           <div className="flex flex-col items-center space-y-3 text-white relative z-10">
@@ -151,10 +197,13 @@ export default function VoiceInventoryAdd({
       </button>
 
       {/* Show transcript */}
-      {transcript && (
+      {(transcript || interimTranscript) && (
         <div className="bg-slate-50 rounded-[24px] p-5 border border-slate-100 animate-in slide-in-from-top-2">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">You said:</p>
-          <p className="text-sm text-slate-700 font-bold italic leading-relaxed">"{transcript}"</p>
+          <p className="text-sm text-slate-700 font-bold italic leading-relaxed">
+            "{transcript}"
+            {interimTranscript && <span className="opacity-40"> {interimTranscript}</span>}
+          </p>
         </div>
       )}
 
@@ -207,6 +256,18 @@ export default function VoiceInventoryAdd({
                       {storageLocations.find(l => l.id === item.locationId)?.name || 'Unknown'}
                     </p>
                   </div>
+                  {item.unitMeasure && (
+                    <div className="bg-slate-50 p-2.5 rounded-xl">
+                      <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Measure</p>
+                      <p className="text-[10px] text-slate-900 font-black uppercase truncate">{item.unitMeasure}</p>
+                    </div>
+                  )}
+                  {item.container && (
+                    <div className="bg-slate-50 p-2.5 rounded-xl">
+                      <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Container</p>
+                      <p className="text-[10px] text-slate-900 font-black uppercase truncate">{item.container}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

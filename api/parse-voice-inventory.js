@@ -27,6 +27,7 @@ Rules:
 - Infer category from product (ketchup=Pantry, beef=Meat, milk=Dairy).
 - If brand not mentioned, leave empty.
 - Convert spoken numbers to digits (three = 3, two = 2).
+- Handle quantity vs unit count ambiguity: If someone says "three eighteen count eggs", the quantity is 3 and the unitMeasure is "18-count". Do NOT combine them into "318".
 - Handle various phrasings: "put in", "add to", "store in".
 - For unitMeasure, extract strings like "18-count", "12-ounce", "2-pound", etc.
 - For container, extract strings like "carton", "can", "bottle", "package", "bag", etc.`;

@@ -287,6 +287,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
             <VoiceInventoryAdd 
               storageLocations={storageLocations}
               subLocations={subLocations}
+              autoStart={true}
               onItemParsed={(item) => {
                 if (onAddToInventory) {
                   onAddToInventory(item);

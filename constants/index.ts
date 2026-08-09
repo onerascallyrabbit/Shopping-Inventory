@@ -1,5 +1,13 @@
 
-import { StorageLocation } from '../types';
+import { StorageLocation, Product, PriceRecord } from '../types';
+
+export const getFullName = (p: Product): string => `${p.itemName}${p.variety ? ` (${p.variety})` : ''}`;
+
+export const getBestPriceRecord = (history: PriceRecord[] | undefined): PriceRecord | undefined => {
+  if (!history || history.length === 0) return undefined;
+  return [...history].sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity))[0];
+};
+
 
 export const DEFAULT_CATEGORIES = [
   "Produce", "Dairy", "Meat", "Seafood", "Deli", "Bakery", 

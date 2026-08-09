@@ -6,6 +6,7 @@ interface KrogerProductDetailsModalProps {
   profile: Profile;
   onClose: () => void;
   onConfirm: (product: any) => void;
+  onProfileChange: (updates: Partial<Profile>) => void;
 }
 
 const KrogerProductDetailsModal: React.FC<KrogerProductDetailsModalProps> = ({ 

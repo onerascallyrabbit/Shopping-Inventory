@@ -61,7 +61,7 @@ app.all("/api/search-store", searchStoreHandler);
 app.all("/api/parse-voice-inventory", parseVoiceInventoryHandler);
 
 // 404 for API routes to prevent SPA fallback
-app.all("/api/:path*", (req, res) => {
+app.all(/^\/api\//, (req, res) => {
   console.warn(`[API] 404 Not Found: ${req.method} ${req.path}`);
   res.status(404).json({ error: "API route not found" });
 });
@@ -76,7 +76,7 @@ async function startServer() {
       app.use(vite.middlewares);
     } else {
       app.use(express.static("dist"));
-      app.get("/:path*", (_req, res) => {
+      app.get(/.*/, (_req, res) => {
         res.sendFile("dist/index.html", { root: "." });
       });
     }

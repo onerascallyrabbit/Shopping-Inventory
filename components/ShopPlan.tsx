@@ -2,6 +2,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ShoppingItem, Product, StoreLocation, Vehicle, StorageLocation, SubLocation, InventoryItem } from '../types';
 import StockPurchasedModal from './StockPurchasedModal';
+import { getBestPriceRecord } from '../constants';
+import { getDistance } from '../utils.geo';
 
 interface ShopPlanProps {
   items: ShoppingItem[];
@@ -17,18 +19,6 @@ interface ShopPlanProps {
   onOverrideStore: (id: string, store: string | undefined) => void;
   onAddToInventory: (item: Partial<InventoryItem>) => void;
 }
-
-const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 3958.8; // Miles
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
 
 const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, activeVehicleId, gasPrice, storageLocations, subLocations, onToggle, onRemove, onOverrideStore, onAddToInventory }) => {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -64,8 +54,8 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
                         products.find(p => p.itemName.toLowerCase() === item.name.toLowerCase());
 
         if (product && product.history.length > 0) {
-          const best = [...product.history].sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity))[0];
-          targetStore = best.store;
+          const best = getBestPriceRecord(product.history);
+          if (best) targetStore = best.store;
         }
       }
 
@@ -106,8 +96,9 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
     const currentStore = item.manualStore || Object.keys(groupedByStore).find(k => groupedByStore[k].some(i => i.id === item.id));
     
     const record = product.history.find(h => h.store === currentStore) || 
-                   [...product.history].sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity))[0];
-                 
+                   getBestPriceRecord(product.history);
+                  
+    if (!record) return null;
     return (record.price / record.quantity) * item.neededQuantity;
   };
 
@@ -166,8 +157,6 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
         {sortedStoreNames.map(storeName => {
           const distance = storeDistances[storeName];
           const fuel = distance ? getFuelEstimate(distance) : null;
-          const displayDistance = distance ? distance.toFixed(1) : "2.4"; 
-          const displayFuel = fuel !== null ? fuel.toFixed(2) : "0.45";
 
           return (
             <section 
@@ -185,11 +174,11 @@ const ShopPlan: React.FC<ShopPlanProps> = ({ items, products, stores, vehicles, 
                   <div className="flex items-center space-x-2">
                     <div className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border ${distance !== undefined ? 'bg-white border-slate-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                       <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                      <span className="text-[10px] font-black text-slate-600 tracking-tight">{displayDistance} <span className="text-slate-400 font-bold">mi</span></span>
+                      <span className="text-[10px] font-black text-slate-600 tracking-tight">{distance !== undefined ? `${distance.toFixed(1)}` : 'unknown'} <span className="text-slate-400 font-bold">mi</span></span>
                     </div>
                     <div className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border ${distance !== undefined ? 'bg-white border-indigo-50' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                       <svg className="w-3 h-3 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                      <span className="text-[10px] font-black text-indigo-600 tracking-tight">${displayFuel} <span className="text-indigo-300 font-bold">gas</span></span>
+                      <span className="text-[10px] font-black text-indigo-600 tracking-tight">{fuel !== null ? `$${fuel.toFixed(2)}` : 'unknown'} <span className="text-indigo-300 font-bold">gas</span></span>
                     </div>
                   </div>
                 </div>

@@ -1,14 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Product } from '../types';
 import { lookupMarketDetails } from '../services/geminiService';
+import { UNITS, getFullName, getBestPriceRecord } from '../constants';
 
 interface ItemBrowserProps {
   products: Product[];
   categoryOrder: string[];
   onAddToList: (name: string, qty: number, unit: string, productId?: string) => void;
 }
-
-const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
 
 const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAddToList }) => {
   const [search, setSearch] = useState('');
@@ -45,8 +44,6 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
     }));
   };
 
-  const getFullName = (p: Product) => `${p.itemName}${p.variety ? ` (${p.variety})` : ''}`;
-
   return (
     <div className="space-y-4">
       <div className="relative">
@@ -77,9 +74,19 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
       )}
 
       <div className="space-y-2">
+        {filteredProducts.length === 0 && (
+          <div className="w-full py-10 flex flex-col items-center justify-center bg-slate-50 rounded-[24px] border border-dashed border-slate-200 text-slate-400">
+            <svg className="w-8 h-8 opacity-20 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <p className="text-[9px] font-black uppercase tracking-widest">
+              {products.length === 0 ? 'No items tracked yet. Log your first price from the Track tab.' : 'No items match your search.'}
+            </p>
+          </div>
+        )}
         {filteredProducts.map(product => {
           const isExpanded = expandedProductId === product.id;
-          const best = [...product.history].sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity))[0];
+          const best = getBestPriceRecord(product.history);
           const genericImg = `https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=120&h=120&grocery,${product.itemName}`;
           const uniqueStoresCount = new Set(product.history.map(h => h.store)).size;
           const marketData = marketInfo[product.id];
@@ -89,7 +96,7 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
               <div 
                 onClick={() => {
                   if (!isExpanded) {
-                    setListUnit(best.unit === 'lb' ? 'pc' : best.unit);
+                    setListUnit(best?.unit === 'lb' ? 'pc' : best?.unit || 'pc');
                     setListQty('1');
                   }
                   setExpandedProductId(isExpanded ? null : product.id);
@@ -97,7 +104,7 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
                 className="p-3 flex items-center space-x-3 cursor-pointer"
               >
                 <div className="w-10 h-10 rounded-xl bg-slate-50 overflow-hidden shrink-0 border border-slate-50">
-                  <img src={best.image || genericImg} alt="" className="w-full h-full object-cover opacity-90" />
+                  <img src={best?.image || genericImg} alt="" className="w-full h-full object-cover opacity-90" />
                 </div>
                 <div className="flex-1 min-w-0 pr-2">
                   <div className="flex items-center space-x-2">
@@ -110,7 +117,7 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
                   </div>
                   <div className="flex items-center space-x-2 mt-0.5">
                     <p className="text-[10px] font-bold text-emerald-600 truncate">
-                      ${best.price.toFixed(2)}/{best.quantity}{best.unit}
+                      {best ? `$${best.price.toFixed(2)}/${best.quantity}${best.unit}` : 'No prices yet'}
                     </p>
                     {product.subCategory && (
                       <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">• {product.subCategory}</span>
@@ -129,7 +136,7 @@ const ItemBrowser: React.FC<ItemBrowserProps> = ({ products, categoryOrder, onAd
                   <div className="bg-slate-50 p-4 rounded-3xl space-y-3">
                     <div className="flex items-center justify-between px-1">
                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Add to Trip List</span>
-                       <span className="text-[8px] font-bold text-slate-300 uppercase">Unit recorded: {best.unit}</span>
+                       <span className="text-[8px] font-bold text-slate-300 uppercase">Unit recorded: {best?.unit || '-'}</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <input 

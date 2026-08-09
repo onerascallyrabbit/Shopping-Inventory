@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StorageLocation, SubLocation } from '../types';
 import { syncStorageLocation, deleteStorageLocation, syncSubLocation, deleteSubLocation } from '../services/supabaseService';
+import { confirmAction } from '../services/notifications';
 
 interface StorageLocationsModalProps {
   user: any;
@@ -59,7 +60,7 @@ const StorageLocationsModal: React.FC<StorageLocationsModalProps> = ({
   };
 
   const handleDeleteLocation = async (loc: StorageLocation) => {
-    if (!confirm(`Delete ${loc.name}? This will affect items stored here.`)) return;
+    if (!(await confirmAction(`Delete ${loc.name}? This will affect items stored here.`))) return;
     const updated = localLocations.filter(l => l.id !== loc.id);
     setLocalLocations(updated);
     onStorageLocationsChange(updated);

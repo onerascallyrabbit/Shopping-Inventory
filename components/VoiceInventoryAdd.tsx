@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { StorageLocation, SubLocation, InventoryItem } from '../types';
 import { DEFAULT_CATEGORIES, UNITS, CONTAINER_TYPES } from '../constants';
+import { showToast } from '../services/notifications';
 
 interface VoiceInventoryAddProps {
   storageLocations: StorageLocation[];
@@ -38,11 +39,24 @@ export default function VoiceInventoryAdd({
     }
   }, [autoStart]);
 
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // ignore
+        }
+        recognitionRef.current = null;
+      }
+    };
+  }, []);
+
   // Use Web Speech API for voice recognition
   const startListening = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert('Speech recognition not supported in this browser');
+      showToast('Speech recognition is not supported in this browser.', 'error');
       return;
     }
 
@@ -83,10 +97,7 @@ export default function VoiceInventoryAdd({
     };
 
     recognition.onend = () => {
-      // Don't auto-process if we're in continuous mode, 
-      // let the user stop it manually or handle it here.
-      // But user said "it cuts off listening too soon", 
-      // so continuous=true helps.
+      setIsListening(false);
     };
 
     recognition.start();
@@ -128,7 +139,7 @@ export default function VoiceInventoryAdd({
       setParsedItems(Array.isArray(parsed) ? parsed : [parsed]);
     } catch (error) {
       console.error('Parse error:', error);
-      alert('Could not understand command. Please try again.');
+      showToast('Could not understand command. Please try again.', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -136,9 +147,11 @@ export default function VoiceInventoryAdd({
 
   const confirmAndAdd = () => {
     if (parsedItems.length > 0) {
+      const count = parsedItems.length;
       parsedItems.forEach(item => onItemParsed(item));
       setParsedItems([]);
       setTranscript('');
+      showToast(`${count} item${count === 1 ? '' : 's'} added to inventory`, 'success');
     }
   };
 

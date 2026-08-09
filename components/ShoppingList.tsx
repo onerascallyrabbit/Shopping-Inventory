@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingItem, Product, StorageLocation, SubLocation, Family, InventoryItem, Profile } from '../types';
 import StockPurchasedModal from './StockPurchasedModal';
 import KrogerProductDetailsModal from './KrogerProductDetailsModal';
+import { UNITS, getBestPriceRecord } from '../constants';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
@@ -17,8 +18,6 @@ interface ShoppingListProps {
   profile: Profile;
   onProfileChange?: (updates: Partial<Profile>) => void;
 }
-
-const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g', 'qt', 'pt'];
 
 const ShoppingList: React.FC<ShoppingListProps> = ({ 
   items, products, storageLocations, subLocations, 
@@ -73,7 +72,8 @@ const ShoppingList: React.FC<ShoppingListProps> = ({
   const getSmartSuggestion = (itemName: string) => {
     const product = products.find(p => p.itemName.toLowerCase().includes(itemName.toLowerCase()));
     if (!product || product.history.length === 0) return null;
-    const bestRecord = [...product.history].sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity))[0];
+    const bestRecord = getBestPriceRecord(product.history);
+    if (!bestRecord) return null;
     return {
       store: bestRecord.store,
       price: bestRecord.price,

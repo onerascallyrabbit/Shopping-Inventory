@@ -1,25 +1,39 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AppTab } from './types';
-import Dashboard from './components/Dashboard';
-import ItemBrowser from './components/ItemBrowser';
-import ShoppingList from './components/ShoppingList';
-import ShopPlan from './components/ShopPlan';
 import BottomNav from './components/BottomNav';
 import Header from './components/Header';
 import AddItemModal from './components/AddItemModal';
-import SettingsView from './components/SettingsView';
-import InventoryView from './components/InventoryView';
-import CellarView from './components/CellarView';
-import MealPlanner from './components/MealPlanner';
 import DiagnosticBanner from './components/DiagnosticBanner';
 import InstallPrompt from './components/InstallPrompt';
+import NotificationHost from './components/NotificationHost';
 import { useAppData } from './hooks/useAppData';
 import { signInWithGoogle, supabase } from './services/supabaseService';
 
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const ItemBrowser = lazy(() => import('./components/ItemBrowser'));
+const ShoppingList = lazy(() => import('./components/ShoppingList'));
+const ShopPlan = lazy(() => import('./components/ShopPlan'));
+const SettingsView = lazy(() => import('./components/SettingsView'));
+const InventoryView = lazy(() => import('./components/InventoryView'));
+const CellarView = lazy(() => import('./components/CellarView'));
+const MealPlanner = lazy(() => import('./components/MealPlanner'));
+
+const TabSkeleton: React.FC = () => (
+  <div className="space-y-4 px-1 animate-pulse" role="status" aria-label="Loading">
+    {[0, 1, 2].map(i => (
+      <div key={i} className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-6 space-y-3">
+        <div className="h-4 bg-slate-200 rounded-full w-2/5" />
+        <div className="h-3 bg-slate-100 rounded-full w-full" />
+        <div className="h-3 bg-slate-100 rounded-full w-4/5" />
+      </div>
+    ))}
+  </div>
+);
+
 const App: React.FC = () => {
   const { 
-    user, loading, products, shoppingList, inventory, mealIdeas,
+    user, loading, syncedAt, products, shoppingList, inventory, mealIdeas,
     storageLocations, setStorageLocations, subLocations, setSubLocations,
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
     customCategories, customSubCategories, addCategory, removeCategory, addSubCategory, removeSubCategory,
@@ -28,7 +42,8 @@ const App: React.FC = () => {
     addPriceRecord, addToList, toggleListItem, removeListItem, updateShoppingItem, overrideStoreForListItem,
     addToInventory, importBulkInventory, reorderStorageLocations,
     refreshMeals, cookMeal, rateMeal,
-    cellarItems, updateCellarQty, addCellarItem, updateCellarItem, removeCellarItem, logConsumption
+    cellarItems, updateCellarQty, addCellarItem, updateCellarItem, removeCellarItem, logConsumption,
+    refresh
   } = useAppData();
 
   const [isGuest, setIsGuest] = useState(() => localStorage.getItem('pricewise_is_guest') === 'true');
@@ -89,11 +104,11 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
       <DiagnosticBanner user={user} isGuest={isGuest} onExitGuest={() => { setIsGuest(false); localStorage.removeItem('pricewise_is_guest'); }} />
-      <Header user={user} onSettingsClick={() => setActiveTab('settings')} activeFamily={activeFamily} loading={loading} />
+      <Header user={user} onSettingsClick={() => setActiveTab('settings')} activeFamily={activeFamily} loading={loading} onRefresh={refresh} syncedAt={syncedAt} />
       
       <main className="flex-1 overflow-y-auto pb-32 px-4 pt-6">
-        
-        {activeTab === 'dashboard' && <Dashboard products={products} onAddToList={addToList} onTabChange={setActiveTab} />}
+        <Suspense fallback={<TabSkeleton />}>
+          {activeTab === 'dashboard' && <Dashboard products={products} onAddToList={addToList} onTabChange={setActiveTab} />}
         {activeTab === 'items' && <ItemBrowser products={products} categoryOrder={profile.categoryOrder} onAddToList={addToList} />}
         {activeTab === 'inventory' && (
           <InventoryView 
@@ -150,10 +165,12 @@ const App: React.FC = () => {
             onReorderStorageLocations={reorderStorageLocations}
           />
         )}
+        </Suspense>
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} onAddClick={() => openAddModal('type')} />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} listCount={shoppingList.length} inventoryCount={inventory.length} />
       <InstallPrompt />
+      <NotificationHost />
       
       <div className="fixed bottom-24 right-4 z-40">
         {isQuickAddOpen && (

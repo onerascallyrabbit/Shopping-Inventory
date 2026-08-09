@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { InventoryItem, StorageLocation, SubLocation, CustomCategory } from '../types';
 import { DEFAULT_CATEGORIES } from '../constants';
+import { showToast } from '../services/notifications';
 
 interface CsvImportModalProps {
   onClose: () => void;
@@ -42,7 +43,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
   const processTextData = (text: string) => {
     if (!text) return;
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-    if (lines.length < 2) return alert("Data must have a header row and content.");
+    if (lines.length < 2) { showToast("Data must have a header row and content.", 'error'); return; }
     
     const firstLine = lines[0];
     const delimiter = firstLine.includes('\t') ? '\t' : ',';

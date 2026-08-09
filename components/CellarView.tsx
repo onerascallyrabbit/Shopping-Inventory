@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { CellarItem, Family } from '../types';
+import { confirmAction } from '../services/notifications';
 
 interface CellarViewProps {
   items: CellarItem[];
@@ -507,7 +508,7 @@ const CellarView: React.FC<CellarViewProps> = ({
             
             {editingItem && (
               <button 
-                onClick={() => { if(confirm('Delete this item?')) { onRemoveItem(editingItem.id); setEditingItem(null); } }}
+                onClick={async () => { if(await confirmAction('Delete this item?')) { onRemoveItem(editingItem.id); setEditingItem(null); } }}
                 className="w-full text-red-500 font-black text-[9px] uppercase tracking-[0.2em] pt-2"
               >
                 Delete Item

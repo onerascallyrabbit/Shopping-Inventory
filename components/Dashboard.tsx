@@ -1,16 +1,15 @@
 
 import React, { useState } from 'react';
-import { Product } from '../types';
+import { Product, AppTab } from '../types';
+import { UNITS, getFullName, getBestPriceRecord } from '../constants';
 
 interface DashboardProps {
   products: Product[];
   onAddToList: (name: string, qty: number, unit: string, productId?: string) => void;
-  onTabChange: (tab: any) => void;
+  onTabChange: (tab: AppTab) => void;
 }
 
-const UNITS = ['pc', 'oz', 'lb', 'ml', 'lt', 'gal', 'count', 'pack', 'kg', 'g'];
-
-const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
+const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList, onTabChange }) => {
   const [promptingId, setPromptingId] = useState<string | null>(null);
   const [promptQty, setPromptQty] = useState('1');
   const [promptUnit, setPromptUnit] = useState('pc');
@@ -22,13 +21,12 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
 
   const bestValueDeals = products
     .map(p => {
-      const best = [...p.history].sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity))[0];
-      return { ...best, product: p };
+      const best = getBestPriceRecord(p.history);
+      return best ? { ...best, product: p } : null;
     })
+    .filter((deal): deal is NonNullable<typeof deal> => deal !== null)
     .sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity))
     .slice(0, 5);
-
-  const getFullName = (p: Product) => `${p.itemName}${p.variety ? ` (${p.variety})` : ''}`;
 
   const handleAddDeal = (deal: any) => {
     onAddToList(getFullName(deal.product), parseFloat(promptQty) || 1, promptUnit, deal.product.id);
@@ -82,6 +80,9 @@ const Dashboard: React.FC<DashboardProps> = ({ products, onAddToList }) => {
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest">Top Value Deals</h2>
+          <button onClick={() => onTabChange('items')} className="text-[9px] font-black text-indigo-500 uppercase tracking-widest hover:text-indigo-700">
+            View All
+          </button>
         </div>
         <div className="space-y-2">
           {bestValueDeals.length > 0 ? bestValueDeals.map((deal) => (

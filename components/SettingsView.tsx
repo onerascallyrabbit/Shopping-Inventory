@@ -5,6 +5,7 @@ import { createFamily, joinFamily, testDatabaseConnection, getEnv } from '../ser
 import StorageLocationsModal from './StorageLocationsModal';
 import TaxonomyModal from './TaxonomyModal';
 import KrogerStorePicker from './KrogerStorePicker';
+import { showToast } from '../services/notifications';
 
 interface SettingsViewProps {
   user?: any;
@@ -75,16 +76,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     if (invite && !profile.familyId) setFamilyInviteCode(invite.toUpperCase());
   }, [profile.familyId]);
 
-  const handleCreateFamily = async () => {
-    if (!familyName) return;
-    try { await createFamily(familyName); alert('Family Hub created!'); window.location.reload(); }
-    catch (e: any) { alert(`Creation failed: ${e.message}`); }
+  const handleCreateFamily = async (name?: string) => {
+    const finalName = (name ?? familyName).trim();
+    if (!finalName) return;
+    try { await createFamily(finalName); showToast('Family Hub created!', 'success'); window.location.reload(); }
+    catch (e: any) { showToast(`Creation failed: ${e.message}`, 'error'); }
   };
 
   const handleJoinFamily = async () => {
     if (!familyInviteCode) return;
-    try { await joinFamily(familyInviteCode); alert('Successfully joined family!'); window.location.reload(); }
-    catch (e: any) { alert(`Join failed: ${e.message}`); }
+    try { await joinFamily(familyInviteCode); showToast('Successfully joined family!', 'success'); window.location.reload(); }
+    catch (e: any) { showToast(`Join failed: ${e.message}`, 'error'); }
   };
 
   const shareInviteLink = () => {
@@ -151,7 +153,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               <input className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold" placeholder="Invite Code..." value={familyInviteCode} onChange={e => setFamilyInviteCode(e.target.value)} />
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={handleJoinFamily} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black uppercase text-[10px]">Join Family</button>
-                <button onClick={() => { const name = prompt('Family Name?'); if(name) { setFamilyName(name); handleCreateFamily(); } }} className="w-full bg-slate-100 text-slate-600 py-3 rounded-xl font-black uppercase text-[10px]">Create Hub</button>
+                <button onClick={() => { const name = prompt('Family Name?'); if(name) handleCreateFamily(name); }} className="w-full bg-slate-100 text-slate-600 py-3 rounded-xl font-black uppercase text-[10px]">Create Hub</button>
               </div>
             </div>
           )}

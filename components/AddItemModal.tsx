@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PriceRecord, Product, StoreLocation, CustomCategory, CustomSubCategory, Profile, InventoryItem, StorageLocation, SubLocation } from '../types';
 import { identifyProductFromImage } from '../services/geminiService';
 import { lookupKrogerProduct, compareKrogerPrices } from '../services/krogerService';
-import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
+import { SUB_CATEGORIES, UNITS, NATIONAL_STORES, DEFAULT_CATEGORIES, CONTAINER_TYPES, getBestPriceRecord } from '../constants';
 import { Html5Qrcode } from "html5-qrcode";
 
 import VoiceInventoryAdd from './VoiceInventoryAdd';
@@ -166,9 +166,8 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
     if (matches.length === 0) return null;
 
     const allHistory = matches.flatMap(p => p.history.map(h => ({ ...h, itemName: p.itemName })));
-    const sorted = allHistory.sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity));
-    
-    const best = sorted[0];
+    const best = getBestPriceRecord(allHistory);
+    if (!best) return null;
     const currentUnitPrice = parseFloat(formData.price) / (parseFloat(formData.quantity) || 1);
     const bestUnitPrice = best.price / best.quantity;
 
@@ -291,7 +290,6 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
               onItemParsed={(item) => {
                 if (onAddToInventory) {
                   onAddToInventory(item);
-                  onClose();
                 } else {
                   // Fallback to manual form if onAddToInventory not provided
                   setFormData(prev => ({

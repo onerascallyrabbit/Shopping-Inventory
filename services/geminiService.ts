@@ -73,12 +73,12 @@ export const identifyProductFromImage = async (base64Image: string, mode: 'barco
 /**
  * Client-side call to /api/generate-meals
  */
-export const generateMealIdeas = async (inventory: InventoryItem[]): Promise<MealIdea[]> => {
+export const generateMealIdeas = async (inventory: InventoryItem[], focus?: string): Promise<MealIdea[]> => {
   try {
     const response = await fetch('/api/generate-meals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inventory })
+      body: JSON.stringify({ inventory, focus })
     });
     if (!response.ok) throw new Error('Failed to generate meals');
     

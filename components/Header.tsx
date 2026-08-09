@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { signOut } from '../services/supabaseService';
+import { confirmAction } from '../services/notifications';
 import { Family } from '../types';
 import { RefreshCw } from 'lucide-react';
 
@@ -9,9 +10,21 @@ interface HeaderProps {
   user?: any;
   activeFamily: Family | null;
   loading?: boolean;
+  onRefresh?: () => void | Promise<void>;
+  syncedAt?: number | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ onSettingsClick, user, activeFamily, loading }) => {
+const Header: React.FC<HeaderProps> = ({ onSettingsClick, user, activeFamily, loading, onRefresh, syncedAt }) => {
+  const handleSignOut = async () => {
+    if (await confirmAction('Sign out?')) {
+      await signOut();
+    }
+  };
+
+  const syncLabel = syncedAt
+    ? `Synced ${new Date(syncedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    : null;
+
   return (
     <header className="bg-white border-b border-slate-200 px-4 pt-6 pb-4 shrink-0">
       <div className="flex items-center justify-between">
@@ -23,34 +36,43 @@ const Header: React.FC<HeaderProps> = ({ onSettingsClick, user, activeFamily, lo
           </div>
           <div className="flex flex-col min-w-0">
             <h1 className="text-lg font-black tracking-tight text-slate-900 leading-none uppercase italic">Aisle Be Back</h1>
-            {activeFamily && (
+            {activeFamily ? (
               <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mt-0.5 truncate max-w-[120px]">
                 {activeFamily.name} Hub
               </span>
-            )}
+            ) : syncLabel ? (
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate max-w-[140px]">
+                {syncLabel}
+              </span>
+            ) : null}
           </div>
         </div>
         
         <div className="flex items-center space-x-3">
-          <div className="flex items-center">
+          <button
+            onClick={() => {
+              if (!loading && onRefresh) onRefresh();
+            }}
+            disabled={loading}
+            title="Refresh data"
+            aria-label="Refresh data"
+            className="p-1.5 -m-1.5 rounded-lg hover:bg-slate-50 active:scale-90 transition-all disabled:opacity-50"
+          >
             <RefreshCw 
               className={`w-4 h-4 transition-all duration-500 ${
-                loading 
-                  ? 'text-slate-300 animate-spin' 
-                  : 'text-emerald-500'
+                loading ? 'text-slate-300 animate-spin' : 'text-emerald-500'
               }`} 
             />
-          </div>
+          </button>
 
           <div className="flex items-center space-x-1">
             {user && (
               <div className="flex items-center space-x-3 pr-2 border-r border-slate-100 mr-1">
                 <button 
-                  onClick={() => {
-                    if(confirm('Sign out?')) signOut();
-                  }}
+                  onClick={handleSignOut}
                   className="w-8 h-8 rounded-full overflow-hidden border-2 border-slate-50 active:scale-95 transition-transform"
                   title="Sign Out"
+                  aria-label="Sign out"
                 >
                   <img 
                     src={user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user.email}`} 
@@ -60,7 +82,7 @@ const Header: React.FC<HeaderProps> = ({ onSettingsClick, user, activeFamily, lo
                 </button>
               </div>
             )}
-            <button onClick={onSettingsClick} className="text-slate-400 hover:text-indigo-600 transition-colors p-2" title="Settings">
+            <button onClick={onSettingsClick} className="text-slate-400 hover:text-indigo-600 transition-colors p-2" title="Settings" aria-label="Settings">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

@@ -41,6 +41,8 @@ export interface ShoppingItem {
   manualStore?: string;
   category?: string;
   userId?: string;
+  krogerProductId?: string;
+  krogerData?: any;
 }
 
 export interface StoreLocation {
@@ -133,6 +135,9 @@ export interface Profile {
   sharePrices: boolean;
   familyId?: string;
   defaultTab?: AppTab;
+  krogerStoreId?: string;
+  krogerStoreName?: string;
+  enableKroger?: boolean;
 }
 
 export interface FamilyMember {

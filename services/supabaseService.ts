@@ -12,6 +12,20 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
   : null;
 
+let cachedUserId: string | null = null;
+
+export const setCachedUserId = (userId: string | null) => {
+  cachedUserId = userId;
+};
+
+export const getUserId = async (): Promise<string | null> => {
+  if (cachedUserId) return cachedUserId;
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  cachedUserId = user?.id ?? null;
+  return cachedUserId;
+};
+
 export const getEnv = (key: string): string => {
   if (key === 'SUPABASE_URL') return SUPABASE_URL;
   if (key === 'SUPABASE_ANON_KEY') return SUPABASE_ANON_KEY;
@@ -72,9 +86,9 @@ export const updateMealStats = async (mealId: string, updates: { cook_count?: nu
 
 export const saveMealRating = async (mealId: string, rating: number) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from('meal_ratings').upsert({ meal_id: mealId, user_id: user.id, rating });
+  const userId = await getUserId();
+  if (!userId) return;
+  await supabase.from('meal_ratings').upsert({ meal_id: mealId, user_id: userId, rating });
   
   const { data } = await supabase.from('meal_ratings').select('rating').eq('meal_id', mealId);
   if (data && data.length > 0) {
@@ -125,11 +139,12 @@ export const deleteCustomSubCategory = async (id: string) => {
  */
 export const fetchCellarItems = async (familyId?: string): Promise<CellarItem[]> => {
   if (!supabase) return [];
+  const userId = await getUserId();
   let query = supabase.from('cellar_items').select('*');
   if (familyId) {
-    query = query.or(`family_id.eq.${familyId},user_id.eq.${(await supabase.auth.getUser()).data.user?.id}`);
+    query = query.or(`family_id.eq.${familyId},user_id.eq.${userId}`);
   } else {
-    query = query.eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+    query = query.eq('user_id', userId);
   }
   
   const { data, error } = await query.order('name', { ascending: true });
@@ -159,8 +174,8 @@ export const fetchCellarItems = async (familyId?: string): Promise<CellarItem[]>
 
 export const syncCellarItem = async (item: CellarItem) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const userId = await getUserId();
+  if (!userId) return;
 
   const payload = {
     id: item.id,
@@ -179,7 +194,7 @@ export const syncCellarItem = async (item: CellarItem) => {
     abv: item.abv,
     price: item.price,
     location: item.location,
-    user_id: item.userId || user.id,
+    user_id: item.userId || userId,
     family_id: item.familyId,
     updated_at: item.updatedAt
   };
@@ -289,8 +304,8 @@ export const fetchShoppingList = async (): Promise<ShoppingItem[]> => {
 
 export const syncShoppingItem = async (item: ShoppingItem) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const userId = await getUserId();
+  if (!userId) return;
   
   const payload = {
     id: item.id,
@@ -301,7 +316,7 @@ export const syncShoppingItem = async (item: ShoppingItem) => {
     is_completed: item.isCompleted,
     manual_store: item.manualStore,
     category: item.category,
-    user_id: item.userId || user.id,
+    user_id: item.userId || userId,
     kroger_product_id: item.krogerProductId,
     kroger_data: item.krogerData
   };
@@ -372,8 +387,8 @@ export const syncProduct = async (product: Partial<Product>) => {
 export const fetchPriceData = async (): Promise<Product[]> => {
   if (!supabase) return [];
   try {
-    const { data: productsData, error: pError } = await supabase.from('products').select('*');
-    const { data: historyData, error: hError } = await supabase.from('price_history').select('*').order('date', { ascending: false });
+    const { data: productsData, error: pError } = await supabase.from('products').select('*').order('item_name').limit(500);
+    const { data: historyData, error: hError } = await supabase.from('price_history').select('*').order('date', { ascending: false }).limit(2000);
 
     if (pError || hError) return [];
 
@@ -476,17 +491,17 @@ export const fetchUserData = async () => {
 
 export const fetchProfile = async (): Promise<Profile | null> => {
   if (!supabase) return null;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const userId = await getUserId();
+  if (!userId) return null;
 
   try {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
     
     if (error && error.code !== 'PGRST116') return null;
     
     if (!data) {
       const initial = { 
-        id: user.id, 
+        id: userId, 
         location_label: '', 
         zip: '', 
         gas_price: 3.50, 
@@ -495,7 +510,7 @@ export const fetchProfile = async (): Promise<Profile | null> => {
       };
       await supabase.from('profiles').insert(initial);
       return { 
-        id: user.id, 
+        id: userId, 
         locationLabel: '', 
         zip: '', 
         gasPrice: 3.50, 
@@ -525,8 +540,8 @@ export const fetchProfile = async (): Promise<Profile | null> => {
 
 export const syncProfile = async (profile: Partial<Profile>) => {
   if (!supabase) return null;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const userId = await getUserId();
+  if (!userId) return null;
   const payload: any = {};
   if (profile.locationLabel !== undefined) payload.location_label = profile.locationLabel;
   if (profile.zip !== undefined) payload.zip = profile.zip;
@@ -541,7 +556,7 @@ export const syncProfile = async (profile: Partial<Profile>) => {
   if (profile.enableKroger !== undefined) payload.enable_kroger = profile.enableKroger;
   
   try {
-    const { data, error } = await supabase.from('profiles').upsert({ id: user.id, ...payload }).select().single();
+    const { data, error } = await supabase.from('profiles').upsert({ id: userId, ...payload }).select().single();
     if (error) {
       console.error("Supabase Profile Sync Error:", error);
       // If it's a missing column error, we might want to handle it differently, 
@@ -557,10 +572,10 @@ export const syncProfile = async (profile: Partial<Profile>) => {
 
 export const createFamily = async (name: string) => {
   if (!supabase) return null;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const userId = await getUserId();
+  if (!userId) return null;
   const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const { data, error } = await supabase.from('families').insert({ name, invite_code: inviteCode, created_by: user.id }).select().single();
+  const { data, error } = await supabase.from('families').insert({ name, invite_code: inviteCode, created_by: userId }).select().single();
   if (error) throw error;
   await syncProfile({ familyId: data.id });
   return data;
@@ -581,9 +596,9 @@ export const joinFamily = async (inviteCode: string) => {
 
 export const syncVehicle = async (v: Vehicle) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from('vehicles').upsert({ id: v.id, user_id: user.id, name: v.name, mpg: v.mpg });
+  const userId = await getUserId();
+  if (!userId) return;
+  await supabase.from('vehicles').upsert({ id: v.id, user_id: userId, name: v.name, mpg: v.mpg });
 };
 
 export const deleteVehicle = async (id: string) => {
@@ -593,10 +608,10 @@ export const deleteVehicle = async (id: string) => {
 
 export const syncStore = async (s: StoreLocation, isPublic: boolean = false) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const userId = await getUserId();
+  if (!userId) return;
   await supabase.from('stores').upsert({ 
-    id: s.id, user_id: user.id, name: s.name, address: s.address, 
+    id: s.id, user_id: userId, name: s.name, address: s.address, 
     lat: s.lat, lng: s.lng, phone: s.phone, hours: s.hours, 
     zip: s.zip, is_public: isPublic
   });
@@ -609,8 +624,8 @@ export const deleteStore = async (id: string) => {
 
 export const syncInventoryItem = async (item: InventoryItem) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const userId = await getUserId();
+  if (!userId) return;
 
   // Fix: use item.locationId instead of item.location_id
   const payload: any = {
@@ -625,8 +640,8 @@ export const syncInventoryItem = async (item: InventoryItem) => {
     container: item.container,
     location_id: item.locationId,
     updated_at: item.updatedAt,
-    user_id: item.userId || user.id
-  };
+      user_id: item.userId || userId
+    };
 
   if (item.subCategory) payload.sub_category = item.subCategory;
   if (item.variety) payload.variety = item.variety;
@@ -651,6 +666,32 @@ export const syncInventoryItem = async (item: InventoryItem) => {
   }
 };
 
+export const patchInventoryItem = async (id: string, updates: Partial<InventoryItem>) => {
+  if (!supabase) return;
+  const payload: any = { updated_at: new Date().toISOString() };
+  if (updates.quantity !== undefined) payload.quantity = updates.quantity;
+  if (updates.unit !== undefined) payload.unit = updates.unit;
+  if (updates.itemName !== undefined) payload.item_name = updates.itemName;
+  if (updates.category !== undefined) payload.category = updates.category;
+  if (updates.subCategory !== undefined) payload.sub_category = updates.subCategory;
+  if (updates.variety !== undefined) payload.variety = updates.variety;
+  if (updates.brand !== undefined) payload.brand = updates.brand;
+  if (updates.subLocation !== undefined) payload.sub_location = updates.subLocation;
+  if (updates.locationId !== undefined) payload.location_id = updates.locationId;
+  if (updates.purchaseDate !== undefined) payload.purchase_date = updates.purchaseDate;
+  if (updates.expirationDate !== undefined) payload.expiration_date = updates.expirationDate;
+  if (updates.openedDate !== undefined) payload.opened_date = updates.openedDate;
+  if (updates.notes !== undefined) payload.notes = updates.notes;
+  if (updates.barcode !== undefined) payload.barcode = updates.barcode;
+  if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl;
+
+  const { error } = await supabase.from('inventory').update(payload).eq('id', id);
+  if (error) {
+    console.error("patchInventoryItem FAILED:", error);
+    throw error;
+  }
+};
+
 export const deleteInventoryItem = async (id: string) => {
   if (!supabase) return;
   await supabase.from('inventory').delete().eq('id', id);
@@ -659,15 +700,15 @@ export const deleteInventoryItem = async (id: string) => {
 // Fix property names to match InventoryItem interface (camelCase) while keeping snake_case for DB columns
 export const bulkSyncInventory = async (items: InventoryItem[]) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const userId = await getUserId();
+  if (!userId) return;
   
   // Fix: use item.locationId instead of item.location_id
   const payload = items.map(item => {
     const row: any = { 
       id: item.id, product_id: item.productId, item_name: item.itemName, 
       category: item.category, quantity: item.quantity, unit: item.unit, 
-      location_id: item.locationId, updated_at: item.updatedAt, user_id: item.userId || user.id 
+      location_id: item.locationId, updated_at: item.updatedAt, user_id: item.userId || userId 
     };
     if (item.subCategory) row.sub_category = item.subCategory;
     if (item.variety) row.variety = item.variety;
@@ -681,16 +722,16 @@ export const bulkSyncInventory = async (items: InventoryItem[]) => {
 
 export const syncStorageLocation = async (loc: StorageLocation) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from('storage_locations').upsert({ id: loc.id, name: loc.name, user_id: user.id, sort_order: loc.sortOrder });
+  const userId = await getUserId();
+  if (!userId) return;
+  await supabase.from('storage_locations').upsert({ id: loc.id, name: loc.name, user_id: userId, sort_order: loc.sortOrder });
 };
 
 export const bulkSyncStorageLocations = async (locs: StorageLocation[]) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  const payload = locs.map(l => ({ id: l.id, name: l.name, user_id: user.id, sort_order: l.sortOrder }));
+  const userId = await getUserId();
+  if (!userId) return;
+  const payload = locs.map(l => ({ id: l.id, name: l.name, user_id: userId, sort_order: l.sortOrder }));
   await supabase.from('storage_locations').upsert(payload);
 };
 
@@ -701,9 +742,9 @@ export const deleteStorageLocation = async (id: string) => {
 
 export const syncSubLocation = async (sub: SubLocation) => {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from('sub_locations').upsert({ id: sub.id, location_id: sub.locationId, name: sub.name, user_id: user.id });
+  const userId = await getUserId();
+  if (!userId) return;
+  await supabase.from('sub_locations').upsert({ id: sub.id, location_id: sub.locationId, name: sub.name, user_id: userId });
 };
 
 export const deleteSubLocation = async (id: string) => {

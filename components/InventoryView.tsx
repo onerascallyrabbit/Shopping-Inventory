@@ -140,6 +140,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
 
       <div className="space-y-10">
+        {Object.keys(groupedInventory).length === 0 && (
+          <div className="text-center py-20 flex flex-col items-center animate-in fade-in">
+            <div className="bg-emerald-50 w-20 h-20 rounded-[32px] flex items-center justify-center mb-6 text-emerald-300">
+              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+            </div>
+            <p className="text-slate-900 font-black text-lg">Stock is empty</p>
+            <p className="text-xs text-slate-400 mt-2 max-w-[220px] font-medium leading-relaxed">Add items to your inventory so you always know what's on the shelf.</p>
+          </div>
+        )}
         {Object.entries(groupedInventory).map(([shelfName, items]) => (
           <div key={shelfName} className="space-y-3">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{shelfName}</h3>

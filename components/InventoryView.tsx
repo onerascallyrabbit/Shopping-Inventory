@@ -33,7 +33,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [draggedItem, setDraggedItem] = useState<InventoryItem | null>(null);
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   const [dwellLocId, setDwellLocId] = useState<string | null>(null);
-  const suppressClickRef = useRef(false);
+  const suppressClickRef = useRef(0);
   const dwellTimerRef = useRef<number | null>(null);
   const dwellPendingRef = useRef<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -159,8 +159,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleGroupDrop = (groupName: string) => {
     const item = draggedItem;
-    setDraggedItem(null);
-    setDragOverGroup(null);
+    endDrag();
     if (!item) return;
     if (activeLocationId === 'All') {
       const loc = locations.find(l => l.name === groupName);
@@ -178,8 +177,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const handleLocationPillDrop = (e: React.DragEvent, locId: string, locName: string) => {
     e.preventDefault();
     const item = draggedItem;
-    setDraggedItem(null);
-    setDragOverGroup(null);
+    endDrag();
     if (!item || item.locationId === locId) return;
     onUpdateItem(item.id, { locationId: locId, subLocation: '' });
     showToast(`${item.itemName} moved to ${locName}`, 'success');
@@ -213,6 +211,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     }
   };
 
+  const endDrag = () => {
+    suppressClickRef.current = Date.now();
+    setDraggedItem(null);
+    setDragOverGroup(null);
+    cancelDwell();
+    setDwellLocId(null);
+  };
+
   const startDwell = (locId: string) => {
     if (locId === activeLocationId) {
       cancelDwell();
@@ -239,8 +245,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const handleDwellDrop = (e: React.DragEvent, locId: string, locName: string, sub: string) => {
     e.preventDefault();
     const item = draggedItem;
-    setDraggedItem(null);
-    setDragOverGroup(null);
+    endDrag();
     if (!item) return;
     if (item.locationId === locId && (item.subLocation || '') === sub) return;
     onUpdateItem(item.id, { locationId: locId, subLocation: sub });
@@ -429,18 +434,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   onDragStart={(e) => {
                     e.dataTransfer.effectAllowed = 'move';
                     e.dataTransfer.setData('text/plain', item.id);
-                    suppressClickRef.current = true;
+                    suppressClickRef.current = Date.now();
                     setDraggedItem(item);
                   }}
-                  onDragEnd={() => {
-                    setDraggedItem(null);
-                    setDragOverGroup(null);
-                    cancelDwell();
-                    setDwellLocId(null);
-                    setTimeout(() => { suppressClickRef.current = false; }, 50);
-                  }}
+                  onDragEnd={endDrag}
                   onClick={() => {
-                    if (suppressClickRef.current) return;
+                    if (Date.now() - suppressClickRef.current < 300) return;
                     setEditingItem(item);
                   }}
                   className={`bg-white border p-4 rounded-[28px] shadow-sm flex items-center justify-between cursor-pointer transition-all hover:shadow-md ${draggedItem?.id === item.id ? 'opacity-40' : ''}`}

@@ -26,13 +26,16 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onAddSubLocation, onDeleteItem
 }) => {
   const [activeLocationId, setActiveLocationId] = useState<string>('All');
-  const [activeSubLocation] = useState<string>('All');
+  const [activeSubLocation, setActiveSubLocation] = useState<string>('All');
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [isAdding, setIsAdding] = useState(false);
   const [addVoiceMode, setAddVoiceMode] = useState(false);
   const [draggedItem, setDraggedItem] = useState<InventoryItem | null>(null);
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
+  const [dwellLocId, setDwellLocId] = useState<string | null>(null);
   const suppressClickRef = useRef(false);
+  const dwellTimerRef = useRef<number | null>(null);
+  const dwellPendingRef = useRef<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [newShelfName, setNewShelfName] = useState('');
@@ -202,6 +205,60 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     if (inv && inv.quantity > 0) handleUpdateQty(id, -inv.quantity);
   };
 
+  const cancelDwell = () => {
+    dwellPendingRef.current = null;
+    if (dwellTimerRef.current) {
+      window.clearTimeout(dwellTimerRef.current);
+      dwellTimerRef.current = null;
+    }
+  };
+
+  const startDwell = (locId: string) => {
+    if (locId === activeLocationId || dwellLocId === locId) {
+      cancelDwell();
+      return;
+    }
+    if (dwellPendingRef.current === locId) return;
+    cancelDwell();
+    dwellPendingRef.current = locId;
+    dwellTimerRef.current = window.setTimeout(() => {
+      dwellPendingRef.current = null;
+      dwellTimerRef.current = null;
+      setDwellLocId(locId);
+    }, 550);
+  };
+
+  const clearFilters = () => {
+    setActiveLocationId('All');
+    setActiveSubLocation('All');
+    setActiveCategory('All');
+    setSearch('');
+  };
+
+  const handleDwellDrop = (e: React.DragEvent, locId: string, locName: string, sub: string) => {
+    e.preventDefault();
+    const item = draggedItem;
+    setDraggedItem(null);
+    setDragOverGroup(null);
+    if (!item) return;
+    if (item.locationId === locId && (item.subLocation || '') === sub) return;
+    onUpdateItem(item.id, { locationId: locId, subLocation: sub });
+    showToast(`${item.itemName} moved to ${locName}${sub ? ` / ${sub}` : ''}`, 'success');
+  };
+
+  const dropTargetProps = (key: string, onDropFn: (e: React.DragEvent) => void) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!draggedItem) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dragOverGroup !== key) setDragOverGroup(key);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDragOverGroup(prev => (prev === key ? null : prev));
+    },
+    onDrop: onDropFn,
+  });
+
   const handleUpdateQty = (id: string, delta: number) => {
     const item = inventory.find(i => i.id === id);
     if (!item) return;
@@ -263,20 +320,70 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
       <div className="space-y-3">
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
-          <button onClick={() => setActiveLocationId('All')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>All Stock</button>
+          <button onClick={() => { setActiveLocationId('All'); setActiveSubLocation('All'); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>All Stock</button>
           {locations.map(loc => (
             <button
               key={loc.id}
-              onClick={() => setActiveLocationId(loc.id)}
-              onDragOver={(e) => { if (!draggedItem) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverGroup !== `pill:${loc.id}`) setDragOverGroup(`pill:${loc.id}`); }}
-              onDragLeave={(e) => { if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDragOverGroup(prev => prev === `pill:${loc.id}` ? null : prev); }}
+              onClick={() => { setActiveLocationId(loc.id); setActiveSubLocation('All'); }}
+              onDragOver={(e) => { if (!draggedItem) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverGroup !== `pill:${loc.id}`) setDragOverGroup(`pill:${loc.id}`); startDwell(loc.id); }}
+              onDragLeave={(e) => { if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) { setDragOverGroup(prev => prev === `pill:${loc.id}` ? null : prev); cancelDwell(); } }}
               onDrop={(e) => handleLocationPillDrop(e, loc.id, loc.name)}
               className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap border transition-all ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-100'} ${dragOverGroup === `pill:${loc.id}` ? 'ring-2 ring-indigo-400 border-indigo-400' : ''}`}
             >
               {loc.name}
             </button>
           ))}
+          {(activeLocationId !== 'All' || activeCategory !== 'All' || search.trim()) && (
+            <button
+              onClick={clearFilters}
+              title="Clear filters"
+              className="shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          )}
         </div>
+
+        {activeLocationId !== 'All' && (
+          <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+            <button onClick={() => setActiveSubLocation('All')} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap border ${activeSubLocation === 'All' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-transparent'}`}>All Shelves</button>
+            {subLocations.filter(sl => sl.locationId === activeLocationId).map(sl => (
+              <button
+                key={sl.id}
+                onClick={() => setActiveSubLocation(prev => (prev === sl.name ? 'All' : sl.name))}
+                {...dropTargetProps(`subpill:${sl.id}`, (e) => { e.preventDefault(); handleGroupDrop(sl.name); })}
+                className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap border transition-all ${activeSubLocation === sl.name ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-400 border-transparent'} ${dragOverGroup === `subpill:${sl.id}` ? 'ring-2 ring-indigo-400 border-indigo-400' : ''} ${draggedItem ? 'cursor-copy' : ''}`}
+              >
+                {sl.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {dwellLocId && dwellLocId !== activeLocationId && (() => {
+          const dwellLoc = locations.find(l => l.id === dwellLocId);
+          if (!dwellLoc) return null;
+          return (
+            <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+              <span className="shrink-0 text-[9px] font-black uppercase tracking-wider text-slate-400 pr-1">{dwellLoc.name} &raquo;</span>
+              <span
+                {...dropTargetProps(`dwell:${dwellLoc.id}:__general`, (e) => handleDwellDrop(e, dwellLoc.id, dwellLoc.name, ''))}
+                className={`shrink-0 px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap border border-dashed transition-all ${dragOverGroup === `dwell:${dwellLoc.id}:__general` ? 'bg-indigo-50 ring-2 ring-indigo-400 border-indigo-400 text-indigo-600' : 'bg-white text-slate-400 border-slate-200'}`}
+              >
+                General
+              </span>
+              {subLocations.filter(sl => sl.locationId === dwellLoc.id).map(sl => (
+                <span
+                  key={sl.id}
+                  {...dropTargetProps(`dwell:${dwellLoc.id}:${sl.name}`, (e) => handleDwellDrop(e, dwellLoc.id, dwellLoc.name, sl.name))}
+                  className={`shrink-0 px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap border border-dashed transition-all ${dragOverGroup === `dwell:${dwellLoc.id}:${sl.name}` ? 'bg-indigo-50 ring-2 ring-indigo-400 border-indigo-400 text-indigo-600' : 'bg-white text-slate-400 border-slate-200'}`}
+                >
+                  {sl.name}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
 
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
           <button onClick={() => setActiveCategory('All')} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap border ${activeCategory === 'All' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-transparent'}`}>All Categories</button>
@@ -327,6 +434,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   onDragEnd={() => {
                     setDraggedItem(null);
                     setDragOverGroup(null);
+                    cancelDwell();
+                    setDwellLocId(null);
                     setTimeout(() => { suppressClickRef.current = false; }, 50);
                   }}
                   onClick={() => {

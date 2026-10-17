@@ -214,11 +214,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const startDwell = (locId: string) => {
-    if (locId === activeLocationId || dwellLocId === locId) {
+    if (locId === activeLocationId) {
       cancelDwell();
+      if (dwellLocId) setDwellLocId(null);
       return;
     }
-    if (dwellPendingRef.current === locId) return;
+    if (dwellLocId === locId || dwellPendingRef.current === locId) return;
     cancelDwell();
     dwellPendingRef.current = locId;
     dwellTimerRef.current = window.setTimeout(() => {
@@ -320,7 +321,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
       <div className="space-y-3">
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
-          <button onClick={() => { setActiveLocationId('All'); setActiveSubLocation('All'); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>All Stock</button>
+          <button onClick={() => { setActiveLocationId('All'); setActiveSubLocation('All'); }} onDragOver={(e) => { if (!draggedItem) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; cancelDwell(); if (dwellLocId) setDwellLocId(null); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>All Stock</button>
           {locations.map(loc => (
             <button
               key={loc.id}
@@ -344,7 +345,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           )}
         </div>
 
-        {activeLocationId !== 'All' && !(dwellLocId && dwellLocId !== activeLocationId) && (
+        {activeLocationId !== 'All' && !dwellLocId && (
           <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
             <button onClick={() => setActiveSubLocation('All')} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap border ${activeSubLocation === 'All' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-transparent'}`}>All Shelves</button>
             {subLocations.filter(sl => sl.locationId === activeLocationId).map(sl => (

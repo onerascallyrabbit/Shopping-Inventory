@@ -20,8 +20,10 @@ Extract and return valid JSON as an ARRAY of objects.
 
 Rules:
 - If multiple items are mentioned (e.g., "3 eggs and 2 milk"), return one object for each.
-- If a location is mentioned once for multiple items (e.g., "add eggs and milk to the fridge"), apply that location to all relevant items.
+- If a location is mentioned once for multiple items (e.g., "add eggs and milk to the fridge"), apply that location to EVERY item in the command by filling the same locationId on each one.
+- If a shelf/sub-location is mentioned once (e.g., "top shelf in the fridge"), apply the same subLocation to EVERY item, unless a different sub-location is explicitly stated for a specific item.
 - Match the mentioned location to the closest available location and return its ID in the locationId field.
+- Match the mentioned shelf/drawer to the closest available sub-location name for the chosen location.
 - For "pantry 2" or "freezer 1", match to location names containing those terms.
 - For "shelf 3" or "top shelf", put in subLocation field.
 - Infer category from product (ketchup=Pantry, beef=Meat, milk=Dairy).

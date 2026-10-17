@@ -161,6 +161,28 @@ export default function VoiceInventoryAdd({
     }
   };
 
+  const carryForwardPlacement = (items: any[]) => {
+    if (items.length === 0) return items;
+    const locCounts: Record<string, number> = {};
+    items.forEach(i => {
+      const id = String(i?.locationId || '').trim();
+      if (id) locCounts[id] = (locCounts[id] || 0) + 1;
+    });
+    const dominantLoc = Object.entries(locCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+    const subCounts: Record<string, number> = {};
+    items.forEach(i => {
+      const sub = String(i?.subLocation || '').trim();
+      const loc = String(i?.locationId || '').trim();
+      if (sub && (!dominantLoc || loc === dominantLoc)) subCounts[sub] = (subCounts[sub] || 0) + 1;
+    });
+    const dominantSub = Object.entries(subCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+    return items.map(i => {
+      const locationId = String(i?.locationId || '').trim() || dominantLoc;
+      const subLocation = String(i?.subLocation || '').trim() || (locationId === dominantLoc ? dominantSub : '');
+      return { ...i, locationId, subLocation };
+    });
+  };
+
   const parseVoiceCommand = async (spokenText: string) => {
     processingRef.current = true;
     setIsProcessing(true);
@@ -183,7 +205,7 @@ export default function VoiceInventoryAdd({
       if (!response.ok) throw new Error('Failed to parse voice command');
       const parsed = await response.json();
       if (!mountedRef.current) return;
-      setParsedItems(Array.isArray(parsed) ? parsed : [parsed]);
+      setParsedItems(carryForwardPlacement(Array.isArray(parsed) ? parsed : [parsed]));
     } catch (error) {
       console.error('Parse error:', error);
       if (mountedRef.current) {

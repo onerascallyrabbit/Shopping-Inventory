@@ -402,6 +402,34 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <input type="date" className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold" value={editingItem.expirationDate || ''} onChange={e => setEditingItem({...editingItem, expirationDate: e.target.value})} />
               </div>
 
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Location</label>
+                <select
+                  className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold"
+                  value={editingItem.locationId || ''}
+                  onChange={e => {
+                    const locationId = e.target.value;
+                    const validSubs = subLocations.filter(sl => sl.locationId === locationId).map(sl => sl.name);
+                    const subLocation = editingItem.subLocation && validSubs.includes(editingItem.subLocation) ? editingItem.subLocation : '';
+                    setEditingItem({ ...editingItem, locationId, subLocation });
+                  }}
+                >
+                  <option value="">Unassigned</option>
+                  {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Shelf / Sub-location</label>
+                <select
+                  className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold"
+                  value={editingItem.subLocation || ''}
+                  onChange={e => setEditingItem({ ...editingItem, subLocation: e.target.value })}
+                >
+                  <option value="">General</option>
+                  {subLocations.filter(sl => sl.locationId === (editingItem.locationId || locations[0]?.id)).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+                </select>
+              </div>
+
               <div className="col-span-2 grid grid-cols-3 gap-2">
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase">Qty</label>

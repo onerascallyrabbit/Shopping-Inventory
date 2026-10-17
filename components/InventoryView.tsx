@@ -34,6 +34,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [search, setSearch] = useState('');
   const [recentlyAddedToList, setRecentlyAddedToList] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (name: string) => {
+    setCollapsedGroups(prev => ({ ...prev, [name]: !prev[name] }));
+  };
 
   const allAvailableCategories = useMemo(() => {
     return Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories.map(c => c.name)])).sort();
@@ -151,7 +156,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         )}
         {Object.entries(groupedInventory).map(([shelfName, items]) => (
           <div key={shelfName} className="space-y-3">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">{shelfName}</h3>
+            <button
+              onClick={() => toggleGroup(shelfName)}
+              aria-expanded={!collapsedGroups[shelfName]}
+              className="w-full flex items-center justify-between px-2 py-1 -my-1 rounded-lg hover:bg-slate-50 transition-colors group"
+            >
+              <div className="flex items-center space-x-2 min-w-0">
+                <svg className={`w-3.5 h-3.5 text-slate-300 transition-transform ${collapsedGroups[shelfName] ? '-rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                </svg>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate group-hover:text-slate-600">{shelfName}</h3>
+              </div>
+              <span className="text-[9px] font-bold text-slate-300 shrink-0">{items.length}</span>
+            </button>
+            {!collapsedGroups[shelfName] && (
             <div className="space-y-2">
               {(items as any[]).map(item => (
                 <div key={item.id} className="bg-white border p-4 rounded-[28px] shadow-sm flex items-center justify-between">
@@ -184,6 +202,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               ))}
             </div>
+            )}
           </div>
         ))}
       </div>

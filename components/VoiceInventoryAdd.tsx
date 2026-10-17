@@ -29,6 +29,13 @@ export default function VoiceInventoryAdd({
   const [isProcessing, setIsProcessing] = useState(false);
   const [parsedItems, setParsedItems] = useState<any[]>([]);
   const recognitionRef = useRef<any>(null);
+  const transcriptRef = useRef('');
+  const interimRef = useRef('');
+  const sessionRef = useRef(0);
+  const endedRef = useRef(false);
+  const stoppingRef = useRef(false);
+  const processingRef = useRef(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     if (autoStart) {
@@ -40,9 +47,14 @@ export default function VoiceInventoryAdd({
   }, [autoStart]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (recognitionRef.current) {
         try {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onresult = null;
           recognitionRef.current.abort();
         } catch {
           // ignore
@@ -59,21 +71,38 @@ export default function VoiceInventoryAdd({
       showToast('Speech recognition is not supported in this browser.', 'error');
       return;
     }
+    if (isListening || processingRef.current || stoppingRef.current) return;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null;
+    }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
+    const session = sessionRef.current + 1;
+    sessionRef.current = session;
+    endedRef.current = false;
+    transcriptRef.current = '';
+    interimRef.current = '';
+    setTranscript('');
+    setInterimTranscript('');
     recognitionRef.current = recognition;
 
     recognition.onstart = () => {
+      if (!mountedRef.current || session !== sessionRef.current) return;
       setIsListening(true);
-      setTranscript('');
-      setInterimTranscript('');
-      setParsedItems([]);
     };
-    
+
     recognition.onresult = (event: any) => {
+      if (!mountedRef.current || session !== sessionRef.current) return;
       let final = '';
       let interim = '';
 
@@ -85,38 +114,55 @@ export default function VoiceInventoryAdd({
         }
       }
 
+      transcriptRef.current = final;
+      interimRef.current = interim;
       setTranscript(final);
       setInterimTranscript(interim);
     };
 
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
+      if (!mountedRef.current || session !== sessionRef.current) return;
       if (event.error !== 'no-speech') {
         setIsListening(false);
       }
     };
 
     recognition.onend = () => {
+      if (!mountedRef.current || session !== sessionRef.current || endedRef.current) return;
+      endedRef.current = true;
+      stoppingRef.current = false;
       setIsListening(false);
+      const fullText = (transcriptRef.current + ' ' + interimRef.current).trim();
+      transcriptRef.current = '';
+      interimRef.current = '';
+      if (fullText) {
+        parseVoiceCommand(fullText);
+      }
     };
 
-    recognition.start();
+    try {
+      recognition.start();
+    } catch (err) {
+      console.error('Speech recognition failed to start:', err);
+      setIsListening(false);
+      showToast('Could not start the microphone. Please try again.', 'error');
+    }
   };
 
-  const stopListening = async () => {
-    if (recognitionRef.current) {
+  const stopListening = () => {
+    if (!recognitionRef.current || endedRef.current || stoppingRef.current) return;
+    stoppingRef.current = true;
+    setIsListening(false);
+    try {
       recognitionRef.current.stop();
-      setIsListening(false);
-      
-      // Combine final and interim if any
-      const fullText = (transcript + ' ' + interimTranscript).trim();
-      if (fullText) {
-        await parseVoiceCommand(fullText);
-      }
+    } catch {
+      stoppingRef.current = false;
     }
   };
 
   const parseVoiceCommand = async (spokenText: string) => {
+    processingRef.current = true;
     setIsProcessing(true);
     
     try {
@@ -136,12 +182,18 @@ export default function VoiceInventoryAdd({
 
       if (!response.ok) throw new Error('Failed to parse voice command');
       const parsed = await response.json();
+      if (!mountedRef.current) return;
       setParsedItems(Array.isArray(parsed) ? parsed : [parsed]);
     } catch (error) {
       console.error('Parse error:', error);
-      showToast('Could not understand command. Please try again.', 'error');
+      if (mountedRef.current) {
+        showToast('Could not understand command. Please try again.', 'error');
+      }
     } finally {
-      setIsProcessing(false);
+      processingRef.current = false;
+      if (mountedRef.current) {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -151,6 +203,9 @@ export default function VoiceInventoryAdd({
       parsedItems.forEach(item => onItemParsed(item));
       setParsedItems([]);
       setTranscript('');
+      setInterimTranscript('');
+      transcriptRef.current = '';
+      interimRef.current = '';
       showToast(`${count} item${count === 1 ? '' : 's'} added to inventory`, 'success');
     }
   };

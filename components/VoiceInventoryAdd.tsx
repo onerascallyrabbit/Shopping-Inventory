@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { StorageLocation, SubLocation, InventoryItem } from '../types';
-import { DEFAULT_CATEGORIES, UNITS, CONTAINER_TYPES } from '../constants';
+import { DEFAULT_CATEGORIES, UNITS, CONTAINER_TYPES, stripLocationPrefix } from '../constants';
 import { showToast } from '../services/notifications';
 
 interface VoiceInventoryAddProps {
@@ -163,20 +163,22 @@ export default function VoiceInventoryAdd({
 
   const carryForwardPlacement = (items: any[]) => {
     if (items.length === 0) return items;
+    const locNames = storageLocations.map(l => l.name);
+    const cleaned = items.map(i => ({ ...i, subLocation: stripLocationPrefix(i?.subLocation, locNames) }));
     const locCounts: Record<string, number> = {};
-    items.forEach(i => {
+    cleaned.forEach(i => {
       const id = String(i?.locationId || '').trim();
       if (id) locCounts[id] = (locCounts[id] || 0) + 1;
     });
     const dominantLoc = Object.entries(locCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
     const subCounts: Record<string, number> = {};
-    items.forEach(i => {
+    cleaned.forEach(i => {
       const sub = String(i?.subLocation || '').trim();
       const loc = String(i?.locationId || '').trim();
       if (sub && (!dominantLoc || loc === dominantLoc)) subCounts[sub] = (subCounts[sub] || 0) + 1;
     });
     const dominantSub = Object.entries(subCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-    return items.map(i => {
+    return cleaned.map(i => {
       const locationId = String(i?.locationId || '').trim() || dominantLoc;
       const subLocation = String(i?.subLocation || '').trim() || (locationId === dominantLoc ? dominantSub : '');
       return { ...i, locationId, subLocation };
@@ -429,12 +431,17 @@ export default function VoiceInventoryAdd({
                     </div>
                     <div className="space-y-1">
                       <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Shelf/Sub</label>
-                      <input 
-                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all" 
+                      <select 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white transition-all appearance-none" 
                         value={item.subLocation || ''} 
                         onChange={(e) => updateItem(idx, { subLocation: e.target.value })}
-                        placeholder="None"
-                      />
+                      >
+                        <option value="">General</option>
+                        {subLocations.filter(sl => sl.locationId === item.locationId).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+                        {item.subLocation && !subLocations.some(sl => sl.locationId === item.locationId && sl.name === item.subLocation) && (
+                          <option value={item.subLocation}>{item.subLocation}</option>
+                        )}
+                      </select>
                     </div>
                   </div>
                 </div>

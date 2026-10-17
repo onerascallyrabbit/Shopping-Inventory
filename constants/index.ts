@@ -8,6 +8,15 @@ export const getBestPriceRecord = (history: PriceRecord[] | undefined): PriceRec
   return [...history].sort((a, b) => (a.price / a.quantity) - (b.price / b.quantity))[0];
 };
 
+export const stripLocationPrefix = (sub: string | undefined, locationNames: string[]): string => {
+  const names = new Set(locationNames.map(n => n.trim().toLowerCase()));
+  const value = String(sub || '').trim();
+  if (!value.includes('/')) return value;
+  const parts = value.split('/').map(p => p.trim()).filter(Boolean);
+  while (parts.length > 1 && names.has(parts[0].toLowerCase())) parts.shift();
+  return parts.join(' ');
+};
+
 
 export const DEFAULT_CATEGORIES = [
   "Produce", "Dairy", "Meat", "Seafood", "Deli", "Bakery", 

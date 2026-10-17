@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 Command: "${transcript}"
 
 Available storage locations: ${availableLocations.map(l => `${l.name} (ID: ${l.id})`).join(', ')}
-Available sub-locations: ${availableSubLocations.map(s => `${s.parent}/${s.name}`).join(', ')}
+Available sub-locations by location (return ONLY the sub-location name, never the parent or a combined path): ${availableSubLocations.map(s => `${s.parent}: ${s.name}`).join(', ')}
 
 Extract and return valid JSON as an ARRAY of objects.
 
@@ -24,6 +24,7 @@ Rules:
 - If a shelf/sub-location is mentioned once (e.g., "top shelf in the fridge"), apply the same subLocation to EVERY item, unless a different sub-location is explicitly stated for a specific item.
 - Match the mentioned location to the closest available location and return its ID in the locationId field.
 - Match the mentioned shelf/drawer to the closest available sub-location name for the chosen location.
+- The subLocation field must be ONLY the sub-location/shelf name itself (e.g. "Top Shelf"). Never prefix it with the location name and never return it as "location/sub-location".
 - For "pantry 2" or "freezer 1", match to location names containing those terms.
 - For "shelf 3" or "top shelf", put in subLocation field.
 - Infer category from product (ketchup=Pantry, beef=Meat, milk=Dairy).
@@ -63,7 +64,18 @@ Rules:
     });
 
     const parsed = JSON.parse(response.text || "[]");
-    res.status(200).json(parsed);
+    const locNames = new Set((availableLocations || []).map(l => String(l.name || '').trim().toLowerCase()));
+    const sanitized = (Array.isArray(parsed) ? parsed : []).map(item => {
+      const raw = String(item?.subLocation || '').trim();
+      let sub = raw;
+      if (sub.includes('/')) {
+        const parts = sub.split('/').map(p => p.trim()).filter(Boolean);
+        while (parts.length > 1 && locNames.has(parts[0].toLowerCase())) parts.shift();
+        sub = parts.join(' ');
+      }
+      return { ...item, subLocation: sub };
+    });
+    res.status(200).json(sanitized);
   } catch (error) {
     console.error('Voice parse error:', error);
     res.status(500).json({ error: error.message });

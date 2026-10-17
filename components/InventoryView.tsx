@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { InventoryItem, StorageLocation, SubLocation, CustomCategory } from '../types';
 import CsvImportModal from './CsvImportModal';
-import { UNITS, DEFAULT_CATEGORIES, CONTAINER_TYPES } from '../constants';
+import { UNITS, DEFAULT_CATEGORIES, CONTAINER_TYPES, stripLocationPrefix } from '../constants';
 
 interface InventoryViewProps {
   inventory: InventoryItem[];
@@ -422,11 +422,16 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <label className="text-[10px] font-black text-slate-400 uppercase">Shelf / Sub-location</label>
                 <select
                   className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold"
-                  value={editingItem.subLocation || ''}
+                  value={stripLocationPrefix(editingItem.subLocation, locations.map(l => l.name))}
                   onChange={e => setEditingItem({ ...editingItem, subLocation: e.target.value })}
                 >
                   <option value="">General</option>
                   {subLocations.filter(sl => sl.locationId === (editingItem.locationId || locations[0]?.id)).map(sl => <option key={sl.id} value={sl.name}>{sl.name}</option>)}
+                  {(() => {
+                    const cleaned = stripLocationPrefix(editingItem.subLocation, locations.map(l => l.name));
+                    const known = subLocations.filter(sl => sl.locationId === (editingItem.locationId || locations[0]?.id)).some(sl => sl.name === cleaned);
+                    return cleaned && !known ? <option value={cleaned}>{cleaned}</option> : null;
+                  })()}
                 </select>
               </div>
 

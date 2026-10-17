@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { InventoryItem, StorageLocation, SubLocation, CustomCategory } from '../types';
 import CsvImportModal from './CsvImportModal';
 import VoiceInventoryAdd from './VoiceInventoryAdd';
-import { showToast } from '../services/notifications';
+import { showToast, confirmAction } from '../services/notifications';
 import { UNITS, DEFAULT_CATEGORIES, CONTAINER_TYPES, stripLocationPrefix } from '../constants';
 
 interface InventoryViewProps {
@@ -16,19 +16,23 @@ interface InventoryViewProps {
   onBulkAdd: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<void>;
   onAddToList: (name: string, qty: number, unit: string, productId?: string) => void;
   onAddSubLocation?: (locId: string, name: string) => void;
+  onDeleteItem: (id: string) => void;
 }
 
 const InventoryView: React.FC<InventoryViewProps> = ({ 
   inventory, locations, subLocations, 
   customCategories,
   onUpdateQty, onUpdateItem, onAddToInventory, onBulkAdd, onAddToList,
-  onAddSubLocation
+  onAddSubLocation, onDeleteItem
 }) => {
   const [activeLocationId, setActiveLocationId] = useState<string>('All');
   const [activeSubLocation] = useState<string>('All');
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [isAdding, setIsAdding] = useState(false);
   const [addVoiceMode, setAddVoiceMode] = useState(false);
+  const [draggedItem, setDraggedItem] = useState<InventoryItem | null>(null);
+  const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
+  const suppressClickRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [newShelfName, setNewShelfName] = useState('');
@@ -150,6 +154,54 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     showToast('Template downloaded - fill it in, then use Bulk Import', 'success');
   };
 
+  const handleGroupDrop = (groupName: string) => {
+    const item = draggedItem;
+    setDraggedItem(null);
+    setDragOverGroup(null);
+    if (!item) return;
+    if (activeLocationId === 'All') {
+      const loc = locations.find(l => l.name === groupName);
+      if (!loc || loc.id === item.locationId) return;
+      onUpdateItem(item.id, { locationId: loc.id, subLocation: '' });
+      showToast(`${item.itemName} moved to ${loc.name}`, 'success');
+    } else {
+      const sub = groupName === 'Loose / General' ? '' : groupName;
+      if ((item.subLocation || '') === sub) return;
+      onUpdateItem(item.id, { subLocation: sub });
+      showToast(sub ? `${item.itemName} moved to ${sub}` : `${item.itemName} moved to general storage`, 'success');
+    }
+  };
+
+  const handleLocationPillDrop = (e: React.DragEvent, locId: string, locName: string) => {
+    e.preventDefault();
+    const item = draggedItem;
+    setDraggedItem(null);
+    setDragOverGroup(null);
+    if (!item || item.locationId === locId) return;
+    onUpdateItem(item.id, { locationId: locId, subLocation: '' });
+    showToast(`${item.itemName} moved to ${locName}`, 'success');
+  };
+
+  const handleDeleteItem = async () => {
+    if (!editingItem) return;
+    const ok = await confirmAction(`Delete "${editingItem.itemName}" from stock? This cannot be undone.`);
+    if (!ok) return;
+    const { id, itemName } = editingItem;
+    setEditingItem(null);
+    onDeleteItem(id);
+    showToast(`${itemName} deleted`, 'success');
+  };
+
+  const handleFullyDeplete = async () => {
+    if (!editingItem) return;
+    const ok = await confirmAction(`Mark all ${editingItem.quantity} ${editingItem.unit} of "${editingItem.itemName}" as used? It will be removed from stock.`);
+    if (!ok) return;
+    const inv = inventory.find(i => i.id === editingItem.id);
+    const id = editingItem.id;
+    setEditingItem(null);
+    if (inv && inv.quantity > 0) handleUpdateQty(id, -inv.quantity);
+  };
+
   const handleUpdateQty = (id: string, delta: number) => {
     const item = inventory.find(i => i.id === id);
     if (!item) return;
@@ -212,7 +264,18 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       <div className="space-y-3">
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
           <button onClick={() => setActiveLocationId('All')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap border ${activeLocationId === 'All' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>All Stock</button>
-          {locations.map(loc => <button key={loc.id} onClick={() => setActiveLocationId(loc.id)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap border ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-100'}`}>{loc.name}</button>)}
+          {locations.map(loc => (
+            <button
+              key={loc.id}
+              onClick={() => setActiveLocationId(loc.id)}
+              onDragOver={(e) => { if (!draggedItem) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverGroup !== `pill:${loc.id}`) setDragOverGroup(`pill:${loc.id}`); }}
+              onDragLeave={(e) => { if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDragOverGroup(prev => prev === `pill:${loc.id}` ? null : prev); }}
+              onDrop={(e) => handleLocationPillDrop(e, loc.id, loc.name)}
+              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap border transition-all ${activeLocationId === loc.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-100'} ${dragOverGroup === `pill:${loc.id}` ? 'ring-2 ring-indigo-400 border-indigo-400' : ''}`}
+            >
+              {loc.name}
+            </button>
+          ))}
         </div>
 
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
@@ -236,7 +299,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             <button
               onClick={() => toggleGroup(shelfName)}
               aria-expanded={!collapsedGroups[shelfName]}
-              className="w-full flex items-center justify-between px-2 py-1 -my-1 rounded-lg hover:bg-slate-50 transition-colors group"
+              onDragOver={(e) => { if (!draggedItem) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverGroup !== shelfName) setDragOverGroup(shelfName); }}
+              onDragLeave={(e) => { if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDragOverGroup(prev => prev === shelfName ? null : prev); }}
+              onDrop={(e) => { e.preventDefault(); handleGroupDrop(shelfName); }}
+              className={`w-full flex items-center justify-between px-2 py-1 -my-1 rounded-lg hover:bg-slate-50 transition-colors group ${dragOverGroup === shelfName ? 'bg-indigo-50 ring-2 ring-indigo-300' : ''} ${draggedItem ? 'cursor-copy' : ''}`}
             >
               <div className="flex items-center space-x-2 min-w-0">
                 <svg className={`w-3.5 h-3.5 text-slate-300 transition-transform ${collapsedGroups[shelfName] ? '-rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -249,7 +315,26 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             {!collapsedGroups[shelfName] && (
             <div className="space-y-2">
               {(items as any[]).map(item => (
-                <div key={item.id} className="bg-white border p-4 rounded-[28px] shadow-sm flex items-center justify-between">
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', item.id);
+                    suppressClickRef.current = true;
+                    setDraggedItem(item);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedItem(null);
+                    setDragOverGroup(null);
+                    setTimeout(() => { suppressClickRef.current = false; }, 50);
+                  }}
+                  onClick={() => {
+                    if (suppressClickRef.current) return;
+                    setEditingItem(item);
+                  }}
+                  className={`bg-white border p-4 rounded-[28px] shadow-sm flex items-center justify-between cursor-pointer transition-all hover:shadow-md ${draggedItem?.id === item.id ? 'opacity-40' : ''}`}
+                >
                   <div className="flex-1 min-w-0 pr-4">
                     <h4 className="font-black text-slate-800 text-xs truncate uppercase leading-tight">
                       {item.itemName}
@@ -267,13 +352,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     )}
                   </div>
                   <div className="flex items-center space-x-2">
-                    <button onClick={() => { onAddToList(item.itemName, 1, item.unit, item.productId); setRecentlyAddedToList(item.id); setTimeout(() => setRecentlyAddedToList(null), 2000); }} className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${recentlyAddedToList === item.id ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-400 hover:text-indigo-600'}`}>
+                    <button onClick={(e) => { e.stopPropagation(); onAddToList(item.itemName, 1, item.unit, item.productId); setRecentlyAddedToList(item.id); setTimeout(() => setRecentlyAddedToList(null), 2000); }} className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${recentlyAddedToList === item.id ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-400 hover:text-indigo-600'}`}>
                       {recentlyAddedToList === item.id ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>}
                     </button>
                     <div className="flex items-center bg-slate-50 rounded-xl p-0.5">
-                      <button onClick={() => handleUpdateQty(item.id, -1)} className="w-8 h-8 text-slate-400 font-black">-</button>
-                      <button onClick={() => setEditingItem(item)} className="px-2 text-xs font-black text-indigo-600">{item.quantity} {item.unit}</button>
-                      <button onClick={() => handleUpdateQty(item.id, 1)} className="w-8 h-8 text-indigo-600 font-black">+</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleUpdateQty(item.id, -1); }} className="w-8 h-8 text-slate-400 font-black">-</button>
+                      <button onClick={(e) => { e.stopPropagation(); setEditingItem(item); }} className="px-2 text-xs font-black text-indigo-600">{item.quantity} {item.unit}</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleUpdateQty(item.id, 1); }} className="w-8 h-8 text-indigo-600 font-black">+</button>
                     </div>
                   </div>
                 </div>
@@ -567,6 +652,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             <div className="flex space-x-3">
               <button onClick={() => setEditingItem(null)} className="flex-1 bg-slate-100 text-slate-500 font-black py-4 rounded-2xl uppercase text-[10px]">Cancel</button>
               <button onClick={() => { onUpdateItem(editingItem.id, editingItem); setEditingItem(null); }} className="flex-1 bg-indigo-600 text-white font-black py-4 rounded-2xl uppercase text-[10px]">Save</button>
+            </div>
+            <div className="flex space-x-3">
+              <button onClick={handleDeleteItem} className="flex-1 bg-red-50 text-red-500 font-black py-3.5 rounded-2xl uppercase text-[10px] transition-all hover:bg-red-100 active:scale-95">Delete</button>
+              <button onClick={handleFullyDeplete} className="flex-1 bg-amber-50 text-amber-600 font-black py-3.5 rounded-2xl uppercase text-[10px] transition-all hover:bg-amber-100 active:scale-95">Fully Deplete</button>
             </div>
           </div>
         </div>

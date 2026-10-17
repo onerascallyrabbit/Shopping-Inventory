@@ -38,7 +38,7 @@ const App: React.FC = () => {
     stores, setStores, vehicles, setVehicles, profile, activeFamily,
     customCategories, customSubCategories, addCategory, removeCategory, addSubCategory, removeSubCategory,
     addSubLocation, removeSubLocation,
-    updateProfile, updateInventoryQty, updateInventoryItem, 
+    updateProfile, updateInventoryQty, updateInventoryItem, removeInventoryItem, 
     addPriceRecord, addToList, toggleListItem, removeListItem, updateShoppingItem, overrideStoreForListItem,
     addToInventory, importBulkInventory, reorderStorageLocations,
     refreshMeals, cookMeal, rateMeal,
@@ -116,7 +116,7 @@ const App: React.FC = () => {
             customCategories={customCategories}
             onUpdateQty={updateInventoryQty} onUpdateItem={updateInventoryItem}
             onAddToInventory={addToInventory} onBulkAdd={importBulkInventory} onAddToList={addToList}
-            onAddSubLocation={addSubLocation}
+            onAddSubLocation={addSubLocation} onDeleteItem={removeInventoryItem}
           />
         )}
         {activeTab === 'cellar' && (

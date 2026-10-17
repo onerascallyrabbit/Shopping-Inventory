@@ -344,7 +344,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           )}
         </div>
 
-        {activeLocationId !== 'All' && (
+        {activeLocationId !== 'All' && !(dwellLocId && dwellLocId !== activeLocationId) && (
           <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
             <button onClick={() => setActiveSubLocation('All')} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap border ${activeSubLocation === 'All' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-transparent'}`}>All Shelves</button>
             {subLocations.filter(sl => sl.locationId === activeLocationId).map(sl => (

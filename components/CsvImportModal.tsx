@@ -56,20 +56,26 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
     
     const initialMappings: Record<number, MappingField> = {};
     headers.forEach((header, index) => {
-      const lower = header.toLowerCase();
-      if (lower.includes('item') || lower.includes('name')) initialMappings[index] = 'itemName';
-      else if (lower.includes('variety')) initialMappings[index] = 'variety';
-      else if (lower.includes('style') || lower.includes('format') || lower.includes('cut')) { initialMappings[index] = 'style'; }
-      else if (lower.includes('brand')) initialMappings[index] = 'brand';
-      else if (lower.includes('qty') || lower.includes('quantity')) initialMappings[index] = 'quantity';
-      else if (lower.includes('unit')) initialMappings[index] = 'unit';
-      else if (lower.includes('size') || lower.includes('volume') || lower.includes('weight')) initialMappings[index] = 'unitSize';
-      else if (lower.includes('measure') || lower.includes('oz') || lower.includes('grams')) initialMappings[index] = 'unitMeasure';
-      else if (lower.includes('container') || lower.includes('packaging')) initialMappings[index] = 'container';
-      else if (lower.includes('category')) initialMappings[index] = 'category';
-      else if (lower.includes('expiry') || lower.includes('expiration')) initialMappings[index] = 'expirationDate';
-      else if (lower.includes('purchase')) initialMappings[index] = 'purchaseDate';
-      else if (lower.includes('note')) initialMappings[index] = 'notes';
+      const base = header.toLowerCase().replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+      if (base.includes('sub') && base.includes('categ')) initialMappings[index] = 'subCategory';
+      else if (base.includes('sub')) initialMappings[index] = 'subLocation';
+      else if (base.includes('item') || base.includes('name')) initialMappings[index] = 'itemName';
+      else if (base.includes('variety')) initialMappings[index] = 'variety';
+      else if (base.includes('style') || base.includes('format') || base.includes('cut')) { initialMappings[index] = 'style'; }
+      else if (base.includes('brand')) initialMappings[index] = 'brand';
+      else if (base.includes('grade')) initialMappings[index] = 'grade';
+      else if (base.includes('origin')) initialMappings[index] = 'origin';
+      else if (base.includes('barcode') || base.includes('upc')) initialMappings[index] = 'barcode';
+      else if (base.includes('qty') || base.includes('quantity')) initialMappings[index] = 'quantity';
+      else if (base.includes('size') || base.includes('volume') || base.includes('weight')) initialMappings[index] = 'unitSize';
+      else if (base.includes('measure') || base.includes('oz') || base.includes('grams')) initialMappings[index] = 'unitMeasure';
+      else if (base.includes('unit')) initialMappings[index] = 'unit';
+      else if (base.includes('container') || base.includes('packaging')) initialMappings[index] = 'container';
+      else if (base.includes('category')) initialMappings[index] = 'category';
+      else if (base.includes('expiry') || base.includes('expiration')) initialMappings[index] = 'expirationDate';
+      else if (base.includes('purchase')) initialMappings[index] = 'purchaseDate';
+      else if (base.includes('location')) initialMappings[index] = 'locationId';
+      else if (base.includes('note')) initialMappings[index] = 'notes';
       else initialMappings[index] = 'ignore';
     });
     setMappings(initialMappings);
@@ -94,25 +100,44 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
         locationId: targetLocationId,
         subLocation: targetSubLocation 
       };
+      let locationName = '';
+      let subFromCsv: string | undefined;
+      let hasSubColumn = false;
 
       csvHeaders.forEach((_, idx) => {
         const field = mappings[idx];
         if (field && field !== 'ignore') {
-          const val = row[idx];
+          const val = String(row[idx] ?? '').trim();
           if (field === 'quantity' || field === 'unitSize') {
-            item[field] = parseFloat(val) || 0;
+            if (val !== '') item[field] = parseFloat(val) || 0;
           } else if (field === 'category') {
             item[field] = allAvailableCategories.find(
               c => c.toLowerCase() === val.toLowerCase()
             ) || "Other";
-          } else {
+          } else if (field === 'locationId') {
+            locationName = val;
+          } else if (field === 'subLocation') {
+            hasSubColumn = true;
+            subFromCsv = val;
+          } else if (val !== '') {
             item[field] = val;
           }
         }
       });
 
+      if (locationName) {
+        const match = locations.find(l => l.name.toLowerCase() === locationName.toLowerCase());
+        if (match) item.locationId = match.id;
+      }
+      if (hasSubColumn) {
+        item.subLocation = subFromCsv || (item.locationId === targetLocationId ? targetSubLocation : '');
+      } else if (item.locationId !== targetLocationId) {
+        item.subLocation = '';
+      }
+
       if (!item.category) item.category = "Other";
       if (!item.unit) item.unit = 'pc';
+      if (!item.quantity || item.quantity < 1) item.quantity = 1;
       
       return item as Omit<InventoryItem, 'id' | 'updatedAt'>;
     }).filter(item => item.itemName);
@@ -236,15 +261,23 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
                     >
                       <option value="ignore">Skip</option>
                       <option value="itemName">Item Name</option>
-                      <option value="unit_size">Unit Size</option>
-                      <option value="unit_measure">Unit Measure</option>
-                      <option value="container">Container</option>
                       <option value="quantity">Quantity</option>
+                      <option value="unit">Unit</option>
+                      <option value="unitSize">Unit Size</option>
+                      <option value="unitMeasure">Unit Measure</option>
+                      <option value="container">Container</option>
                       <option value="brand">Brand</option>
                       <option value="variety">Variety</option>
                       <option value="style">Style (e.g. Diced, Smoked)</option>
+                      <option value="grade">Grade</option>
+                      <option value="origin">Origin</option>
+                      <option value="subCategory">Sub-category</option>
                       <option value="category">Category</option>
-                      <option value="expirationDate">Expiry</option>
+                      <option value="locationId">Location (by name)</option>
+                      <option value="subLocation">Sub-location / Shelf</option>
+                      <option value="purchaseDate">Purchase Date</option>
+                      <option value="expirationDate">Expiry Date</option>
+                      <option value="barcode">Barcode</option>
                       <option value="notes">Notes</option>
                     </select>
                   </div>

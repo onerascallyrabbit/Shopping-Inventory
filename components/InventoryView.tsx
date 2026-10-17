@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { InventoryItem, StorageLocation, SubLocation, CustomCategory } from '../types';
 import CsvImportModal from './CsvImportModal';
+import VoiceInventoryAdd from './VoiceInventoryAdd';
+import { showToast } from '../services/notifications';
 import { UNITS, DEFAULT_CATEGORIES, CONTAINER_TYPES, stripLocationPrefix } from '../constants';
 
 interface InventoryViewProps {
@@ -26,6 +28,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [activeSubLocation] = useState<string>('All');
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [isAdding, setIsAdding] = useState(false);
+  const [addVoiceMode, setAddVoiceMode] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [newShelfName, setNewShelfName] = useState('');
@@ -80,6 +83,73 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     });
   };
 
+  const handleDownloadTemplate = () => {
+    const cell = (v: any) => String(v ?? '').replace(/[",|\r\n]/g, ' ').trim();
+    const cats = Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories.map(c => c.name)])).map(cell);
+    const locNames = locations.map(l => cell(l.name)).filter(Boolean);
+    const subNames = Array.from(new Set(subLocations.map(sl => cell(sl.name)))).filter(Boolean);
+
+    const headers = [
+      'Item Name (REQUIRED)',
+      'Quantity (optional: default 1)',
+      `Unit (optional: ${UNITS.map(cell).join('|')})`,
+      `Category (optional: ${cats.join('|') || 'see app'})`,
+      'Sub-category (optional)',
+      'Brand (optional)',
+      'Variety (optional)',
+      'Style (optional)',
+      'Grade (optional)',
+      'Origin (optional)',
+      'Unit Size (optional: number)',
+      `Unit Measure (optional: ${UNITS.map(cell).join('|')})`,
+      `Container (optional: ${CONTAINER_TYPES.map(cell).join('|')})`,
+      `Location (optional: ${locNames.join('|') || 'add locations in app first'})`,
+      `Sub-location (optional: ${subNames.join('|') || 'add shelves in app first'})`,
+      'Purchase Date (optional: YYYY-MM-DD)',
+      'Expiration Date (optional: YYYY-MM-DD)',
+      'Barcode (optional)',
+      'Notes (optional)'
+    ];
+
+    const fmtDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const today = new Date();
+    const example = new Date(today.getTime() + 14 * 86400000);
+    const firstLoc = locations[0];
+    const guideRow = [
+      '',
+      '2',
+      'pc',
+      'Dairy',
+      'Milk',
+      'Tillamook',
+      'Sharp',
+      'Aged',
+      'Extra Sharp',
+      'Wisconsin',
+      '12',
+      'oz',
+      'bags',
+      cell(firstLoc?.name || ''),
+      cell(subLocations.find(sl => sl.locationId === firstLoc?.id)?.name || ''),
+      fmtDate(today),
+      fmtDate(example),
+      '',
+      'GUIDE ROW - keep Item Name blank so import skips it'
+    ];
+
+    const csv = '\uFEFF' + headers.join(',') + '\n' + guideRow.join(',');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stock-import-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Template downloaded - fill it in, then use Bulk Import', 'success');
+  };
+
   const handleUpdateQty = (id: string, delta: number) => {
     const item = inventory.find(i => i.id === id);
     if (!item) return;
@@ -110,6 +180,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               )}
             </button>
             <button 
+              onClick={handleDownloadTemplate}
+              title="Download Template"
+              className="bg-white text-indigo-600 border border-indigo-100 w-9 h-9 flex items-center justify-center rounded-xl active:scale-95 shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            </button>
+            <button 
               onClick={() => setIsImporting(true)} 
               title="Bulk Import"
               className="bg-white text-indigo-600 border border-indigo-100 w-9 h-9 flex items-center justify-center rounded-xl active:scale-95 shadow-sm"
@@ -117,7 +194,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
             </button>
             <button 
-              onClick={() => { setEditingItem({} as any); setIsAdding(true); }} 
+              onClick={() => { setEditingItem({} as any); setAddVoiceMode(false); setIsAdding(true); }} 
               className="bg-indigo-600 text-white text-[10px] font-black uppercase px-3 py-2 rounded-xl active:scale-95 shadow-lg flex items-center space-x-1"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
@@ -210,7 +287,25 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       {isAdding && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="bg-white w-full max-w-lg rounded-[40px] p-6 space-y-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-black uppercase">Add to Stock</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-black uppercase">Add to Stock</h3>
+              <button
+                type="button"
+                onClick={() => setAddVoiceMode(v => !v)}
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 ${addVoiceMode ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:text-indigo-600'}`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 11a7 7 0 01-7 7m7-7a7 7 0 00-7-7m7 7v4M10 11a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h2a2 2 0 012 2v6zM10 11a2 2 0 00-2 2H6a2 2 0 00-2-2V5a2 2 0 012-2h2a2 2 0 012 2v6z"/></svg>
+                <span>{addVoiceMode ? 'Manual' : 'Voice'}</span>
+              </button>
+            </div>
+            {addVoiceMode ? (
+              <VoiceInventoryAdd
+                storageLocations={locations}
+                subLocations={subLocations}
+                autoStart={true}
+                onItemParsed={(item) => onAddToInventory(item)}
+              />
+            ) : (
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase">Item Name</label>
@@ -341,8 +436,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <textarea className="w-full bg-slate-50 rounded-xl px-4 py-3 font-bold h-20 resize-none" placeholder="Notes..." onChange={e => setEditingItem({ ...editingItem, notes: e.target.value } as any)} />
               </div>
             </div>
+            )}
             <div className="flex space-x-3">
-              <button onClick={() => { setIsAdding(false); setEditingItem(null); }} className="flex-1 bg-slate-100 text-slate-500 font-black py-4 rounded-2xl uppercase text-[10px]">Cancel</button>
+              <button onClick={() => { setIsAdding(false); setEditingItem(null); setAddVoiceMode(false); }} className="flex-1 bg-slate-100 text-slate-500 font-black py-4 rounded-2xl uppercase text-[10px]">Cancel</button>
+              {!addVoiceMode && (
               <button 
                 onClick={() => { 
                   if (editingItem?.itemName) {
@@ -361,6 +458,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               >
                 Add Item
               </button>
+              )}
             </div>
           </div>
         </div>

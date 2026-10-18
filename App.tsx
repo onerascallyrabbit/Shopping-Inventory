@@ -168,7 +168,7 @@ const App: React.FC = () => {
         </Suspense>
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} listCount={shoppingList.length} inventoryCount={inventory.length} />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} listCount={shoppingList.length} />
       <InstallPrompt />
       <NotificationHost />
       

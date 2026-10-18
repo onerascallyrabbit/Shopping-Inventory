@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
-  Product, ShoppingItem, InventoryItem, StorageLocation, 
+  Product, ShoppingItem, InventoryItem, InventoryImportRow, StorageLocation, 
   SubLocation, StoreLocation, Vehicle, Profile, Family, CustomCategory, CustomSubCategory, MealIdea, CellarItem, ConsumptionLog
 } from '../types';
 import { 
@@ -360,12 +360,36 @@ export const useAppData = () => {
     if (user) try { await syncInventoryItem(newItem); } catch (err) { loadAllData(); }
   }, [user]);
 
-  const importBulkInventory = useCallback(async (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => {
+  const importBulkInventory = useCallback(async (items: InventoryImportRow[]) => {
     const timestamp = new Date().toISOString();
-    const newItems = items.map(i => ({ ...i, id: crypto.randomUUID(), updatedAt: timestamp, userId: user?.id || '' })) as InventoryItem[];
-    setInventory(prev => [...prev, ...newItems]);
-    if (user) try { await bulkSyncInventory(newItems); } catch (err) { loadAllData(); throw err; }
-  }, [user]);
+    const toCreate: InventoryItem[] = [];
+    const toUpdate: Array<{ id: string; updates: Partial<InventoryItem> }> = [];
+    items.forEach(raw => {
+      if (raw.id && inventory.some(i => i.id === raw.id)) {
+        const { id, ...updates } = raw as any;
+        if (updates.productId === 'manual') delete updates.productId;
+        toUpdate.push({ id, updates });
+      } else {
+        const newId = raw.id || crypto.randomUUID();
+        toCreate.push({ ...(raw as any), id: newId, updatedAt: timestamp, userId: user?.id || '' } as InventoryItem);
+      }
+    });
+    if (toUpdate.length) {
+      setInventory(prev => prev.map(item => {
+        const t = toUpdate.find(x => x.id === item.id);
+        if (!t) return item;
+        const updated = { ...item, ...t.updates, updatedAt: timestamp };
+        return updated;
+      }));
+      if (user) {
+        try { await Promise.all(toUpdate.map(t => patchInventoryItem(t.id, t.updates))); } catch (err) { loadAllData(); throw err; }
+      }
+    }
+    if (toCreate.length) {
+      setInventory(prev => [...prev, ...toCreate]);
+      if (user) try { await bulkSyncInventory(toCreate); } catch (err) { loadAllData(); throw err; }
+    }
+  }, [user, inventory]);
 
   const updateCellarQty = useCallback(async (id: string, delta: number) => {
     const target = cellarItems.find(i => i.id === id);

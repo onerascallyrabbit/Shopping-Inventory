@@ -10,3 +10,14 @@ export const confirmAction = (message: string): Promise<boolean> => {
     window.dispatchEvent(new CustomEvent('app-confirm', { detail: { message, resolve } }));
   });
 };
+
+export interface ChoiceOption {
+  label: string;
+  value: string;
+}
+
+export const chooseAction = (message: string, options: ChoiceOption[]): Promise<string | null> => {
+  return new Promise((resolve) => {
+    window.dispatchEvent(new CustomEvent('app-choice', { detail: { message, options, resolve } }));
+  });
+};

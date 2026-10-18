@@ -111,6 +111,10 @@ export interface InventoryItem {
   updatedAt: string;
 }
 
+export interface InventoryImportRow extends Omit<InventoryItem, 'id' | 'updatedAt'> {
+  id?: string;
+}
+
 export interface Vehicle {
   id: string;
   name: string;

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { InventoryItem, StorageLocation, SubLocation, CustomCategory } from '../types';
 import CsvImportModal from './CsvImportModal';
 import VoiceInventoryAdd from './VoiceInventoryAdd';
-import { showToast, confirmAction } from '../services/notifications';
+import { showToast, confirmAction, chooseAction } from '../services/notifications';
 import { UNITS, DEFAULT_CATEGORIES, CONTAINER_TYPES, stripLocationPrefix } from '../constants';
 
 interface InventoryViewProps {
@@ -70,9 +70,18 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const groupedInventory = useMemo(() => {
     const groups: Record<string, InventoryItem[]> = {};
     filteredInventory.forEach(item => {
-      let groupName = activeLocationId === 'All' ? (locations.find(l => l.id === item.locationId)?.name || 'Unknown') : (item.subLocation || 'Loose / General');
-      if (!groups[groupName]) groups[groupName] = [];
-      groups[groupName].push(item);
+      if (activeLocationId === 'All') {
+        const loc = locations.find(l => l.id === item.locationId);
+        const locName = loc ? loc.name : 'Unknown';
+        const subKey = item.subLocation || 'Loose / General';
+        const groupName = `${locName} / ${subKey}`;
+        if (!groups[groupName]) groups[groupName] = [];
+        groups[groupName].push(item);
+      } else {
+        const groupName = item.subLocation || 'Loose / General';
+        if (!groups[groupName]) groups[groupName] = [];
+        groups[groupName].push(item);
+      }
     });
     return groups;
   }, [filteredInventory, activeLocationId, locations]);
@@ -90,13 +99,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     });
   };
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
+    const options = [
+      { label: 'Blank template (new entries only)', value: 'blank' },
+      { label: 'Include current stock (updates existing by ID)', value: 'stock' }
+    ];
+    const choice = await chooseAction('Choose template type:', options);
+    if (!choice) return;
+    const includeStock = choice === 'stock';
     const cell = (v: any) => String(v ?? '').replace(/[",|\r\n]/g, ' ').trim();
     const cats = Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories.map(c => c.name)])).map(cell);
     const locNames = locations.map(l => cell(l.name)).filter(Boolean);
     const subNames = Array.from(new Set(subLocations.map(sl => cell(sl.name)))).filter(Boolean);
-
     const headers = [
+      'ID (optional - leave blank for new / fill to update existing)',
       'Item Name (REQUIRED)',
       'Quantity (optional: default 1)',
       `Unit (optional: ${UNITS.map(cell).join('|')})`,
@@ -117,44 +133,41 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       'Barcode (optional)',
       'Notes (optional)'
     ];
-
     const fmtDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const today = new Date();
     const example = new Date(today.getTime() + 14 * 86400000);
     const firstLoc = locations[0];
     const guideRow = [
-      '',
-      '2',
-      'pc',
-      'Dairy',
-      'Milk',
-      'Tillamook',
-      'Sharp',
-      'Aged',
-      'Extra Sharp',
-      'Wisconsin',
-      '12',
-      'oz',
-      'bags',
+      '', '', '2', 'pc', 'Dairy', 'Milk', 'Tillamook', 'Sharp', 'Aged', 'Extra Sharp', 'Wisconsin', '12', 'oz', 'bags',
       cell(firstLoc?.name || ''),
       cell(subLocations.find(sl => sl.locationId === firstLoc?.id)?.name || ''),
-      fmtDate(today),
-      fmtDate(example),
-      '',
-      'GUIDE ROW - keep Item Name blank so import skips it'
+      fmtDate(today), fmtDate(example), '', 'GUIDE ROW - keep Item Name blank so import skips it'
     ];
-
-    const csv = '\uFEFF' + headers.join(',') + '\n' + guideRow.join(',');
+    const lines: string[] = [headers.join(','), guideRow.join(',')];
+    if (includeStock) {
+      inventory.forEach(it => {
+        const locName = locations.find(l => l.id === it.locationId)?.name || '';
+        const row = [
+          cell(it.id), cell(it.itemName), String(it.quantity ?? 1), cell(it.unit ?? 'pc'), cell(it.category ?? ''),
+          cell(it.subCategory ?? ''), cell(it.brand ?? ''), cell(it.variety ?? ''), cell(it.style ?? ''), cell(it.grade ?? ''),
+          cell(it.origin ?? ''), it.unitSize != null ? String(it.unitSize) : '', cell(it.unitMeasure ?? ''), cell(it.container ?? ''),
+          cell(locName), cell(it.subLocation ?? ''), cell(it.purchaseDate ?? ''), cell(it.expirationDate ?? ''),
+          cell(it.barcode ?? ''), cell(it.notes ?? '')
+        ];
+        lines.push(row.map(v => (v.includes(',') ? `"${v.replace(/"/g, '""')}"` : v)).join(','));
+      });
+    }
+    const csv = '\uFEFF' + lines.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'stock-import-template.csv';
+    a.download = includeStock ? 'stock-current.csv' : 'stock-import-template.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Template downloaded - fill it in, then use Bulk Import', 'success');
+    showToast(includeStock ? 'Current stock exported - bulk edit and re-import' : 'Template downloaded - fill it in, then use Bulk Import', 'success');
   };
 
   const handleGroupDrop = (groupName: string) => {
@@ -162,10 +175,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     endDrag();
     if (!item) return;
     if (activeLocationId === 'All') {
-      const loc = locations.find(l => l.name === groupName);
-      if (!loc || loc.id === item.locationId) return;
-      onUpdateItem(item.id, { locationId: loc.id, subLocation: '' });
-      showToast(`${item.itemName} moved to ${loc.name}`, 'success');
+      const match = locations
+        .filter(l => groupName === l.name || groupName.startsWith(`${l.name} / `))
+        .sort((a, b) => b.name.length - a.name.length)[0];
+      if (!match) return;
+      const rest = groupName.slice(match.name.length).replace(/^ \/ /, '');
+      const sub = !rest || rest === 'Loose / General' ? '' : rest;
+      if (match.id === item.locationId && (item.subLocation || '') === sub) return;
+      onUpdateItem(item.id, { locationId: match.id, subLocation: sub });
+      showToast(`${item.itemName} moved to ${match.name}${sub ? ` / ${sub}` : ''}`, 'success');
     } else {
       const sub = groupName === 'Loose / General' ? '' : groupName;
       if ((item.subLocation || '') === sub) return;
@@ -412,10 +430,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             <button
               onClick={() => toggleGroup(shelfName)}
               aria-expanded={!collapsedGroups[shelfName]}
-              onDragOver={(e) => { if (!draggedItem) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOverGroup !== shelfName) setDragOverGroup(shelfName); }}
-              onDragLeave={(e) => { if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDragOverGroup(prev => prev === shelfName ? null : prev); }}
-              onDrop={(e) => { e.preventDefault(); handleGroupDrop(shelfName); }}
-              className={`w-full flex items-center justify-between px-2 py-1 -my-1 rounded-lg hover:bg-slate-50 transition-colors group ${dragOverGroup === shelfName ? 'bg-indigo-50 ring-2 ring-indigo-300' : ''} ${draggedItem ? 'cursor-copy' : ''}`}
+              {...dropTargetProps(`group:${shelfName}`, (e) => { e.preventDefault(); handleGroupDrop(shelfName); })}
+              className={`w-full flex items-center justify-between px-2 py-1 -my-1 rounded-lg hover:bg-slate-50 transition-colors group ${dragOverGroup === `group:${shelfName}` ? 'bg-indigo-50 ring-2 ring-indigo-300' : ''} ${draggedItem ? 'cursor-copy' : ''}`}
             >
               <div className="flex items-center space-x-2 min-w-0">
                 <svg className={`w-3.5 h-3.5 text-slate-300 transition-transform ${collapsedGroups[shelfName] ? '-rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

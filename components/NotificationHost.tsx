@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ToastKind } from '../services/notifications';
+import { ToastKind, ChoiceOption } from '../services/notifications';
 
 interface ToastItem {
   id: number;
@@ -12,6 +12,12 @@ interface ConfirmState {
   resolve: (result: boolean) => void;
 }
 
+interface ChoiceState {
+  message: string;
+  options: ChoiceOption[];
+  resolve: (result: string | null) => void;
+}
+
 const toastStyles: Record<ToastKind, string> = {
   success: 'bg-emerald-600 text-white',
   error: 'bg-red-500 text-white',
@@ -21,6 +27,7 @@ const toastStyles: Record<ToastKind, string> = {
 const NotificationHost: React.FC = () => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [choiceState, setChoiceState] = useState<ChoiceState | null>(null);
 
   useEffect(() => {
     let nextId = 0;
@@ -39,17 +46,29 @@ const NotificationHost: React.FC = () => {
       setConfirmState({ message, resolve });
     };
 
+    const onChoice = (e: Event) => {
+      const { message, options, resolve } = (e as CustomEvent).detail;
+      setChoiceState({ message, options, resolve });
+    };
+
     window.addEventListener('app-toast', onToast);
     window.addEventListener('app-confirm', onConfirm);
+    window.addEventListener('app-choice', onChoice);
     return () => {
       window.removeEventListener('app-toast', onToast);
       window.removeEventListener('app-confirm', onConfirm);
+      window.removeEventListener('app-choice', onChoice);
     };
   }, []);
 
   const closeConfirm = (result: boolean) => {
     confirmState?.resolve(result);
     setConfirmState(null);
+  };
+
+  const closeChoice = (result: string | null) => {
+    choiceState?.resolve(result);
+    setChoiceState(null);
   };
 
   return (
@@ -65,6 +84,35 @@ const NotificationHost: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {choiceState && (
+        <div
+          className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in"
+          role="alertdialog"
+          aria-modal="true"
+        >
+          <div className="bg-white w-full max-w-xs rounded-[28px] shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-200">
+            <p className="text-sm font-black text-slate-800 leading-relaxed text-center">{choiceState.message}</p>
+            <div className="space-y-3">
+              {choiceState.options.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => closeChoice(opt.value)}
+                  className="w-full py-3 bg-indigo-600 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+                >
+                  {opt.label}
+                </button>
+              ))}
+              <button
+                onClick={() => closeChoice(null)}
+                className="w-full py-3 bg-slate-100 text-slate-500 font-black rounded-2xl text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmState && (
         <div

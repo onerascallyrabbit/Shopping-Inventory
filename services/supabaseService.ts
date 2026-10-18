@@ -676,6 +676,13 @@ export const patchInventoryItem = async (id: string, updates: Partial<InventoryI
   if (updates.subCategory !== undefined) payload.sub_category = updates.subCategory;
   if (updates.variety !== undefined) payload.variety = updates.variety;
   if (updates.brand !== undefined) payload.brand = updates.brand;
+  if (updates.style !== undefined) payload.style = updates.style;
+  if (updates.grade !== undefined) payload.grade = updates.grade;
+  if (updates.origin !== undefined) payload.origin = updates.origin;
+  if (updates.unitSize !== undefined) payload.unit_size = updates.unitSize;
+  if (updates.unitMeasure !== undefined) payload.unit_measure = updates.unitMeasure;
+  if (updates.container !== undefined) payload.container = updates.container;
+  if (updates.productId !== undefined) payload.product_id = updates.productId;
   if (updates.subLocation !== undefined) payload.sub_location = updates.subLocation;
   if (updates.locationId !== undefined) payload.location_id = updates.locationId;
   if (updates.purchaseDate !== undefined) payload.purchase_date = updates.purchaseDate;

@@ -1,18 +1,18 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { InventoryItem, StorageLocation, SubLocation, CustomCategory } from '../types';
+import { InventoryItem, InventoryImportRow, StorageLocation, SubLocation, CustomCategory } from '../types';
 import { DEFAULT_CATEGORIES } from '../constants';
 import { showToast } from '../services/notifications';
 
 interface CsvImportModalProps {
   onClose: () => void;
-  onImport: (items: Omit<InventoryItem, 'id' | 'updatedAt'>[]) => Promise<void>;
+  onImport: (items: InventoryImportRow[]) => Promise<void>;
   locations: StorageLocation[];
   subLocations: SubLocation[];
   activeLocationId: string;
   customCategories: CustomCategory[];
 }
 
-type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'ignore';
+type MappingField = keyof Omit<InventoryItem, 'id' | 'updatedAt' | 'productId'> | 'ignore' | 'id';
 
 const CsvImportModal: React.FC<CsvImportModalProps> = ({ 
   onClose, onImport, locations, subLocations, activeLocationId,
@@ -28,7 +28,8 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
   
   const [targetLocationId, setTargetLocationId] = useState(activeLocationId || (locations[0]?.id || ''));
   const [targetSubLocation, setTargetSubLocation] = useState('');
-  const [reviewItems, setReviewItems] = useState<Omit<InventoryItem, 'id' | 'updatedAt'>[]>([]);
+  const [reviewItems, setReviewItems] = useState<InventoryImportRow[]>([]);
+
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,7 +58,8 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
     const initialMappings: Record<number, MappingField> = {};
     headers.forEach((header, index) => {
       const base = header.toLowerCase().replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
-      if (base.includes('sub') && base.includes('categ')) initialMappings[index] = 'subCategory';
+      if (base === 'id') initialMappings[index] = 'id';
+      else if (base.includes('sub') && base.includes('categ')) initialMappings[index] = 'subCategory';
       else if (base.includes('sub')) initialMappings[index] = 'subLocation';
       else if (base.includes('item') || base.includes('name')) initialMappings[index] = 'itemName';
       else if (base.includes('variety')) initialMappings[index] = 'variety';
@@ -95,35 +97,38 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
   const generateReviewItems = () => {
     const items = csvRows.map(row => {
-      const item: any = { 
-        productId: 'manual', 
-        locationId: targetLocationId,
-        subLocation: targetSubLocation 
-      };
-      let locationName = '';
-      let subFromCsv: string | undefined;
-      let hasSubColumn = false;
+        const item: any = {
+          productId: 'manual',
+          locationId: targetLocationId,
+          subLocation: targetSubLocation
+        };
+        let locationName = '';
+        let subFromCsv: string | undefined;
+        let hasSubColumn = false;
 
-      csvHeaders.forEach((_, idx) => {
-        const field = mappings[idx];
-        if (field && field !== 'ignore') {
-          const val = String(row[idx] ?? '').trim();
-          if (field === 'quantity' || field === 'unitSize') {
-            if (val !== '') item[field] = parseFloat(val) || 0;
-          } else if (field === 'category') {
-            item[field] = allAvailableCategories.find(
-              c => c.toLowerCase() === val.toLowerCase()
-            ) || "Other";
-          } else if (field === 'locationId') {
-            locationName = val;
-          } else if (field === 'subLocation') {
-            hasSubColumn = true;
-            subFromCsv = val;
-          } else if (val !== '') {
-            item[field] = val;
+        csvHeaders.forEach((_, idx) => {
+          const field = mappings[idx];
+          if (field && field !== 'ignore') {
+            const val = String(row[idx] ?? '').trim();
+            if (field === 'quantity' || field === 'unitSize') {
+              if (val !== '') item[field] = parseFloat(val) || 0;
+            } else if (field === 'category') {
+              item[field] = allAvailableCategories.find(
+                c => c.toLowerCase() === val.toLowerCase()
+              ) || "Other";
+            } else if (field === 'locationId') {
+              locationName = val;
+            } else if (field === 'subLocation') {
+              hasSubColumn = true;
+              subFromCsv = val;
+            } else if (field === 'id') {
+              if (val) item.id = val;
+            } else if (val !== '') {
+              item[field] = val;
+            }
           }
-        }
-      });
+        });
+
 
       if (locationName) {
         const match = locations.find(l => l.name.toLowerCase() === locationName.toLowerCase());
@@ -139,14 +144,14 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
       if (!item.unit) item.unit = 'pc';
       if (!item.quantity || item.quantity < 1) item.quantity = 1;
       
-      return item as Omit<InventoryItem, 'id' | 'updatedAt'>;
+      return item as InventoryImportRow;
     }).filter(item => item.itemName);
 
     setReviewItems(items);
     setStep('review');
   };
 
-  const updateReviewItem = (index: number, updates: Partial<Omit<InventoryItem, 'id' | 'updatedAt'>>) => {
+  const updateReviewItem = (index: number, updates: Partial<InventoryImportRow>) => {
     setReviewItems(prev => prev.map((item, idx) => idx === index ? { ...item, ...updates } : item));
   };
 
@@ -160,6 +165,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
     try { 
       await onImport(reviewItems); 
     } catch (err) { 
+      showToast('Import failed - your changes were not fully saved', 'error');
       setIsSyncing(false); 
     }
   };
@@ -260,6 +266,7 @@ const CsvImportModal: React.FC<CsvImportModalProps> = ({
                       onChange={e => setMappings({...mappings, [idx]: e.target.value as MappingField})}
                     >
                       <option value="ignore">Skip</option>
+                      <option value="id">ID (update existing)</option>
                       <option value="itemName">Item Name</option>
                       <option value="quantity">Quantity</option>
                       <option value="unit">Unit</option>

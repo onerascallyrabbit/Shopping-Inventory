@@ -44,6 +44,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [search, setSearch] = useState('');
   const [recentlyAddedToList, setRecentlyAddedToList] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [isCookCopied, setIsCookCopied] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   const toggleGroup = (name: string) => {
@@ -97,6 +98,22 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     });
+  };
+
+  const handleCopyForSupercook = () => {
+    const NON_FOOD_CATEGORIES = new Set(['Household', 'Personal Care', 'Pets']);
+    const lines = filteredInventory
+      .filter(item => !NON_FOOD_CATEGORIES.has(item.category))
+      .map(item => [item.variety, item.style, item.itemName].filter(Boolean).join(' ').trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(lines)).sort((a, b) => a.localeCompare(b));
+    if (unique.length === 0) return;
+
+    navigator.clipboard.writeText(unique.join('\n')).then(() => {
+      setIsCookCopied(true);
+      setTimeout(() => setIsCookCopied(false), 2000);
+      showToast(`${unique.length} ingredients copied - paste into Supercook`, 'success');
+    }).catch(() => showToast('Could not access clipboard', 'error'));
   };
 
   const handleDownloadTemplate = async () => {
@@ -310,6 +327,18 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
               ) : (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+              )}
+            </button>
+            <button 
+              onClick={handleCopyForSupercook}
+              disabled={filteredInventory.length === 0}
+              title="Copy ingredients for Supercook (one per line)"
+              className={`flex items-center justify-center w-9 h-9 rounded-xl transition-all border ${isCookCopied ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 active:scale-95 shadow-sm'} ${filteredInventory.length === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+            >
+              {isCookCopied ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 3v3m0 0V3m0 3h3a1 1 0 011 1v1a4 4 0 01-4 4h-2a4 4 0 01-4-4V7a1 1 0 011-1h2zM6 14h12a2 2 0 012 2v1a4 4 0 01-4 4H8a4 4 0 01-4-4v-1a2 2 0 012-2z" /></svg>
               )}
             </button>
             <button 
